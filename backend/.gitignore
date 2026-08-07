@@ -1,0 +1,57 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ---- Distribution / packaging ----
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+
+# ---- uv / virtual environments ----
+.venv/
+venv/
+env/
+# uv.lock should be committed for reproducible builds — do NOT ignore it
+
+# ---- Environment variables / secrets ----
+.env
+!.env.example
+
+# ---- Testing & coverage ----
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+
+# ---- Type checking / linting caches ----
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+
+# ---- Databases (local dev) ----
+*.db
+*.sqlite3
+
+# ---- Logs ----
+*.log
+
+# ---- IDE / editor ----
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Alembic (uncomment if you don't want to track migration history) ----
+# alembic/versions/
