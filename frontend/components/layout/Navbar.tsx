@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Sparkles } from "lucide-react";
+import { Menu, X, Sparkles, LayoutDashboard, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -18,6 +20,7 @@ const navLinks = [
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, role, logout } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -31,7 +34,9 @@ export function Navbar() {
     } else {
       document.body.style.overflow = "";
     }
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [mobileOpen]);
 
   return (
@@ -53,20 +58,24 @@ export function Navbar() {
           aria-label="Main navigation"
         >
           {/* Logo */}
-          <a
-            href="#hero"
+          <Link
+            href="/"
             className="flex items-center gap-2.5 group"
             aria-label="IncluLearn — Go to home"
           >
-            <div className="w-9 h-9 rounded-[var(--radius-sm)] flex items-center justify-center"
-                 style={{ background: "var(--gradient-brand)" }}>
+            <div
+              className="w-9 h-9 rounded-[var(--radius-sm)] flex items-center justify-center"
+              style={{ background: "var(--gradient-brand)" }}
+            >
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="font-[family-name:var(--font-display)] text-lg font-bold text-text-primary
-                           group-hover:text-brand transition-colors duration-200">
+            <span
+              className="font-[family-name:var(--font-display)] text-lg font-bold text-text-primary
+                           group-hover:text-brand transition-colors duration-200"
+            >
               IncluLearn
             </span>
-          </a>
+          </Link>
 
           {/* Desktop Nav Links */}
           <div className="hidden lg:flex items-center gap-1">
@@ -79,8 +88,10 @@ export function Navbar() {
                          hover:bg-surface-hover relative group"
               >
                 {link.label}
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 rounded-full
-                               bg-brand transition-all duration-300 group-hover:w-6" />
+                <span
+                  className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 rounded-full
+                               bg-brand transition-all duration-300 group-hover:w-6"
+                />
               </a>
             ))}
           </div>
@@ -88,12 +99,38 @@ export function Navbar() {
           {/* Desktop Right Actions */}
           <div className="hidden lg:flex items-center gap-3">
             <ThemeToggle />
-            <Button variant="ghost" size="sm">
-              Log in
-            </Button>
-            <Button variant="primary" size="sm">
-              Sign Up
-            </Button>
+
+            {user && role ? (
+              <>
+                <Link href="/dashboard">
+                  <Button variant="primary" size="sm">
+                    <LayoutDashboard className="w-4 h-4 mr-1.5" />
+                    Dashboard
+                  </Button>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={logout}
+                  className="text-text-secondary hover:text-rose-500"
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="ghost" size="sm">
+                    Log in
+                  </Button>
+                </Link>
+                <Link href="/register">
+                  <Button variant="primary" size="sm">
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -158,12 +195,46 @@ export function Navbar() {
               ))}
 
               <div className="mt-auto flex flex-col gap-3 pb-6">
-                <Button variant="outline" size="lg" className="w-full">
-                  Log in
-                </Button>
-                <Button variant="primary" size="lg" className="w-full">
-                  Sign Up
-                </Button>
+                {user && role ? (
+                  <>
+                    <Link
+                      href="/dashboard"
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <Button variant="primary" size="lg" className="w-full">
+                        <LayoutDashboard className="w-4 h-4 mr-2" />
+                        Dashboard
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="w-full"
+                      onClick={() => {
+                        logout();
+                        setMobileOpen(false);
+                      }}
+                    >
+                      Sign Out
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/login" onClick={() => setMobileOpen(false)}>
+                      <Button variant="outline" size="lg" className="w-full">
+                        Log in
+                      </Button>
+                    </Link>
+                    <Link
+                      href="/register"
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <Button variant="primary" size="lg" className="w-full">
+                        Sign Up
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </motion.div>
           </motion.div>

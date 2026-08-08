@@ -46,7 +46,43 @@ from sqlmodel import select
 from src.core.security import verify_password
 from fastapi import HTTPException
 
+from src.models.school import School
+from typing import Optional
+from pydantic import BaseModel
+
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+class SchoolSearchResult(BaseModel):
+    school_name: str
+    branch_name: str
+    state: str
+
+@router.get(
+    "/schools/search",
+    response_model=list[SchoolSearchResult],
+    summary="Search registered schools and branches for autocomplete suggestions",
+)
+async def search_registered_schools(
+    query: Optional[str] = None,
+    session: AsyncSession = Depends(get_session),
+):
+    stmt = select(School).where(School.branch_name != "SELF")
+    if query:
+        stmt = stmt.where(
+            (School.school_name.ilike(f"%{query}%")) |  # type: ignore[attr-defined]
+            (School.branch_name.ilike(f"%{query}%"))    # type: ignore[attr-defined]
+        )
+    stmt = stmt.limit(20)
+    result = await session.execute(stmt)
+    schools = result.scalars().all()
+    return [
+        SchoolSearchResult(
+            school_name=s.school_name,
+            branch_name=s.branch_name,
+            state=s.state,
+        )
+        for s in schools
+    ]
 
 
 # ── School ─────────────────────────────────────────────────────────────────────

@@ -12,6 +12,7 @@ class StudentProfile(BaseModel):
     state: str
     school_name: str
     branch_name: str
+    enrollment_type: str = "school"
     class_number: Optional[int]
     section: Optional[str]
     created_at: datetime
