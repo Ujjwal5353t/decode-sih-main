@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -37,7 +38,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html
       lang="en"
@@ -58,11 +63,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider>
-          {/* Skip to content link */}
-          <a href="#main-content" className="skip-link">
-            Skip to main content
-          </a>
-          {children}
+          <AuthProvider>
+            {/* Skip to content link */}
+            <a href="#main-content" className="skip-link">
+              Skip to main content
+            </a>
+            {children}
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

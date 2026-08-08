@@ -36,10 +36,22 @@ async def generate_student_unique_number(
     row = result.fetchone()
 
     if row is None:
-        raise ValueError(
-            f"No branch counter found for branch '{school.branch_name}'. "
-            "This should have been created during school registration."
+        # Auto-create counter row if missing (e.g. for SELF or newly added branches)
+        await session.execute(
+            text(
+                "INSERT INTO branch_counters (branch_name, last_counter) "
+                "VALUES (:branch, 0) ON CONFLICT (branch_name) DO NOTHING"
+            ),
+            {"branch": school.branch_name},
         )
+        result = await session.execute(
+            text(
+                "SELECT last_counter FROM branch_counters "
+                "WHERE branch_name = :branch FOR UPDATE"
+            ),
+            {"branch": school.branch_name},
+        )
+        row = result.fetchone()
 
     next_counter = row[0] + 1
     padded = str(next_counter).zfill(4)  # 0001 … 9999

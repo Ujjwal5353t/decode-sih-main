@@ -34,9 +34,12 @@ class Student(SQLModel, table=True):
     # FK to School.branch_name (not UUID) so queries are human-readable
     branch_name: str = Field(foreign_key="schools.branch_name", index=True, max_length=120)
 
+    # Enrollment mode: "self" (NCERT self-educated) or "school" (school branch enrolled)
+    enrollment_type: str = Field(default="school", max_length=20)
+
     # Set in the post-registration setup step (1–5)
     class_number: Optional[int] = Field(default=None)
-    # Set in the post-registration setup step (A/B/C/D)
-    section: Optional[str] = Field(default=None, max_length=1)
+    # Set in the post-registration setup step (A/B/C/D or SELF for self-enrolled)
+    section: Optional[str] = Field(default=None, max_length=10)
 
     created_at: datetime = Field(default_factory=_utcnow)

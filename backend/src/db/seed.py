@@ -185,7 +185,37 @@ async def seed_ncert_books(session: AsyncSession) -> None:
     print(f"[seed] {len(_NCERT_BOOKS)} NCERT books seeded.")
 
 
+from src.models.school import BranchCounter, School
+
+async def seed_self_school(session: AsyncSession) -> None:
+    result = await session.execute(
+        select(School).where(School.branch_name == "SELF")
+    )
+    if not result.scalar_one_or_none():
+        self_school = School(
+            school_name="NCERT Self-Educated",
+            branch_name="SELF",
+            student_prefix="SELF",
+            email="self@inclulearn.ai",
+            password_hash=hash_password("SelfEducated123!"),
+            state="All India",
+        )
+        session.add(self_school)
+
+    # Ensure BranchCounter for SELF exists
+    counter_res = await session.execute(
+        select(BranchCounter).where(BranchCounter.branch_name == "SELF")
+    )
+    if not counter_res.scalar_one_or_none():
+        counter = BranchCounter(branch_name="SELF", last_counter=0)
+        session.add(counter)
+
+    await session.commit()
+    print("[seed] Default 'SELF' school branch and counter created for self-enrolled students.")
+
+
 async def run_all_seeds(session: AsyncSession) -> None:
     """Entry point — called from main.py lifespan."""
     await seed_admin(session)
+    await seed_self_school(session)
     await seed_ncert_books(session)

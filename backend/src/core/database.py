@@ -13,6 +13,12 @@ engine = create_async_engine(
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
+    # Disable asyncpg prepared statement cache to avoid
+    # InvalidCachedStatementError after schema/column type changes.
+    connect_args={
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    },
 )
 
 # Async session factory
@@ -25,10 +31,20 @@ AsyncSessionFactory = sessionmaker(  # type: ignore[call-overload]
 )
 
 
+from sqlalchemy import text
+
 async def init_db() -> None:
-    """Create all tables on startup (idempotent)."""
+    """Create all tables on startup (idempotent) and apply missing column migrations."""
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+        # Migration: ensure enrollment_type column exists on students table
+        await conn.execute(
+            text("ALTER TABLE students ADD COLUMN IF NOT EXISTS enrollment_type VARCHAR(20) DEFAULT 'school';")
+        )
+        # Migration: expand section column to support 'SELF' for self-enrolled students
+        await conn.execute(
+            text("ALTER TABLE students ALTER COLUMN section TYPE VARCHAR(10);")
+        )
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
