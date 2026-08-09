@@ -1,119 +1,229 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
-import { Camera, BookOpen, TrendingUp } from "lucide-react";
+import {
+  UserPlus,
+  ClipboardCheck,
+  Sparkles,
+  GraduationCap,
+  BarChart3,
+  MessageSquare,
+} from "lucide-react";
 import { SectionWrapper } from "@/components/shared/SectionWrapper";
 
-const steps = [
+const timelineSteps = [
   {
-    icon: Camera,
-    number: "01",
-    title: "Snap",
-    description:
-      "Take a photo of any textbook, worksheet, or handwritten notes. Our AI instantly extracts and understands the content.",
-    accent: "var(--brand-primary)",
+    number: 1,
+    title: "Create Profile",
+    description: "Language, grade, device and accessibility needs in under two minutes.",
+    icon: UserPlus,
+    badgeBg: "bg-blue-500/10 border-blue-500/20 text-blue-600",
+    gradient: "var(--gradient-brand)",
   },
   {
-    icon: BookOpen,
-    number: "02",
-    title: "Learn",
-    description:
-      "AI generates personalized lessons adapted to the child's language, learning pace, and cognitive needs.",
-    accent: "var(--brand-accent)",
+    number: 2,
+    title: "Learning Assessment",
+    description: "A playful 8-minute diagnostic maps strengths, gaps and learning style.",
+    icon: ClipboardCheck,
+    badgeBg: "bg-cyan-500/10 border-cyan-500/20 text-cyan-600",
+    gradient: "var(--gradient-cyan)",
   },
   {
-    icon: TrendingUp,
-    number: "03",
-    title: "Grow",
-    description:
-      "Track progress with AI-driven insights. Parents receive voice updates. Teachers get actionable analytics.",
-    accent: "var(--brand-sky)",
+    number: 3,
+    title: "AI Builds the Journey",
+    description: "A personalized curriculum path is generated and cached for offline use.",
+    icon: Sparkles,
+    badgeBg: "bg-violet-500/10 border-violet-500/20 text-violet-600",
+    gradient: "var(--gradient-violet)",
+  },
+  {
+    number: 4,
+    title: "Student Learns",
+    description: "Adaptive lessons, narration and quizzes — with or without internet.",
+    icon: GraduationCap,
+    badgeBg: "bg-emerald-500/10 border-emerald-500/20 text-emerald-600",
+    gradient: "var(--gradient-emerald)",
+  },
+  {
+    number: 5,
+    title: "Teacher Insights",
+    description: "Classroom analytics and action cards land in the teacher copilot.",
+    icon: BarChart3,
+    badgeBg: "bg-amber-500/10 border-amber-500/20 text-amber-600",
+    gradient: "var(--gradient-amber)",
+  },
+  {
+    number: 6,
+    title: "Parent Updates",
+    description: "Weekly voice summaries, progress timeline, and gentle nudges — in home language.",
+    icon: MessageSquare,
+    badgeBg: "bg-rose-500/10 border-rose-500/20 text-rose-600",
+    gradient: "var(--gradient-rose)",
   },
 ];
 
 export function HowItWorks() {
-  const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isInView = useInView(containerRef, { once: true, margin: "-80px" });
+
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start 70%", "end 80%"],
+  });
+
+  const lineHeight = useTransform(scrollYProgress, [0, 1], ["0%", "100%"]);
 
   return (
-    <SectionWrapper id="how-it-works" className="py-32">
-      <div className="max-w-6xl mx-auto px-6" ref={ref}>
+    <SectionWrapper id="how-it-works" className="py-20 lg:py-26 overflow-hidden">
+      <div className="max-w-6xl mx-auto px-6" ref={containerRef}>
         {/* Section Header */}
-        <div className="text-center mb-20">
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={isInView ? { opacity: 1 } : {}}
-            className="text-brand text-sm font-semibold uppercase tracking-widest mb-4
-                     font-[family-name:var(--font-display)]"
+        <div className="text-center mb-14 max-w-3xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.5 }}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold
+                       tracking-wider uppercase font-[family-name:var(--font-display)] mb-4 border"
+            style={{
+              borderColor: "var(--border-brand)",
+              background: "color-mix(in srgb, var(--brand-primary) 6%, var(--bg-surface))",
+              color: "var(--brand-primary)",
+            }}
           >
-            How It Works
-          </motion.p>
+            <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+            HOW IT WORKS
+          </motion.div>
+
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.1 }}
+            transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 0.68, 0, 1] as const }}
             className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl
-                     font-bold tracking-tight"
+                     font-bold tracking-tight leading-[1.15]"
           >
-            Three steps to{" "}
-            <span className="gradient-text">better learning</span>
+            Six steps from first login to{" "}
+            <span className="gradient-text">a child who loves learning.</span>
           </motion.h2>
         </div>
 
-        {/* Steps */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-          {/* Connecting line */}
-          <div className="hidden md:block absolute top-16 left-[16.6%] right-[16.6%] h-px"
-               style={{ background: "var(--gradient-brand)" }}
-               aria-hidden="true" />
+        {/* Vertical Timeline Container */}
+        <div className="relative">
+          {/* Central Connecting Line (Background Track) */}
+          <div
+            className="absolute left-6 md:left-1/2 top-4 bottom-4 w-[2px] -translate-x-1/2 bg-border-primary"
+            aria-hidden="true"
+          />
 
-          {steps.map((step, i) => {
-            const Icon = step.icon;
-            return (
-              <motion.div
-                key={step.title}
-                initial={{ opacity: 0, y: 40 }}
-                animate={isInView ? { opacity: 1, y: 0 } : {}}
-                transition={{
-                  duration: 0.6,
-                  delay: 0.2 + i * 0.15,
-                  ease: [0.25, 0.4, 0, 1],
-                }}
-                className="relative flex flex-col items-center text-center group"
-              >
-                {/* Icon circle */}
-                <motion.div
-                  whileHover={{ scale: 1.1, rotate: 5 }}
-                  transition={{ type: "spring", stiffness: 300 }}
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6 relative
-                           shadow-[var(--shadow-md)] border border-border-primary"
-                  style={{ background: `color-mix(in srgb, ${step.accent} 15%, var(--bg-surface))` }}
+          {/* Animated Line Fill on Scroll */}
+          <motion.div
+            className="absolute left-6 md:left-1/2 top-4 w-[2px] -translate-x-1/2 origin-top rounded-full"
+            style={{
+              height: lineHeight,
+              background: "var(--gradient-brand)",
+              boxShadow: "0 0 12px rgba(37, 99, 235, 0.4)",
+            }}
+            aria-hidden="true"
+          />
+
+          {/* 6 Alternating Steps with Spaced Out Vertical Timeline */}
+          <div className="space-y-10 md:space-y-14 relative">
+            {timelineSteps.map((step, index) => {
+              const Icon = step.icon;
+              const isEven = index % 2 !== 0;
+
+              return (
+                <div
+                  key={step.number}
+                  className={`relative flex flex-col md:flex-row items-start md:items-center ${
+                    isEven ? "md:flex-row-reverse" : ""
+                  }`}
                 >
-                  <Icon
-                    className="w-7 h-7"
-                    style={{ color: step.accent }}
-                  />
-                  {/* Step number */}
-                  <span
-                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full text-[11px] font-bold
-                             text-white flex items-center justify-center font-[family-name:var(--font-display)]"
-                    style={{ background: step.accent }}
+                  {/* Card Content Side */}
+                  <div
+                    className={`w-full md:w-1/2 ${
+                      isEven
+                        ? "pl-16 md:pl-10 lg:pl-14 md:pr-0"
+                        : "pl-16 md:pr-10 lg:pr-14 md:pl-0"
+                    }`}
                   >
-                    {step.number}
-                  </span>
-                </motion.div>
+                    <motion.div
+                      initial={{
+                        opacity: 0,
+                        x: isEven ? 30 : -30,
+                        y: 16,
+                      }}
+                      whileInView={{ opacity: 1, x: 0, y: 0 }}
+                      viewport={{ once: true, margin: "-60px" }}
+                      transition={{
+                        duration: 0.5,
+                        delay: index * 0.08,
+                        ease: [0.22, 0.68, 0, 1] as const,
+                      }}
+                      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                      className="card-premium p-6 sm:p-7 rounded-[var(--radius-xl)] bg-surface border border-border-primary
+                                shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-card-hover)] hover:border-brand/40
+                                transition-all duration-300 relative group overflow-hidden text-left"
+                    >
+                      {/* Subtle hover gradient background */}
+                      <div
+                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                        style={{
+                          background:
+                            "radial-gradient(ellipse at top left, color-mix(in srgb, var(--brand-primary) 5%, transparent), transparent 70%)",
+                        }}
+                      />
 
-                {/* Content */}
-                <h3 className="text-xl font-bold mb-3 font-[family-name:var(--font-display)]">
-                  {step.title}
-                </h3>
-                <p className="text-text-secondary text-sm leading-relaxed max-w-xs">
-                  {step.description}
-                </p>
-              </motion.div>
-            );
-          })}
+                      {/* Header with Icon */}
+                      <div className="flex items-center justify-between mb-3 relative z-10">
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-xs transition-colors duration-300 ${step.badgeBg}`}
+                        >
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <span className="text-[11px] font-bold text-text-tertiary uppercase tracking-widest font-[family-name:var(--font-display)]">
+                          Step 0{step.number}
+                        </span>
+                      </div>
+
+                      {/* Title & Description */}
+                      <h3 className="text-lg font-bold mb-1.5 text-text-primary font-[family-name:var(--font-display)] relative z-10">
+                        {step.title}
+                      </h3>
+                      <p className="text-text-secondary text-xs sm:text-sm leading-relaxed relative z-10">
+                        {step.description}
+                      </p>
+                    </motion.div>
+                  </div>
+
+                  {/* Number Badge Node (Centered on central line) */}
+                  <div className="absolute left-6 md:left-1/2 -translate-x-1/2 top-6 md:top-1/2 md:-translate-y-1/2 z-20">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      whileInView={{ scale: 1 }}
+                      viewport={{ once: true }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 20,
+                        delay: index * 0.08,
+                      }}
+                      whileHover={{ scale: 1.15, transition: { duration: 0.15 } }}
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs
+                                font-[family-name:var(--font-display)] shadow-[var(--shadow-brand)]
+                                border-2 border-surface cursor-pointer"
+                      style={{ background: step.gradient }}
+                    >
+                      {step.number}
+                    </motion.div>
+                  </div>
+
+                  {/* Empty Spacer Side for desktop balance */}
+                  <div className="hidden md:block w-1/2" />
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </SectionWrapper>

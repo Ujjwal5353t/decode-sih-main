@@ -8,9 +8,11 @@ import { SECTION_LABELS, type SectionId } from "@/lib/utils";
 const DOT_SECTIONS: SectionId[] = [
   "hero",
   "why",
+  "how-it-works",
   "features",
   "snap-learn",
   "playground",
+  "faq",
   "cta",
 ];
 
@@ -36,7 +38,7 @@ export function DotNav() {
 
         return (
           <div key={id} className="relative flex items-center">
-            {/* Tooltip label — right-to-left reveal on hover */}
+            {/* Tooltip label */}
             <AnimatePresence>
               {isHovered && (
                 <motion.div
@@ -44,12 +46,11 @@ export function DotNav() {
                   animate={{ opacity: 1, x: 0, scale: 1 }}
                   exit={{ opacity: 0, x: 8, scale: 0.9 }}
                   transition={{ duration: 0.15, ease: "easeOut" }}
-                  className="absolute right-8 whitespace-nowrap"
+                  className="absolute right-8 whitespace-nowrap pointer-events-none"
                 >
                   <span
-                    className="px-3 py-1.5 rounded-[var(--radius-sm)] text-[11px] font-semibold
-                             tracking-wide uppercase bg-surface border border-border-primary
-                             text-text-secondary shadow-[var(--shadow-md)]
+                    className="px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-semibold
+                             tracking-wide uppercase glass-card text-text-secondary
                              font-[family-name:var(--font-display)]"
                   >
                     {SECTION_LABELS[id]}
@@ -69,13 +70,14 @@ export function DotNav() {
                 setTimeout(() => setHoveredId(null), 1000);
               }}
               className="relative flex items-center justify-center w-6 h-6 cursor-pointer
-                       group touch-manipulation"
+                       group touch-manipulation outline-none focus:outline-none focus-visible:outline-none
+                       border-none ring-0 focus:ring-0 focus-visible:ring-0 shadow-none rounded-full"
               aria-label={`Jump to ${SECTION_LABELS[id]}`}
               aria-current={isActive ? "true" : undefined}
             >
-              {/* Outer ring — visible on active */}
+              {/* Outer ring */}
               <motion.div
-                className="absolute rounded-full"
+                className="absolute rounded-full pointer-events-none"
                 animate={{
                   width: isActive ? 18 : 0,
                   height: isActive ? 18 : 0,
@@ -91,7 +93,7 @@ export function DotNav() {
 
               {/* Core dot */}
               <motion.div
-                className="rounded-full"
+                className="rounded-full pointer-events-none"
                 animate={{
                   width: isActive ? 7 : 5,
                   height: isActive ? 7 : 5,
@@ -100,6 +102,7 @@ export function DotNav() {
                     : isHovered
                     ? "var(--text-secondary)"
                     : "var(--text-tertiary)",
+                  boxShadow: isActive ? "0 0 8px rgba(37, 99, 235, 0.4)" : "none",
                 }}
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
               />

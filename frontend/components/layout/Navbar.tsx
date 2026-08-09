@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Sparkles, LayoutDashboard, LogOut } from "lucide-react";
-import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -44,9 +43,9 @@ export function Navbar() {
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.6, ease: [0.25, 0.4, 0, 1] }}
+        transition={{ duration: 0.6, ease: [0.22, 0.68, 0, 1] }}
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+          "fixed top-0 left-0 right-0 z-50 transition-all duration-400",
           scrolled
             ? "glass shadow-[var(--shadow-md)] border-b border-border-primary"
             : "bg-transparent"
@@ -63,12 +62,15 @@ export function Navbar() {
             className="flex items-center gap-2.5 group"
             aria-label="IncluLearn — Go to home"
           >
-            <div
-              className="w-9 h-9 rounded-[var(--radius-sm)] flex items-center justify-center"
+            <motion.div
+              whileHover={{ scale: 1.08, rotate: 5 }}
+              transition={{ type: "spring", stiffness: 400, damping: 15 }}
+              className="w-9 h-9 rounded-[var(--radius-md)] flex items-center justify-center
+                       shadow-[var(--shadow-brand)]"
               style={{ background: "var(--gradient-brand)" }}
             >
               <Sparkles className="w-5 h-5 text-white" />
-            </div>
+            </motion.div>
             <span
               className="font-[family-name:var(--font-display)] text-lg font-bold text-text-primary
                            group-hover:text-brand transition-colors duration-200"
@@ -84,7 +86,7 @@ export function Navbar() {
                 key={link.label}
                 href={link.href}
                 className="px-4 py-2 text-sm font-medium text-text-secondary
-                         hover:text-text-primary transition-colors duration-200 rounded-[var(--radius-sm)]
+                         hover:text-text-primary transition-colors duration-200 rounded-[var(--radius-md)]
                          hover:bg-surface-hover relative group"
               >
                 {link.label}
@@ -103,31 +105,47 @@ export function Navbar() {
             {user && role ? (
               <>
                 <Link href="/dashboard">
-                  <Button variant="primary" size="sm">
-                    <LayoutDashboard className="w-4 h-4 mr-1.5" />
+                  <motion.div
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold text-white rounded-[var(--radius-lg)]
+                             cursor-pointer shadow-[var(--shadow-brand)] font-[family-name:var(--font-display)]
+                             hover:shadow-[0_6px_24px_rgba(37,99,235,0.3)] transition-shadow duration-300"
+                    style={{ background: "var(--gradient-brand)" }}
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
                     Dashboard
-                  </Button>
+                  </motion.div>
                 </Link>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={logout}
-                  className="text-text-secondary hover:text-rose-500"
+                  className="p-2.5 rounded-[var(--radius-lg)] text-text-secondary hover:text-rose-500
+                           hover:bg-surface-hover transition-colors duration-200 cursor-pointer"
+                  aria-label="Log out"
                 >
                   <LogOut className="w-4 h-4" />
-                </Button>
+                </button>
               </>
             ) : (
               <>
-                <Link href="/login">
-                  <Button variant="ghost" size="sm">
-                    Log in
-                  </Button>
+                <Link
+                  href="/login"
+                  className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary
+                           transition-colors duration-200 font-[family-name:var(--font-display)]"
+                >
+                  Log in
                 </Link>
                 <Link href="/register">
-                  <Button variant="primary" size="sm">
+                  <motion.div
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="px-5 py-2.5 text-sm font-semibold text-white rounded-[var(--radius-lg)]
+                             cursor-pointer shadow-[var(--shadow-brand)] font-[family-name:var(--font-display)]
+                             hover:shadow-[0_6px_24px_rgba(37,99,235,0.3)] transition-shadow duration-300"
+                    style={{ background: "var(--gradient-brand)" }}
+                  >
                     Sign Up
-                  </Button>
+                  </motion.div>
                 </Link>
               </>
             )}
@@ -200,38 +218,46 @@ export function Navbar() {
                     <Link
                       href="/dashboard"
                       onClick={() => setMobileOpen(false)}
+                      className="w-full px-6 py-3 text-center text-sm font-semibold text-white
+                               rounded-[var(--radius-lg)] shadow-[var(--shadow-brand)]
+                               font-[family-name:var(--font-display)] flex items-center justify-center gap-2"
+                      style={{ background: "var(--gradient-brand)" }}
                     >
-                      <Button variant="primary" size="lg" className="w-full">
-                        <LayoutDashboard className="w-4 h-4 mr-2" />
-                        Dashboard
-                      </Button>
+                      <LayoutDashboard className="w-4 h-4" />
+                      Dashboard
                     </Link>
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="w-full"
+                    <button
                       onClick={() => {
                         logout();
                         setMobileOpen(false);
                       }}
+                      className="w-full px-6 py-3 text-center text-sm font-medium text-text-secondary
+                               border border-border-primary rounded-[var(--radius-lg)]
+                               hover:border-rose-500 hover:text-rose-500 transition-colors duration-200 cursor-pointer"
                     >
                       Sign Out
-                    </Button>
+                    </button>
                   </>
                 ) : (
                   <>
-                    <Link href="/login" onClick={() => setMobileOpen(false)}>
-                      <Button variant="outline" size="lg" className="w-full">
-                        Log in
-                      </Button>
+                    <Link
+                      href="/login"
+                      onClick={() => setMobileOpen(false)}
+                      className="w-full px-6 py-3 text-center text-sm font-medium text-text-secondary
+                               border border-border-primary rounded-[var(--radius-lg)]
+                               hover:border-[var(--border-brand)] transition-colors duration-200 font-[family-name:var(--font-display)]"
+                    >
+                      Log in
                     </Link>
                     <Link
                       href="/register"
                       onClick={() => setMobileOpen(false)}
+                      className="w-full px-6 py-3 text-center text-sm font-semibold text-white
+                               rounded-[var(--radius-lg)] shadow-[var(--shadow-brand)]
+                               font-[family-name:var(--font-display)] flex items-center justify-center"
+                      style={{ background: "var(--gradient-brand)" }}
                     >
-                      <Button variant="primary" size="lg" className="w-full">
-                        Sign Up
-                      </Button>
+                      Sign Up
                     </Link>
                   </>
                 )}

@@ -80,7 +80,7 @@ export function Playground() {
   const sampleText = languages.find((l) => l.code === selectedLang)?.sample || languages[0].sample;
 
   return (
-    <SectionWrapper id="playground" className="py-32 overflow-hidden">
+    <SectionWrapper id="playground" className="py-20 lg:py-26 overflow-hidden">
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <GradientBlob color="brand" size="lg" className="bottom-0 right-0 opacity-10" />
         <GradientBlob color="sky" size="md" className="top-[20%] left-0 opacity-10" />
@@ -88,7 +88,7 @@ export function Playground() {
 
       <div className="max-w-5xl mx-auto px-6" ref={ref}>
         {/* Section Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-14">
           <motion.p
             initial={{ opacity: 0 }}
             animate={isInView ? { opacity: 1 } : {}}
