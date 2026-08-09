@@ -4,7 +4,6 @@ import { motion, useInView, AnimatePresence } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 import { Camera, FileText, BookOpen, CheckCircle } from "lucide-react";
 import { SectionWrapper } from "@/components/shared/SectionWrapper";
-import { GradientBlob } from "@/components/shared/GradientBlob";
 
 const steps = [
   {
@@ -62,23 +61,19 @@ export function SnapAndLearn() {
     if (!isInView) return;
     const interval = setInterval(() => {
       setActiveStep((prev) => (prev + 1) % steps.length);
-    }, 3000);
+    }, 3500);
     return () => clearInterval(interval);
   }, [isInView]);
 
   return (
-    <SectionWrapper id="snap-learn" className="py-32 overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-        <GradientBlob color="accent" size="lg" className="top-[20%] left-0 opacity-15" />
-      </div>
-
+    <SectionWrapper id="snap-learn" className="py-20 lg:py-26 overflow-hidden">
       <div className="max-w-6xl mx-auto px-6" ref={ref}>
         {/* Section Header */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-14">
           <motion.p
             initial={{ opacity: 0 }}
             animate={isInView ? { opacity: 1 } : {}}
-            className="text-brand text-sm font-semibold uppercase tracking-widest mb-4
+            className="text-brand text-sm font-semibold uppercase tracking-[0.2em] mb-4
                      font-[family-name:var(--font-display)]"
           >
             Snap & Learn
@@ -86,7 +81,7 @@ export function SnapAndLearn() {
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.1 }}
+            transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 0.68, 0, 1] }}
             className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl
                      font-bold tracking-tight"
           >
@@ -94,10 +89,10 @@ export function SnapAndLearn() {
             <span className="gradient-text">interactive lesson</span>
           </motion.h2>
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="mt-4 text-text-secondary text-lg max-w-2xl mx-auto"
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="mt-4 text-text-secondary text-base sm:text-lg max-w-2xl mx-auto"
           >
             Just point your camera. AI does the rest.
           </motion.p>
@@ -110,7 +105,7 @@ export function SnapAndLearn() {
             initial={{ opacity: 0, x: -30 }}
             animate={isInView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="space-y-4"
+            className="space-y-3"
           >
             {steps.map((step, i) => {
               const Icon = step.icon;
@@ -120,19 +115,28 @@ export function SnapAndLearn() {
                 <motion.button
                   key={step.title}
                   onClick={() => setActiveStep(i)}
-                  animate={{
-                    backgroundColor: isActive ? "var(--bg-surface-hover)" : "transparent",
-                  }}
-                  className={`w-full flex items-start gap-4 p-5 rounded-[var(--radius-lg)] text-left
-                            transition-all duration-300 cursor-pointer border
-                            ${isActive ? "border-border-brand shadow-[var(--shadow-md)]" : "border-transparent hover:border-border-primary"}`}
+                  className={`w-full flex items-start gap-4 p-5 rounded-[var(--radius-xl)] text-left
+                            transition-all duration-300 cursor-pointer border relative overflow-hidden
+                            ${isActive
+                              ? "border-[var(--border-brand)] shadow-[var(--shadow-md)] bg-surface"
+                              : "border-transparent hover:border-border-primary bg-transparent"}`}
                 >
+                  {/* Active background glow */}
+                  {isActive && (
+                    <div
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        background: "radial-gradient(ellipse at left center, color-mix(in srgb, var(--brand-primary) 5%, transparent), transparent 70%)",
+                      }}
+                    />
+                  )}
+
                   <div
-                    className="w-10 h-10 rounded-[var(--radius-md)] flex items-center justify-center shrink-0
-                             transition-colors duration-300"
+                    className="w-10 h-10 rounded-[var(--radius-lg)] flex items-center justify-center shrink-0
+                              transition-all duration-300 relative z-10"
                     style={{
                       background: isActive
-                        ? "var(--brand-primary)"
+                        ? "var(--gradient-brand)"
                         : "var(--bg-muted)",
                     }}
                   >
@@ -143,7 +147,7 @@ export function SnapAndLearn() {
                       }}
                     />
                   </div>
-                  <div>
+                  <div className="relative z-10">
                     <h3 className={`font-bold font-[family-name:var(--font-display)] text-base
                                   ${isActive ? "text-text-primary" : "text-text-secondary"}`}>
                       {step.title}
@@ -156,10 +160,11 @@ export function SnapAndLearn() {
                   {/* Progress bar */}
                   {isActive && (
                     <motion.div
-                      className="absolute bottom-0 left-0 h-0.5 bg-brand rounded-full"
+                      className="absolute bottom-0 left-0 h-[2px] rounded-full"
+                      style={{ background: "var(--gradient-brand)" }}
                       initial={{ width: "0%" }}
                       animate={{ width: "100%" }}
-                      transition={{ duration: 3, ease: "linear" }}
+                      transition={{ duration: 3.5, ease: "linear" }}
                     />
                   )}
                 </motion.button>
@@ -198,11 +203,12 @@ export function SnapAndLearn() {
                     {steps[activeStep].content.map((line, j) => (
                       <motion.div
                         key={j}
-                        initial={{ opacity: 0, x: 10 }}
+                        initial={{ opacity: 0, x: 12 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: j * 0.1 }}
-                        className="flex items-center gap-3 p-3 rounded-[var(--radius-md)]
-                                 bg-muted/50 border border-border-secondary"
+                        className="flex items-center gap-3 p-3.5 rounded-[var(--radius-md)]
+                                 bg-muted/50 border border-border-secondary
+                                 hover:border-[var(--border-brand)] transition-colors duration-200"
                       >
                         <span className="text-sm text-text-primary font-mono">
                           {line}
@@ -214,9 +220,9 @@ export function SnapAndLearn() {
               </AnimatePresence>
             </div>
 
-            {/* Decorative elements */}
-            <div className="absolute -z-10 -top-4 -right-4 w-full h-full rounded-[var(--radius-xl)]
-                          border border-border-brand opacity-30"
+            {/* Decorative offset border */}
+            <div className="absolute -z-10 -top-3 -right-3 w-full h-full rounded-[var(--radius-xl)]
+                          border border-[var(--border-brand)] opacity-20"
                  aria-hidden="true" />
           </motion.div>
         </div>

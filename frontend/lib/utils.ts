@@ -14,6 +14,7 @@ export const SECTION_IDS = [
   "accessibility",
   "teacher-parent",
   "playground",
+  "faq",
   "cta",
 ] as const;
 
@@ -26,7 +27,8 @@ export const SECTION_LABELS: Record<SectionId, string> = {
   features: "Features",
   "snap-learn": "Snap & Learn",
   accessibility: "Accessibility",
-  "teacher-parent": "Teacher & Parent",
+  "teacher-parent": "Teacher AI",
   playground: "Playground",
+  faq: "FAQ",
   cta: "Get Started",
 };
