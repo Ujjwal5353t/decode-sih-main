@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator
 
 
@@ -36,11 +37,12 @@ class SchoolLoginRequest(BaseModel):
 # ── Student ────────────────────────────────────────────────────────────────────
 
 class StudentRegisterRequest(BaseModel):
-    school_name: str
-    branch_name: str          # must exist in schools table
+    enrollment_type: str = "school"  # "self" or "school"
+    school_name: str = "NCERT Self-Educated"
+    branch_name: str = "SELF"
     email: EmailStr
     password: str
-    state: str
+    state: str = "All India"
 
     @field_validator("password")
     @classmethod
@@ -51,7 +53,8 @@ class StudentRegisterRequest(BaseModel):
 
 
 class StudentLoginRequest(BaseModel):
-    branch_name: str
+    branch_name: Optional[str] = None
+    enrollment_type: Optional[str] = None   # "self" or "school" — used to validate login mode
     email: EmailStr
     password: str
 
@@ -71,8 +74,8 @@ class StudentClassSetupRequest(BaseModel):
     @classmethod
     def valid_section(cls, v: str) -> str:
         v = v.strip().upper()
-        if v not in ("A", "B", "C", "D"):
-            raise ValueError("Section must be A, B, C, or D.")
+        if v not in ("A", "B", "C", "D", "SELF"):
+            raise ValueError("Section must be A, B, C, D, or SELF (for self-enrolled).")
         return v
 
 
