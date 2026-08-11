@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from src.api.routes import admin, auth, ncert, parent, school, student
+from src.api.routes import admin, auth, contact, ncert, parent, school, student
 
 api_router = APIRouter()
 
@@ -11,3 +11,4 @@ api_router.include_router(student.router)
 api_router.include_router(parent.router)
 api_router.include_router(admin.router)
 api_router.include_router(ncert.router)
+api_router.include_router(contact.router)

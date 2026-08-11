@@ -9,11 +9,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
-  { label: "Product", href: "#how-it-works" },
-  { label: "Features", href: "#features" },
-  { label: "Playground", href: "#playground" },
-  { label: "About", href: "#why" },
-  { label: "Contact", href: "#cta" },
+  { label: "Product",    href: "#how-it-works" },
+  { label: "Features",  href: "#features" },
+  { label: "Playground", href: "#quiz-showcase" },
+  { label: "About",     href: "#why" },
+  { label: "Contact",   href: "#cta" },
 ];
 
 export function Navbar() {

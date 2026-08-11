@@ -331,3 +331,23 @@ export async function searchSchools(query?: string): Promise<SchoolSearchResult[
 export async function getNCERTBooksForClass(class_number: number): Promise<NCERTBookOut[]> {
   return fetchApi<NCERTBookOut[]>(`/ncert/books/class/${class_number}`);
 }
+
+export interface ContactInquiryResponse {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  created_at: string;
+  status_message: string;
+}
+
+export async function submitContactForm(data: {
+  name: string;
+  email: string;
+  message: string;
+}): Promise<ContactInquiryResponse> {
+  return fetchApi<ContactInquiryResponse>("/contact", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
