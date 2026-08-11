@@ -53,5 +53,9 @@ coverage.xml
 .DS_Store
 Thumbs.db
 
+# ---- ML / OCR Model Cache ----
+.easyocr_models/
+
+
 # ---- Alembic (uncomment if you don't want to track migration history) ----
 # alembic/versions/

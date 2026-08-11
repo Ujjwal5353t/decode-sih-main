@@ -77,7 +77,14 @@ async def upload_images_as_pdf(
     and upload the resulting PDF to Cloudinary.
 
     Returns:
-        {"url": str, "public_id": str}
+        {
+            "url": str,
+            "public_id": str,
+            "image_bytes_list": list[bytes]   ← original raw bytes, used by OCR
+        }
+
+    The raw bytes are the *original* uploaded bytes (before JPEG re-encoding),
+    so the OCR engine receives the highest-quality image possible.
     """
     import img2pdf
     from PIL import Image
@@ -88,7 +95,8 @@ async def upload_images_as_pdf(
             detail="At least one image file is required.",
         )
 
-    image_bytes_list: list[bytes] = []
+    raw_bytes_list: list[bytes] = []   # original bytes — for OCR
+    jpeg_bytes_list: list[bytes] = []  # re-encoded JPEG — for img2pdf
 
     for file in files:
         if file.content_type not in _ALLOWED_IMAGE_TYPES:
@@ -100,14 +108,17 @@ async def upload_images_as_pdf(
         raw = await file.read()
         _check_size(raw)
 
+        # Keep original bytes for OCR (highest quality)
+        raw_bytes_list.append(raw)
+
         # Ensure the image is valid and convert to RGB JPEG for img2pdf compatibility
         img = Image.open(io.BytesIO(raw)).convert("RGB")
         buf = io.BytesIO()
-        img.save(buf, format="JPEG")
-        image_bytes_list.append(buf.getvalue())
+        img.save(buf, format="JPEG", quality=95)
+        jpeg_bytes_list.append(buf.getvalue())
 
     # Merge all images into one PDF in memory
-    pdf_bytes = img2pdf.convert(image_bytes_list)
+    pdf_bytes = img2pdf.convert(jpeg_bytes_list)
 
     public_id = f"{folder}/{uuid.uuid4()}"
     result = cloudinary.uploader.upload(
@@ -116,7 +127,11 @@ async def upload_images_as_pdf(
         resource_type="raw",
         overwrite=False,
     )
-    return {"url": result["secure_url"], "public_id": result["public_id"]}
+    return {
+        "url": result["secure_url"],
+        "public_id": result["public_id"],
+        "image_bytes_list": raw_bytes_list,   # passed through to OCR pipeline
+    }
 
 
 def delete_cloudinary_asset(public_id: str) -> None:

@@ -45,6 +45,16 @@ async def init_db() -> None:
         await conn.execute(
             text("ALTER TABLE students ALTER COLUMN section TYPE VARCHAR(10);")
         )
+        # Migration: add OCR tracking columns to modules table
+        await conn.execute(
+            text("ALTER TABLE modules ADD COLUMN IF NOT EXISTS ocr_status VARCHAR(20) DEFAULT 'pending';")
+        )
+        await conn.execute(
+            text("ALTER TABLE modules ADD COLUMN IF NOT EXISTS ocr_pdf_url TEXT;")
+        )
+        await conn.execute(
+            text("ALTER TABLE modules ADD COLUMN IF NOT EXISTS ocr_pdf_public_id TEXT;")
+        )
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

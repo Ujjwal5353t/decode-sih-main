@@ -17,8 +17,12 @@ class ModuleOut(BaseModel):
     ncert_book_id: Optional[uuid.UUID]
     created_at: datetime
     updated_at: datetime
+    # OCR fields — only meaningful for image_upload modules
+    ocr_status: str
+    ocr_pdf_url: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
 
 
 class UpdateModuleTitleRequest(BaseModel):
