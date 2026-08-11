@@ -6,14 +6,13 @@ import { useActiveSection } from "@/hooks/useActiveSection";
 import { SECTION_LABELS, type SectionId } from "@/lib/utils";
 
 const DOT_SECTIONS: SectionId[] = [
-  "hero",
-  "why",
-  "how-it-works",
-  "features",
-  "snap-learn",
-  "playground",
-  "faq",
-  "cta",
+  "hero",           // Home
+  "why",            // Why It Matters
+  "how-it-works",   // How It Works
+  "quiz-showcase",  // Playground
+  "teacher-parent", // Dashboards
+  "faq",            // FAQs
+  "cta",            // Contact
 ];
 
 export function DotNav() {

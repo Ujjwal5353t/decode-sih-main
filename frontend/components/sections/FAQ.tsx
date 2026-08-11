@@ -7,39 +7,44 @@ import { SectionWrapper } from "@/components/shared/SectionWrapper";
 
 const faqData = [
   {
-    question: "Does it really work offline?",
+    question: "01 — What is Inclusive Education AI?",
     answer:
-      "Yes. Lessons, narration, quizzes and the OCR pipeline run on-device using a local WatermelonDB store. Progress queues locally and syncs automatically the moment connectivity returns — no lost work, no duplicate records.",
+      "Inclusive Education AI is an AI-powered learning platform built to make education accessible to every child—regardless of language, learning needs, or internet connectivity.\n\nIt combines adaptive learning, regional languages, offline-first education, assistive technology, life-skills learning, and AI-powered support for teachers and parents in one ecosystem.",
   },
   {
-    question: "Does it support dyslexia and other learning differences?",
+    question: "02 — What makes it different from a normal AI tutor?",
     answer:
-      "Yes. IncluLearn includes specialized fonts (such as OpenDyslexic), customizable line-spacing, high-contrast themes, ADHD focus modes, and screen-reader optimizations built directly into the core learning experience.",
+      "We don't just make AI explain a lesson—we make the learning experience adapt to the learner.\n\nUnlike a conventional AI tutor, Inclusive Education AI combines personalized learning + accessibility + regional languages + offline learning + assistive technology + teacher/parent collaboration.\n\nA child doesn't simply receive an answer. The platform learns from their progress and adapts what they learn, how they learn it, and how much support they receive.",
   },
   {
-    question: "How many languages are supported?",
+    question: "03 — How does AI personalize learning for my child?",
     answer:
-      "Over 50 regional languages are supported out of the box with natural voice narration, real-time textbook translation, and multi-lingual parent voice reports.",
+      "Every child learns differently.\n\nOur platform can use assessment results, learning progress, interactions, pace, and performance to build an individual learning profile. The system can then adapt the difficulty, pace, explanation style, content format, and activities to better match the child's needs.\n\nInstead of asking every child to fit the curriculum, we make the curriculum fit the child.",
   },
   {
-    question: "What does the teacher dashboard show?",
+    question: "04 — Can it work without the internet?",
     answer:
-      "Teachers see real-time concept mastery trends, automated weak-concept detection, at-risk student alerts, attendance correlations, and ready-to-project AI lesson recap decks.",
+      "Yes—that's one of our core principles.\n\nThe platform follows an offline-first approach, allowing essential learning experiences to continue even when internet connectivity is unavailable. Learning activity can be stored locally and synchronized when connectivity returns.\n\nThis makes the platform especially relevant for low-connectivity schools and communities where continuous internet access cannot be assumed.",
   },
   {
-    question: "How do parent reports work?",
+    question: "05 — How does it support children with different learning needs?",
     answer:
-      "Parents receive weekly 1-minute AI voice summaries delivered in their native spoken language directly via WhatsApp or SMS, breaking down progress without complicated dashboards.",
+      "Accessibility is built into the learning experience—not added as an afterthought.\n\nDepending on the learner's needs, the platform can provide features such as dyslexia-friendly reading modes, adjustable text and spacing, reduced cognitive load, high-contrast interfaces, captions, visual learning, sign-language support, and AAC-style communication.\n\nThe goal isn't to create a separate classroom for every child.\n\nIt's to create one learning environment that can adapt to different children.",
   },
   {
-    question: "Is it suitable for low-resource schools?",
+    question: "06 — What is Snap & Learn?",
     answer:
-      "Absolutely. The platform is optimized to run smoothly on affordable Android tablets and low-cost hardware, requiring zero constant internet connectivity.",
+      "Snap & Learn turns an ordinary textbook page into an interactive AI lesson.\n\nA child photographs a page, and AI can read the content, understand it, simplify the explanation, translate it into a preferred language, narrate it, and generate interactive questions.\n\nSo instead of needing a specially digitized textbook, a printed page can become an accessible, personalized learning experience.",
   },
   {
-    question: "What about pricing and school support?",
+    question: "07 — How do teachers and parents become part of the learning journey?",
     answer:
-      "IncluLearn is completely free for individual students. School and district plans offer bulk teacher co-pilot tools, custom curriculum mapping, and dedicated onboarding support.",
+      "Learning shouldn't stop at the student's screen.\n\nOur Teacher/Parent AI Co-Pilot turns learning progress into useful, human-friendly insights.\n\nTeachers can receive actionable recommendations about where a child may need additional support, while parents can receive simple updates—potentially through voice in their preferred language—so they understand what the child is learning and how they can help.\n\nAI connects the child, teacher, and parent instead of isolating learning to an app.",
+  },
+  {
+    question: "08 — Does Inclusive Education AI replace teachers?",
+    answer:
+      "No. It makes teachers more powerful.\n\nAI can handle repetitive tasks such as identifying learning patterns, adapting content, and summarizing progress. Teachers remain responsible for the human side of education—understanding the child, building confidence, mentoring, encouraging, and making important decisions.\n\nAI personalizes the learning. Humans personalize the care.",
   },
 ];
 
@@ -137,7 +142,7 @@ export function FAQ() {
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.35, ease: [0.22, 0.68, 0, 1] as const }}
                     >
-                      <div className="px-6 pb-7 sm:px-7 text-text-secondary text-sm sm:text-base leading-relaxed border-t border-border-secondary/60 pt-4">
+                      <div className="px-6 pb-7 sm:px-7 text-text-secondary text-sm sm:text-base leading-relaxed border-t border-border-secondary/60 pt-4 whitespace-pre-line">
                         {item.answer}
                       </div>
                     </motion.div>

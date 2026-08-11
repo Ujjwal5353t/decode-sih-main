@@ -218,6 +218,43 @@
   50% { transform: scale(1.03); opacity: 0.5; }
 }
 
+@keyframes light-orb-drift-a {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  25%       { transform: translate(40px, -50px) scale(1.08); }
+  50%       { transform: translate(-30px, 30px) scale(0.96); }
+  75%       { transform: translate(25px, 55px) scale(1.04); }
+}
+
+@keyframes light-orb-drift-b {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  30%       { transform: translate(-45px, 35px) scale(1.06); }
+  60%       { transform: translate(30px, -40px) scale(0.94); }
+  85%       { transform: translate(-20px, -25px) scale(1.03); }
+}
+
+@keyframes light-orb-drift-c {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  20%       { transform: translate(35px, 45px) scale(0.97); }
+  55%       { transform: translate(-50px, -30px) scale(1.05); }
+  80%       { transform: translate(20px, -15px) scale(1.02); }
+}
+
+@keyframes light-mesh-shift {
+  0%, 100% { opacity: 0.55; transform: scaleX(1); }
+  50%       { opacity: 0.75; transform: scaleX(1.05); }
+}
+
+@keyframes gradient-text-animated {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+
+@keyframes section-glow-in {
+  0%   { opacity: 0; transform: scale(0.85); }
+  60%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.1); }
+}
+
 /* ─── Global Styles ─── */
 * {
   box-sizing: border-box;
@@ -424,3 +461,189 @@ body {
 [data-theme="dark"] .noise-overlay::after {
   opacity: 0.025;
 }
+
+/* ─── Animated hero gradient text with light-sweep ─── */
+.gradient-text-hero {
+  background: linear-gradient(135deg, #2563EB 0%, #3B82F6 40%, #06B6D4 70%, #8B5CF6 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-text-animated 6s ease infinite;
+  position: relative;
+}
+
+[data-theme="dark"] .gradient-text-hero {
+  background: linear-gradient(135deg, #60A5FA 0%, #38BDF8 40%, #22D3EE 70%, #A78BFA 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-text-animated 6s ease infinite;
+}
+
+/* ─── Light-sweep shimmer overlay on hero gradient text ─── */
+@keyframes light-sweep {
+  0% { left: -60%; }
+  100% { left: 120%; }
+}
+
+.gradient-text-hero::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 40%,
+    rgba(255, 255, 255, 0.25) 50%,
+    rgba(255, 255, 255, 0.15) 60%,
+    transparent 100%
+  );
+  transform: skewX(-12deg);
+  animation: light-sweep 4s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+  animation-delay: 2s;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+[data-theme="dark"] .gradient-text-hero::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 40%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.08) 60%,
+    transparent 100%
+  );
+}
+
+/* ─── Light-theme ambient orb utility ─── */
+.light-ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.light-ambient-orb-a {
+  animation: light-orb-drift-a 28s ease-in-out infinite;
+}
+.light-ambient-orb-b {
+  animation: light-orb-drift-b 22s ease-in-out infinite;
+}
+.light-ambient-orb-c {
+  animation: light-orb-drift-c 32s ease-in-out infinite;
+}
+
+/* Suppress light-theme-only orbs in dark mode */
+[data-theme="dark"] .light-only {
+  display: none !important;
+}
+
+/* ─── Light-theme richer card shadows ─── */
+:root .card-premium:hover {
+  box-shadow:
+    0 16px 48px rgba(37, 99, 235, 0.14),
+    0 4px 16px rgba(37, 99, 235, 0.08),
+    0 0 0 1px rgba(37, 99, 235, 0.06);
+}
+
+/* ─── Light-theme section divider — wider glow ─── */
+:root .section-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(139, 92, 246, 0.2) 10%,
+    rgba(37, 99, 235, 0.35) 30%,
+    var(--brand-primary) 50%,
+    rgba(37, 99, 235, 0.35) 70%,
+    rgba(6, 182, 212, 0.2) 90%,
+    transparent
+  );
+  opacity: 0.45;
+  filter: blur(0.5px);
+}
+
+/* ─── Animated mesh gradient band (light-theme only) ─── */
+.light-mesh-band {
+  animation: light-mesh-shift 10s ease-in-out infinite;
+}
+
+/* ─── Premium hover depth for feature/content cards in light mode ─── */
+:root .hover-lift {
+  transition: transform 0.25s cubic-bezier(0.22, 0.68, 0, 1),
+              box-shadow 0.25s cubic-bezier(0.22, 0.68, 0, 1);
+}
+:root .hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 20px 60px rgba(37, 99, 235, 0.12),
+    0 6px 20px rgba(37, 99, 235, 0.07);
+}
+
+/* ─── Premium CTA button interaction ─── */
+.btn-premium {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s cubic-bezier(0.22, 0.68, 0, 1),
+              box-shadow 0.3s cubic-bezier(0.22, 0.68, 0, 1);
+}
+.btn-premium:hover {
+  transform: translateY(-2px);
+}
+.btn-premium::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.btn-premium:hover::after {
+  opacity: 1;
+}
+
+/* ─── Light-theme scroll reveal depth (subtle section glow on enter) ─── */
+.section-enter-glow::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.85);
+  width: 600px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse,
+    rgba(37, 99, 235, 0.06) 0%,
+    rgba(139, 92, 246, 0.03) 50%,
+    transparent 70%
+  );
+  pointer-events: none;
+  opacity: 0;
+  animation: section-glow-in 1.8s cubic-bezier(0.22, 0.68, 0, 1) forwards;
+  z-index: 0;
+}
+
+[data-theme="dark"] .section-enter-glow::before {
+  display: none;
+}
+
+/* ─── Smooth focus transitions for interactive elements ─── */
+button, a, [role="button"] {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 0.25s;
+  transition-timing-function: cubic-bezier(0.22, 0.68, 0, 1);
+}
+

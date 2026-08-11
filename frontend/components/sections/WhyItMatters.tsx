@@ -4,26 +4,28 @@ import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
 import { SectionWrapper } from "@/components/shared/SectionWrapper";
 import { AnimatedCounter } from "@/components/shared/AnimatedCounter";
-import { Users, BookX, Puzzle, Brain, Sparkles, HeartHandshake } from "lucide-react";
+import { Users, BookX, Languages, Brain, WifiOff, Sparkles, HeartHandshake } from "lucide-react";
 
 export function WhyItMatters() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const isInView = useInView(containerRef, { once: true, margin: "-80px" });
+  const isInView = useInView(containerRef, { once: true, margin: "-60px" });
 
   return (
     <SectionWrapper id="why" className="py-20 lg:py-26 overflow-hidden">
-      {/* Background ambient glows */}
+      {/* Background ambient glows (GPU Accelerated) */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <div
-          className="absolute top-1/2 left-0 w-[500px] h-[500px] -translate-y-1/2 rounded-full"
+          className="absolute top-1/2 left-0 w-[500px] h-[500px] -translate-y-1/2 rounded-full transform-gpu"
           style={{
             background: "radial-gradient(circle, color-mix(in srgb, var(--brand-primary) 6%, transparent), transparent 70%)",
+            willChange: "transform",
           }}
         />
         <div
-          className="absolute top-1/3 right-0 w-[400px] h-[400px] rounded-full"
+          className="absolute top-1/3 right-0 w-[400px] h-[400px] rounded-full transform-gpu"
           style={{
             background: "radial-gradient(circle, color-mix(in srgb, var(--brand-sky) 5%, transparent), transparent 70%)",
+            willChange: "transform",
           }}
         />
       </div>
@@ -34,9 +36,9 @@ export function WhyItMatters() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold
-                       tracking-wider uppercase font-[family-name:var(--font-display)] mb-3 border"
+                       tracking-wider uppercase font-[family-name:var(--font-display)] mb-3 border transform-gpu"
             style={{
               borderColor: "var(--border-brand)",
               background: "color-mix(in srgb, var(--brand-primary) 6%, var(--bg-surface))",
@@ -44,42 +46,41 @@ export function WhyItMatters() {
             }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-            WHY IT MATTERS
+            WHY IT MATTERS — INDIA EVIDENCE
           </motion.div>
 
           <motion.h2
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 0.68, 0, 1] as const }}
+            transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
             className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl
-                     font-bold tracking-tight leading-[1.15]"
+                     font-bold tracking-tight leading-[1.15] transform-gpu"
           >
             Education is a right,{" "}
             <span className="gradient-text">not a privilege.</span>
           </motion.h2>
 
           <motion.p
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 14 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="mt-3 text-text-secondary text-base sm:text-lg leading-relaxed max-w-2xl mx-auto"
+            transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
+            className="mt-3 text-text-secondary text-base sm:text-lg leading-relaxed max-w-2xl mx-auto transform-gpu"
           >
-            Millions of children are left behind by systems that weren&apos;t designed for them.
-            We&apos;re building the technology to change that.
+            India-specific evidence highlights the critical learning gaps that demand adaptive, multilingual, and offline-first AI education.
           </motion.p>
         </div>
 
         {/* ════ COMPOSITION: ASYMMETRIC AWWWARDS STATS LAYOUT ════ */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-stretch mb-8">
-          {/* ── LEFT FEATURED HERO CARD (260M Stat) ── */}
+          {/* ── LEFT FEATURED HERO CARD (12.09 Cr Stat) ── */}
           <motion.div
-            initial={{ opacity: 0, x: -20, y: 16 }}
-            animate={isInView ? { opacity: 1, x: 0, y: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.25, ease: [0.22, 0.68, 0, 1] as const }}
-            whileHover={{ y: -4, scale: 1.01, transition: { duration: 0.2 } }}
+            initial={{ opacity: 0, y: 16 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.5, delay: 0.25, ease: "easeOut" }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
             className="lg:col-span-6 rounded-[28px] bg-surface border border-border-primary
                        shadow-[var(--shadow-md)] hover:shadow-[var(--shadow-card-hover)] hover:border-[var(--border-brand)]
-                       p-7 sm:p-8 flex flex-col justify-between relative overflow-hidden group transition-all duration-300"
+                       p-7 sm:p-8 flex flex-col justify-between relative overflow-hidden group transition-all duration-300 transform-gpu"
           >
             {/* Ambient Background Gradient Mesh */}
             <div
@@ -100,153 +101,190 @@ export function WhyItMatters() {
                 <Users className="w-6 h-6 text-brand" />
               </div>
               <span className="px-3 py-1 rounded-full text-xs font-bold text-brand bg-brand/10 border border-brand/20 font-[family-name:var(--font-display)]">
-                Global Impact
+                India Education Data
               </span>
             </div>
 
-            {/* Hero Number Display with Orbital Ring Decoration */}
+            {/* Hero Number Display */}
             <div className="relative my-2 z-10">
               <div className="flex items-baseline gap-1">
                 <AnimatedCounter
-                  target={260}
-                  suffix="M"
+                  target={12.09}
+                  decimals={2}
+                  suffix=" Cr"
                   className="text-5xl sm:text-6xl lg:text-7xl font-black font-[family-name:var(--font-display)] gradient-text tracking-tight"
-                  duration={2.2}
+                  duration={2.0}
                 />
               </div>
 
               <h3 className="text-lg sm:text-xl font-extrabold text-text-primary font-[family-name:var(--font-display)] mt-3 mb-1.5">
-                Children out of school worldwide
+                Children in India&apos;s Foundational + Preparatory stages
               </h3>
               <p className="text-text-secondary text-xs sm:text-sm leading-relaxed max-w-md">
-                Left behind by traditional rigid educational systems that fail to accommodate language, location, or learning differences.
-              </p>
+               Too many learners still navigate one-size-fits-all education that cannot adapt to their language, location, pace, or individual learning needs.  </p>
             </div>
 
-            {/* Bottom Progress Arc Illustration */}
+            {/* Bottom Citation Line */}
             <div className="pt-4 mt-4 border-t border-border-secondary/70 relative z-10 flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-text-tertiary uppercase tracking-wider font-[family-name:var(--font-display)]">
                 <Sparkles className="w-3.5 h-3.5 text-brand" />
-                Targeting 100% Inclusion
+                According to UDISE+ 2023–24
               </div>
               <span className="text-xs font-bold text-brand font-[family-name:var(--font-display)]">
-                UN SDG 4 Aligned
+                Target Population
               </span>
             </div>
           </motion.div>
 
-          {/* ── RIGHT STAGGERED STAT CARDS (40%, 93%, 15%) ── */}
-          <div className="lg:col-span-6 flex flex-col gap-4">
-            {/* Card 1: 40% Cannot read in native language */}
+          {/* ── RIGHT STAGGERED STAT CARDS (51.2%, 35%, 10.5 Lakh, 36.5%) ── */}
+          <div className="lg:col-span-6 flex flex-col gap-3.5">
+            {/* Card 1: 51.2% Learning Gap */}
             <motion.div
-              initial={{ opacity: 0, x: 20, y: 16 }}
-              animate={isInView ? { opacity: 1, x: 0, y: 0 } : {}}
-              transition={{ duration: 0.5, delay: 0.35, ease: [0.22, 0.68, 0, 1] as const }}
-              whileHover={{ y: -3, scale: 1.01, transition: { duration: 0.2 } }}
+              initial={{ opacity: 0, y: 16 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.4, delay: 0.3, ease: "easeOut" }}
+              whileHover={{ y: -3, transition: { duration: 0.2 } }}
               className="rounded-[24px] bg-surface border border-border-primary
                          shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-card-hover)] hover:border-[var(--border-brand)]
-                         p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative overflow-hidden group transition-all duration-300"
+                         p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative overflow-hidden group transition-all duration-300 transform-gpu"
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3.5">
                 <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border border-border-secondary group-hover:border-[var(--border-brand)] transition-colors"
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-border-secondary group-hover:border-[var(--border-brand)] transition-colors"
                   style={{ background: "color-mix(in srgb, var(--brand-sky) 10%, var(--bg-surface))" }}
                 >
                   <BookX className="w-5 h-5 text-sky" />
                 </div>
                 <div>
-                  <h4 className="text-sm sm:text-base font-bold text-text-primary font-[family-name:var(--font-display)]">
-                    Cannot read in their native language
+                  <h4 className="text-sm font-bold text-text-primary font-[family-name:var(--font-display)] leading-snug">
+                    Rural Class V children cannot read a Class II-level text
                   </h4>
-                  <p className="text-xs text-text-tertiary mt-0.5">
-                    Severe barriers caused by monolingual learning materials.
+                  <p className="text-[11px] text-text-tertiary mt-0.5">
+                    According to ASER 2024
                   </p>
                 </div>
               </div>
               <AnimatedCounter
-                target={40}
+                target={51.2}
+                decimals={1}
                 suffix="%"
-                className="text-3xl sm:text-4xl font-black font-[family-name:var(--font-display)] text-sky shrink-0"
+                className="text-2xl sm:text-3xl font-black font-[family-name:var(--font-display)] text-sky shrink-0"
                 duration={1.8}
               />
             </motion.div>
 
-            {/* Card 2: 93% Lack adaptive tools */}
+            {/* Card 2: 35% Language Barrier */}
             <motion.div
-              initial={{ opacity: 0, x: 20, y: 16 }}
-              animate={isInView ? { opacity: 1, x: 0, y: 0 } : {}}
-              transition={{ duration: 0.5, delay: 0.45, ease: [0.22, 0.68, 0, 1] as const }}
-              whileHover={{ y: -3, scale: 1.01, transition: { duration: 0.2 } }}
+              initial={{ opacity: 0, y: 16 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.4, delay: 0.35, ease: "easeOut" }}
+              whileHover={{ y: -3, transition: { duration: 0.2 } }}
               className="rounded-[24px] bg-surface border border-border-primary
                          shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-card-hover)] hover:border-[var(--border-brand)]
-                         p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative overflow-hidden group transition-all duration-300"
+                         p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative overflow-hidden group transition-all duration-300 transform-gpu"
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3.5">
                 <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border border-border-secondary group-hover:border-[var(--border-brand)] transition-colors"
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-border-secondary group-hover:border-[var(--border-brand)] transition-colors"
                   style={{ background: "color-mix(in srgb, var(--brand-primary) 10%, var(--bg-surface))" }}
                 >
-                  <Puzzle className="w-5 h-5 text-brand" />
+                  <Languages className="w-5 h-5 text-brand" />
                 </div>
                 <div>
-                  <h4 className="text-sm sm:text-base font-bold text-text-primary font-[family-name:var(--font-display)]">
-                    Lack access to adaptive learning tools
+                  <h4 className="text-sm font-bold text-text-primary font-[family-name:var(--font-display)] leading-snug">
+                    Students in India are not taught in the language they speak and understand best
                   </h4>
-                  <p className="text-xs text-text-tertiary mt-0.5">
-                    One-size-fits-all education leaves neurodivergent learners behind.
+                  <p className="text-[11px] text-text-tertiary mt-0.5">
+                    According to UNICEF India
                   </p>
                 </div>
               </div>
               <AnimatedCounter
-                target={93}
+                target={35}
                 suffix="%"
-                className="text-3xl sm:text-4xl font-black font-[family-name:var(--font-display)] text-brand shrink-0"
+                className="text-2xl sm:text-3xl font-black font-[family-name:var(--font-display)] text-brand shrink-0"
                 duration={1.8}
               />
             </motion.div>
 
-            {/* Card 3: 15% Dyslexia or ADHD */}
+            {/* Card 3: 10.5 Lakh Special Needs */}
             <motion.div
-              initial={{ opacity: 0, x: 20, y: 16 }}
-              animate={isInView ? { opacity: 1, x: 0, y: 0 } : {}}
-              transition={{ duration: 0.5, delay: 0.55, ease: [0.22, 0.68, 0, 1] as const }}
-              whileHover={{ y: -3, scale: 1.01, transition: { duration: 0.2 } }}
+              initial={{ opacity: 0, y: 16 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.4, delay: 0.4, ease: "easeOut" }}
+              whileHover={{ y: -3, transition: { duration: 0.2 } }}
               className="rounded-[24px] bg-surface border border-border-primary
                          shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-card-hover)] hover:border-[var(--border-brand)]
-                         p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative overflow-hidden group transition-all duration-300"
+                         p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative overflow-hidden group transition-all duration-300 transform-gpu"
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3.5">
                 <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border border-border-secondary group-hover:border-[var(--border-brand)] transition-colors"
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-border-secondary group-hover:border-[var(--border-brand)] transition-colors"
                   style={{ background: "color-mix(in srgb, var(--brand-violet) 10%, var(--bg-surface))" }}
                 >
                   <Brain className="w-5 h-5 text-violet-600" />
                 </div>
                 <div>
-                  <h4 className="text-sm sm:text-base font-bold text-text-primary font-[family-name:var(--font-display)]">
-                    Of learners have dyslexia or ADHD
+                  <h4 className="text-sm font-bold text-text-primary font-[family-name:var(--font-display)] leading-snug">
+                    Children with Special Needs in India&apos;s Foundational + Preparatory stages
                   </h4>
-                  <p className="text-xs text-text-tertiary mt-0.5">
-                    Require specialized font weighting, focus tools, and pace adjustments.
+                  <p className="text-[11px] text-text-tertiary mt-0.5">
+                    According to UDISE+ 2023–24
                   </p>
                 </div>
               </div>
               <AnimatedCounter
-                target={15}
+                target={10.5}
+                decimals={1}
+                suffix=" Lakh"
+                className="text-2xl sm:text-3xl font-black font-[family-name:var(--font-display)] text-violet-600 shrink-0"
+                duration={1.8}
+              />
+            </motion.div>
+
+            {/* Card 4: 36.5% Offline-First / Internet Access */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.4, delay: 0.45, ease: "easeOut" }}
+              whileHover={{ y: -3, transition: { duration: 0.2 } }}
+              className="rounded-[24px] bg-surface border border-border-primary
+                         shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-card-hover)] hover:border-[var(--border-brand)]
+                         p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative overflow-hidden group transition-all duration-300 transform-gpu"
+            >
+              <div className="flex items-center gap-3.5">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-border-secondary group-hover:border-[var(--border-brand)] transition-colors"
+                  style={{ background: "color-mix(in srgb, var(--brand-primary) 10%, var(--bg-surface))" }}
+                >
+                  <WifiOff className="w-5 h-5 text-brand" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-text-primary font-[family-name:var(--font-display)] leading-snug">
+                    Schools in India still lack internet access
+                  </h4>
+                  <p className="text-[11px] text-text-tertiary mt-0.5">
+                    According to UDISE+ 2024–25
+                  </p>
+                </div>
+              </div>
+              <AnimatedCounter
+                target={36.5}
+                decimals={1}
                 suffix="%"
-                className="text-3xl sm:text-4xl font-black font-[family-name:var(--font-display)] text-violet-600 shrink-0"
+                className="text-2xl sm:text-3xl font-black font-[family-name:var(--font-display)] text-brand shrink-0"
                 duration={1.8}
               />
             </motion.div>
           </div>
         </div>
 
-        {/* ════ ELEGANT MISSION STATEMENT CARD ════ */}
+        {/* ════ ELEGANT FULL-WIDTH CORE MISSION CARD (RESTORED TO ORIGINAL APPROVED STYLE) ════ */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.5, delay: 0.6 }}
-          className="gradient-border rounded-[24px] p-6 sm:p-8 bg-surface shadow-[var(--shadow-md)] text-center relative overflow-hidden"
+          transition={{ duration: 0.4, delay: 0.5, ease: "easeOut" }}
+          className="gradient-border rounded-[24px] p-6 sm:p-8 bg-surface shadow-[var(--shadow-md)] text-center relative overflow-hidden transform-gpu"
         >
           <div className="max-w-3xl mx-auto flex flex-col items-center">
             <div

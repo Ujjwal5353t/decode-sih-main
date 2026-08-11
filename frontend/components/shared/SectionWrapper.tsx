@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,7 @@ export function SectionWrapper({
 }: SectionWrapperProps) {
   const ref = useRef<HTMLElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-80px" });
+  const [glowFired, setGlowFired] = useState(false);
 
   if (noAnimation) {
     return (
@@ -39,7 +40,17 @@ export function SectionWrapper({
           : { opacity: 0, y: 50, filter: "blur(6px)" }
       }
       transition={{ duration: 0.8, ease: [0.22, 0.68, 0, 1] }}
-      className={cn("relative", className)}
+      onAnimationComplete={() => {
+        if (isInView && !glowFired) setGlowFired(true);
+      }}
+      className={cn(
+        "relative",
+        // section-enter-glow adds a CSS ::before pseudo-element that animates in
+        // and fades out — providing a soft ambient spotlight in light mode only.
+        // In dark mode, the ::before is suppressed via [data-theme="dark"] CSS rule.
+        glowFired && "section-enter-glow",
+        className
+      )}
     >
       {children}
     </motion.section>
