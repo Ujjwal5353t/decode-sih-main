@@ -10,7 +10,8 @@ import {
   ArrowUpRight,
   TrendingUp,
   Sparkles,
-} from "lucide-react";
+}
+ from "lucide-react";
 import { SectionWrapper } from "@/components/shared/SectionWrapper";
 
 const insightCards = [

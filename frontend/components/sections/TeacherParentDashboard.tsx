@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 type DashboardRole = "teacher" | "parent" | "student";
 
 const ROLES: { id: DashboardRole; label: string; icon: React.ElementType; badge: string }[] = [
-  { id: "teacher", label: "Teacher View", icon: GraduationCap, badge: "Ms. Ananya · Grade 6 Science" },
+  { id: "teacher", label: "Teacher View", icon: GraduationCap, badge: "Ms. Ananya · Grade 5 Science" },
   { id: "parent", label: "Parent View", icon: Heart, badge: "Mr. Sharma · Parent of Rohan" },
   { id: "student", label: "Student View", icon: Users, badge: "Rohan S. · Level 4 Learner" },
 ];

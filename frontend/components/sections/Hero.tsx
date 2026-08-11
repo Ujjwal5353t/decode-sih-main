@@ -7,7 +7,7 @@ import Image from "next/image";
 
 const trustBadges = [
   { icon: WifiOff, label: "Offline First" },
-  { icon: Globe, label: "20+ Languages" },
+  { icon: Globe, label: "7+ Languages" },
   { icon: Shield, label: "WCAG Accessible" },
   { icon: GraduationCap, label: "Trusted by Schools" },
 ];
@@ -22,7 +22,7 @@ const floatingCards = [
   },
   {
     icon: Globe,
-    label: "25+ Languages",
+    label: "7+ Languages",
     sublabel: "Regional support",
     position: "bottom-[28%] -right-[8%]",
     delay: 0.9,
@@ -89,6 +89,54 @@ export function Hero() {
       y: 0,
       filter: "blur(0px)",
       transition: { duration: 0.6, ease: [0.22, 0.68, 0, 1] as const },
+    },
+  };
+
+  /* ── Headline Word-by-Word Staggered Entrance Variants ── */
+  const headlineWordContainerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.075,
+        delayChildren: 0.15,
+      },
+    },
+  };
+
+  const wordVariants = {
+    hidden: {
+      opacity: 0,
+      y: 18,
+      filter: "blur(8px)",
+    },
+    visible: {
+      opacity: 1,
+      y: 0,
+      filter: "blur(0px)",
+      transition: {
+        duration: 0.5,
+        ease: [0.22, 0.68, 0, 1] as const,
+      },
+    },
+  };
+
+  const highlightWordVariants = {
+    hidden: {
+      opacity: 0,
+      y: 22,
+      scale: 0.94,
+      filter: "blur(10px)",
+    },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      filter: "blur(0px)",
+      transition: {
+        duration: 0.6,
+        ease: [0.175, 0.885, 0.32, 1.1] as const,
+      },
     },
   };
 
@@ -175,9 +223,40 @@ export function Hero() {
               className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl lg:text-[3.5rem]
                          font-extrabold tracking-[-0.03em] leading-[1.12] mb-5"
             >
-              Learning Built Around{" "}
-              <span className="gradient-text-hero">Every Child</span>, Not the
-              Other Way Around.
+              <motion.span
+                variants={headlineWordContainerVariants}
+                initial="hidden"
+                animate={isInView ? "visible" : "hidden"}
+                className="inline-block"
+              >
+                <motion.span variants={wordVariants} className="inline-block">
+                  Learning
+                </motion.span>{" "}
+                <motion.span variants={wordVariants} className="inline-block">
+                  Built
+                </motion.span>{" "}
+                <motion.span variants={wordVariants} className="inline-block">
+                  Around
+                </motion.span>{" "}
+                <motion.span variants={highlightWordVariants} className="inline-block">
+                  <span className="gradient-text-hero">Every Child</span>,
+                </motion.span>{" "}
+                <motion.span variants={wordVariants} className="inline-block">
+                  Not
+                </motion.span>{" "}
+                <motion.span variants={wordVariants} className="inline-block">
+                  the
+                </motion.span>{" "}
+                <motion.span variants={wordVariants} className="inline-block">
+                  Other
+                </motion.span>{" "}
+                <motion.span variants={wordVariants} className="inline-block">
+                  Way
+                </motion.span>{" "}
+                <motion.span variants={wordVariants} className="inline-block">
+                  Around.
+                </motion.span>
+              </motion.span>
             </motion.h1>
 
             {/* Rotating sub-phrase */}
