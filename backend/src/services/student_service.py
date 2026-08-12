@@ -58,7 +58,10 @@ async def register_student(data: StudentRegisterRequest, session: AsyncSession) 
     # 3 — Atomically generate unique student number (SELECT FOR UPDATE on counter)
     unique_number = await generate_student_unique_number(session, school)
 
-    # 4 — Create Student
+    # 4 — Determine class/section (self-enrolled always gets section="SELF")
+    section = "SELF" if enrollment_type == "self" else data.section.strip().upper()
+
+    # 5 — Create Student
     student = Student(
         unique_number=unique_number,
         email=clean_email,
@@ -67,6 +70,8 @@ async def register_student(data: StudentRegisterRequest, session: AsyncSession) 
         school_name=target_school_name,
         branch_name=target_branch,
         enrollment_type=enrollment_type,
+        class_number=data.class_number,
+        section=section,
     )
     session.add(student)
 
