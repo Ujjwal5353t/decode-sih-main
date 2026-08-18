@@ -2,7 +2,8 @@
 
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
-import { Sparkles, ExternalLink, MessageCircle, Link2, Mail } from "lucide-react";
+import { ExternalLink, MessageCircle, Link2, Mail } from "lucide-react";
+import Image from "next/image";
 
 interface FooterLinkItem {
   label: string;
@@ -10,31 +11,22 @@ interface FooterLinkItem {
 }
 
 const footerLinks: Record<string, FooterLinkItem[]> = {
-  Product: [
+  PRODUCT: [
     { label: "Adaptive Learning", href: "#features" },
-    { label: "Personalized Quizzes", href: "#quiz-showcase" },
     { label: "Regional Languages", href: "#features" },
     { label: "Offline Learning", href: "#features" },
-    { label: "Accessibility & SLD", href: "#features" },
+    { label: "Accessibility", href: "#features" },
   ],
-  Resources: [
-    { label: "Interactive Playground", href: "#playground" },
-    { label: "Learning Intelligence", href: "#quiz-showcase" },
-    { label: "Teacher & Parent Portal", href: "#dashboards" },
-    { label: "India Evidence & Data", href: "#why" },
-    { label: "FAQs & Support", href: "#faq" },
-  ],
-  "Quick Links": [
-    { label: "Home", href: "#hero" },
+  EXPLORE: [
     { label: "Why It Matters", href: "#why" },
-    { label: "Core Features", href: "#features" },
-    { label: "AI Playground", href: "#playground" },
-    { label: "Dashboards", href: "#dashboards" },
+    { label: "Features", href: "#features" },
+    { label: "FAQs", href: "#faq" },
   ],
-  "Get In Touch": [
+  "QUICK LINKS": [
+    { label: "Home", href: "#hero" },
+    { label: "Playground", href: "#playground" },
+    { label: "Dashboards", href: "#dashboards" },
     { label: "Contact Us", href: "#contact" },
-    { label: "Start Learning Free", href: "#playground" },
-    { label: "Platform FAQs", href: "#faq" },
   ],
 };
 
@@ -189,23 +181,24 @@ export function Footer() {
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, ease: [0.22, 0.68, 0, 1] }}
-          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 mb-12"
+          className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12 items-start mb-12"
         >
           {/* Brand column */}
-          <div className="col-span-2 md:col-span-3 lg:col-span-1 mb-4 lg:mb-0">
-            <a href="#hero" className="flex items-center gap-2.5 mb-4">
-              <div
-                className="w-9 h-9 rounded-[var(--radius-md)] flex items-center justify-center
-                         shadow-[var(--shadow-brand)]"
-                style={{ background: "var(--gradient-brand)" }}
-              >
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-[family-name:var(--font-display)] text-lg font-bold text-text-primary">
-                IncluLearn
-              </span>
+          <div className="md:col-span-5 lg:col-span-5 mb-6 md:mb-0">
+            <a href="#hero" className="inline-block mb-4">
+              <Image
+                src="/vidyasetu-logo.png"
+                alt="VidyaSetu — LEARN • GROW • BELONG — AI for Inclusive Education"
+                width={500}
+                height={150}
+                className="h-24 sm:h-28 md:h-32 lg:h-36 w-auto object-contain"
+                priority
+              />
             </a>
-            <p className="text-sm text-text-secondary leading-relaxed max-w-xs">
+
+
+
+            <p className="text-sm text-text-secondary leading-relaxed max-w-sm">
               AI-powered, inclusive learning designed around every child — regardless of language, ability, or internet access.
             </p>
 
@@ -231,33 +224,37 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Link columns */}
-          {Object.entries(footerLinks).map(([category, links], i) => (
-            <motion.div
-              key={category}
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.5, delay: 0.1 + i * 0.05 }}
-            >
-              <h4 className="text-sm font-semibold text-text-primary mb-4 font-[family-name:var(--font-display)]">
-                {category}
-              </h4>
-              <ul className="space-y-2.5">
-                {links.map((item) => (
-                  <li key={item.label}>
-                    <a
-                      href={item.href}
-                      className="text-sm text-text-secondary hover:text-brand
-                                transition-colors duration-200"
-                    >
-                      {item.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          ))}
+          {/* Navigation Group (Product, Explore, Quick Links) shifted right with compact column gaps */}
+          <div className="md:col-span-7 lg:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-6 sm:gap-8 lg:gap-8 items-start md:pl-6 lg:pl-10">
+            {Object.entries(footerLinks).map(([category, links], i) => (
+              <motion.div
+                key={category}
+                initial={{ opacity: 0, y: 20 }}
+                animate={isInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.5, delay: 0.1 + i * 0.05 }}
+                className="col-span-1 flex flex-col items-start pt-1"
+              >
+                <h4 className="text-sm font-bold text-text-primary mb-4 font-[family-name:var(--font-display)] uppercase tracking-wider">
+                  {category}
+                </h4>
+                <ul className="space-y-3">
+                  {links.map((item) => (
+                    <li key={item.label}>
+                      <a
+                        href={item.href}
+                        className="text-sm text-text-secondary hover:text-brand
+                                  transition-colors duration-200 block"
+                      >
+                        {item.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            ))}
+          </div>
         </motion.div>
+
 
         {/* Bottom bar */}
         <motion.div
@@ -268,7 +265,7 @@ export function Footer() {
                     justify-between gap-4"
         >
           <p className="text-xs text-text-tertiary">
-            © {new Date().getFullYear()} IncluLearn • AI for Inclusive Education.
+            © {new Date().getFullYear()} VidyaSetu • AI for Inclusive Education.
           </p>
           <div className="flex items-center gap-6">
             <a href="#why" className="text-xs text-text-tertiary hover:text-brand transition-colors">
@@ -286,5 +283,6 @@ export function Footer() {
     </footer>
   );
 }
+
 
 

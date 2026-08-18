@@ -20,6 +20,8 @@ import {
   Eye,
   EyeOff,
   BookOpen,
+  Hash,
+  LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -73,6 +75,10 @@ export default function RegisterPage() {
   const [branchName, setBranchName] = useState("");
   const [stateName, setStateName] = useState("Delhi");
 
+  // Student class/section fields
+  const [classNumber, setClassNumber] = useState<number>(1);
+  const [section, setSection] = useState<string>("A");
+
   // School specific field
   const [studentPrefix, setStudentPrefix] = useState("");
 
@@ -110,6 +116,8 @@ export default function RegisterPage() {
             email: email.trim(),
             password,
             state: stateName.trim(),
+            class_number: classNumber,
+            section: section,
           });
         } else {
           // Self Enrolled Mode
@@ -118,6 +126,8 @@ export default function RegisterPage() {
             email: email.trim(),
             password,
             state: stateName.trim() || "All India",
+            class_number: classNumber,
+            section: "SELF",
           });
         }
       } else if (selectedRole === "school") {
@@ -184,9 +194,10 @@ export default function RegisterPage() {
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           <span className="font-[family-name:var(--font-display)] text-xl font-bold text-text-primary group-hover:text-brand transition-colors">
-            IncluLearn
+            VidyaSetu
           </span>
         </Link>
+
         <div className="flex items-center gap-4">
           <ThemeToggle />
           <Link href="/login">
@@ -405,6 +416,57 @@ export default function RegisterPage() {
                       required
                     />
                   </div>
+                </div>
+              )}
+
+              {/* Class & Section fields — student registration only */}
+              {selectedRole === "student" && (
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Class Number */}
+                  <div>
+                    <label className="block text-xs font-semibold text-text-secondary mb-1.5">
+                      Class
+                    </label>
+                    <div className="relative">
+                      <Hash className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                      <select
+                        value={classNumber}
+                        onChange={(e) => setClassNumber(Number(e.target.value))}
+                        className="w-full pl-10 pr-4 py-2.5 bg-surface text-text-primary text-sm rounded-[var(--radius-md)] border border-border-primary focus:border-brand focus:outline-none transition-colors appearance-none cursor-pointer"
+                        required
+                      >
+                        {Array.from({ length: 5 }, (_, i) => i + 1).map((cls) => (
+                          <option key={cls} value={cls}>
+                            Class {cls}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Section — only for school-enrolled */}
+                  {studentEnrollment === "school" && (
+                    <div>
+                      <label className="block text-xs font-semibold text-text-secondary mb-1.5">
+                        Section
+                      </label>
+                      <div className="relative">
+                        <LayoutGrid className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                        <select
+                          value={section}
+                          onChange={(e) => setSection(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 bg-surface text-text-primary text-sm rounded-[var(--radius-md)] border border-border-primary focus:border-brand focus:outline-none transition-colors appearance-none cursor-pointer"
+                          required
+                        >
+                          {["A", "B", "C", "D"].map((sec) => (
+                            <option key={sec} value={sec}>
+                              Section {sec}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -17,7 +17,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "IncluLearn — AI-Powered Inclusive Education Platform",
+  title: "VidyaSetu — AI-Powered Inclusive Education Platform",
   description:
     "Making quality education accessible to every child, regardless of language, internet availability, or learning differences. AI-powered adaptive learning with 50+ languages, offline support, and accessibility-first design.",
   keywords: [
@@ -31,12 +31,13 @@ export const metadata: Metadata = {
     "accessible education",
   ],
   openGraph: {
-    title: "IncluLearn — AI-Powered Inclusive Education",
+    title: "VidyaSetu — AI-Powered Inclusive Education",
     description:
       "Making quality education accessible to every child. AI-powered adaptive learning with 50+ languages and offline support.",
     type: "website",
   },
 };
+
 
 export default function RootLayout({
   children,

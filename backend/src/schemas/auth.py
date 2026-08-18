@@ -43,12 +43,29 @@ class StudentRegisterRequest(BaseModel):
     email: EmailStr
     password: str
     state: str = "All India"
+    class_number: int = 1          # 1–12
+    section: str = "SELF"          # A/B/C/D for school-enrolled; "SELF" for self-enrolled
 
     @field_validator("password")
     @classmethod
     def password_min_length(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters.")
+        return v
+
+    @field_validator("class_number")
+    @classmethod
+    def valid_class(cls, v: int) -> int:
+        if v not in range(1, 13):
+            raise ValueError("Class number must be between 1 and 12.")
+        return v
+
+    @field_validator("section")
+    @classmethod
+    def valid_section(cls, v: str) -> str:
+        v = v.strip().upper()
+        if v not in ("A", "B", "C", "D", "SELF"):
+            raise ValueError("Section must be A, B, C, D, or SELF (for self-enrolled).")
         return v
 
 
@@ -60,14 +77,15 @@ class StudentLoginRequest(BaseModel):
 
 
 class StudentClassSetupRequest(BaseModel):
+    """Kept for backward compatibility; prefer supplying class/section at registration."""
     class_number: int
     section: str              # A / B / C / D
 
     @field_validator("class_number")
     @classmethod
     def valid_class(cls, v: int) -> int:
-        if v not in range(1, 6):
-            raise ValueError("Class number must be between 1 and 5.")
+        if v not in range(1, 13):
+            raise ValueError("Class number must be between 1 and 12.")
         return v
 
     @field_validator("section")

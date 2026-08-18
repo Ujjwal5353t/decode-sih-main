@@ -188,8 +188,9 @@ export function TeacherParentDashboard() {
                   {ROLES.find((r) => r.id === activeRole)?.badge}
                 </h3>
                 <p className="text-xs text-text-tertiary">
-                  IncluLearn AI Connected Ecosystem · Real-Time Sync
+                  VidyaSetu AI Connected Ecosystem · Real-Time Sync
                 </p>
+
               </div>
             </div>
 

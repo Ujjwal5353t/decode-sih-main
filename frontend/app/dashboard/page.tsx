@@ -76,9 +76,10 @@ export default function DashboardPage() {
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <span className="font-[family-name:var(--font-display)] text-lg font-bold text-text-primary group-hover:text-brand transition-colors">
-              IncluLearn
+              VidyaSetu
             </span>
           </Link>
+
 
           <div className="flex items-center gap-4">
             {/* Role Badge */}
