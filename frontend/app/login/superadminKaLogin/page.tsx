@@ -142,7 +142,7 @@ export default function SuperAdminLoginPage() {
                   <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
                   <input
                     type="email"
-                    placeholder="admin@inclulearn.com"
+                    placeholder="admin@vidyasetu.ai"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 bg-surface text-text-primary text-sm rounded-[var(--radius-md)] border border-border-primary focus:border-brand focus:outline-none transition-colors"

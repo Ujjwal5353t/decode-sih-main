@@ -183,7 +183,6 @@ export function Footer() {
           transition={{ duration: 0.6, ease: [0.22, 0.68, 0, 1] }}
           className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12 items-start mb-12"
         >
-          {/* Brand column */}
           <div className="md:col-span-5 lg:col-span-5 mb-6 md:mb-0">
             <a href="#hero" className="inline-block mb-4">
               <Image

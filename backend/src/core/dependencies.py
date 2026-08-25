@@ -132,3 +132,57 @@ async def get_current_admin(
     if not admin:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin not found.")
     return admin
+
+
+# ── Teacher ────────────────────────────────────────────────────────────────────
+
+async def get_current_teacher(
+    response: Response,
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    session: AsyncSession = Depends(get_session),
+):
+    from src.models.teacher import Teacher
+
+    payload = _extract_payload(credentials)
+    _check_role(payload, "teacher")
+    _maybe_refresh(payload, response)
+
+    teacher_id = uuid.UUID(payload["sub"])
+    teacher = await session.get(Teacher, teacher_id)
+    if not teacher:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found.")
+    return teacher
+
+
+# ── School Admin or Superadmin Dual Dependency ──────────────────────────────────
+
+async def get_current_school_or_admin(
+    response: Response,
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    session: AsyncSession = Depends(get_session),
+):
+    from src.models.school import School
+    from src.models.admin import Admin
+
+    payload = _extract_payload(credentials)
+    role = payload.get("role")
+    if role not in ("school", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted to school branch admin or platform admin accounts.",
+        )
+    _maybe_refresh(payload, response)
+
+    entity_id = uuid.UUID(payload["sub"])
+    if role == "school":
+        entity = await session.get(School, entity_id)
+    else:
+        entity = await session.get(Admin, entity_id)
+
+    if not entity:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{role.capitalize()} user not found.",
+        )
+    return entity
+

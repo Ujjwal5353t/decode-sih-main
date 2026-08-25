@@ -1,0 +1,302 @@
+﻿"""
+Teacher dashboard routes (protected -- teacher role required).
+
+GET  /teacher/me
+GET  /teacher/classes
+GET  /teacher/classes/{class_number}/{section}/students
+GET  /teacher/classes/{class_number}/{section}/modules
+GET  /teacher/classes/{class_number}/{section}/assignments
+POST /teacher/classes/{class_number}/{section}/assignments/upload-pdf   (multipart)
+POST /teacher/classes/{class_number}/{section}/assignments/ai-quiz
+PATCH /teacher/assignments/{assignment_id}
+DELETE /teacher/assignments/{assignment_id}
+GET  /teacher/assignments/{assignment_id}/submissions
+PATCH /teacher/assignments/{assignment_id}/submissions/{student_id}/score
+POST /teacher/assignments/{assignment_id}/students/{student_id}/feedback
+GET  /teacher/assignments/{assignment_id}/students/{student_id}/feedback
+"""
+
+import uuid
+from typing import Annotated, Optional
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.core.database import get_session
+from src.core.dependencies import get_current_teacher
+from src.models.teacher import Teacher
+from src.schemas.teacher import (
+    AssignmentCreateQuizRequest,
+    AssignmentOut,
+    AssignmentUpdateRequest,
+    FeedbackOut,
+    FeedbackRequest,
+    SetScoreRequest,
+    SubmissionOut,
+    TeacherClassOut,
+    TeacherProfile,
+)
+from src.schemas.student import StudentProfile
+from src.schemas.module import ModuleOut
+from src.services import teacher_service, module_service
+
+router = APIRouter(prefix="/teacher", tags=["Teacher Dashboard"])
+
+
+# ── Profile ────────────────────────────────────────────────────────────────────
+
+@router.get("/me", response_model=TeacherProfile, summary="Get teacher profile")
+async def get_teacher_profile(teacher: Teacher = Depends(get_current_teacher)):
+    return TeacherProfile.model_validate(teacher)
+
+
+# ── Assigned classes ───────────────────────────────────────────────────────────
+
+@router.get(
+    "/classes",
+    response_model=list[TeacherClassOut],
+    summary="List classes assigned to this teacher",
+)
+async def get_teacher_classes(
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    assignments = await teacher_service.get_assigned_classes(teacher, session)
+    return [
+        TeacherClassOut(
+            id=a.id,
+            class_number=a.class_number,
+            section=a.section,
+            label=f"{a.class_number}{a.section}",
+            assigned_at=a.assigned_at,
+        )
+        for a in assignments
+    ]
+
+
+@router.get(
+    "/classes/{class_number}/{section}/students",
+    response_model=list[StudentProfile],
+    summary="List students in a class section",
+)
+async def get_class_students(
+    class_number: int,
+    section: str,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session)
+    students = await teacher_service.get_class_students(
+        teacher.branch_name, class_number, section.upper(), session
+    )
+    return [StudentProfile.model_validate(s) for s in students]
+
+
+@router.get(
+    "/classes/{class_number}/{section}/modules",
+    response_model=list[ModuleOut],
+    summary="List modules for a class (same as school view)",
+)
+async def get_class_modules(
+    class_number: int,
+    section: str,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session)
+    return await module_service.get_class_modules(teacher.branch_name, class_number, session)
+
+
+# ── Assignments ────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/classes/{class_number}/{section}/assignments",
+    response_model=list[AssignmentOut],
+    summary="List assignments for a class section",
+)
+async def list_assignments(
+    class_number: int,
+    section: str,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session)
+    assignments = await teacher_service.list_assignments(teacher, class_number, section, session)
+    return [AssignmentOut.model_validate(a) for a in assignments]
+
+
+@router.post(
+    "/classes/{class_number}/{section}/assignments/upload-pdf",
+    response_model=AssignmentOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new PDF assignment (max 5 MB)",
+)
+async def create_pdf_assignment(
+    class_number: int,
+    section: str,
+    title: Annotated[str, Form()],
+    file: Annotated[UploadFile, File(description="PDF file (max 5 MB)")],
+    description: Annotated[Optional[str], Form()] = None,
+    deadline_days: Annotated[Optional[int], Form()] = None,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session)
+
+    from src.schemas.teacher import AssignmentCreatePdfRequest
+    data = AssignmentCreatePdfRequest(
+        title=title,
+        description=description,
+        deadline_days=deadline_days,
+    )
+    asgn = await teacher_service.create_pdf_assignment(
+        teacher, class_number, section, data, file, session
+    )
+    return AssignmentOut.model_validate(asgn)
+
+
+@router.post(
+    "/classes/{class_number}/{section}/assignments/ai-quiz",
+    response_model=AssignmentOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create an AI quiz assignment from selected modules",
+)
+async def create_quiz_assignment(
+    class_number: int,
+    section: str,
+    data: AssignmentCreateQuizRequest,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session)
+    asgn = await teacher_service.create_quiz_assignment(teacher, class_number, section, data, session)
+    return AssignmentOut.model_validate(asgn)
+
+
+@router.patch(
+    "/assignments/{assignment_id}",
+    response_model=AssignmentOut,
+    summary="Update assignment title, description, or deadline",
+)
+async def update_assignment(
+    assignment_id: uuid.UUID,
+    data: AssignmentUpdateRequest,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    asgn = await teacher_service.update_assignment(assignment_id, teacher, data, session)
+    return AssignmentOut.model_validate(asgn)
+
+
+@router.delete(
+    "/assignments/{assignment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an assignment (also removes Cloudinary file)",
+)
+async def delete_assignment(
+    assignment_id: uuid.UUID,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    await teacher_service.delete_assignment(assignment_id, teacher, session)
+
+
+# ── Progress / Submissions ─────────────────────────────────────────────────────
+
+@router.get(
+    "/assignments/{assignment_id}/submissions",
+    response_model=list[SubmissionOut],
+    summary="List all student submissions for an assignment",
+)
+async def get_submissions(
+    assignment_id: uuid.UUID,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    from sqlmodel import select
+    from src.models.student import Student
+
+    submissions = await teacher_service.get_submissions(assignment_id, teacher, session)
+    result = []
+    for sub in submissions:
+        student = await session.get(Student, sub.student_id)
+        out = SubmissionOut(
+            id=sub.id,
+            student_id=sub.student_id,
+            student_unique_number=sub.student_unique_number,
+            student_name=None,
+            student_email=student.email if student else None,
+            score=sub.score,
+            max_score=sub.max_score,
+            attempted_at=sub.attempted_at,
+            last_attempted_at=sub.last_attempted_at,
+        )
+        result.append(out)
+    return result
+
+
+@router.patch(
+    "/assignments/{assignment_id}/submissions/{student_id}/score",
+    response_model=SubmissionOut,
+    summary="Enter or update a student score for a submission",
+)
+async def set_score(
+    assignment_id: uuid.UUID,
+    student_id: uuid.UUID,
+    data: SetScoreRequest,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    from src.models.student import Student
+    sub = await teacher_service.set_submission_score(
+        assignment_id, student_id, data.score, data.max_score, teacher, session
+    )
+    student = await session.get(Student, sub.student_id)
+    return SubmissionOut(
+        id=sub.id,
+        student_id=sub.student_id,
+        student_unique_number=sub.student_unique_number,
+        student_name=None,
+        student_email=student.email if student else None,
+        score=sub.score,
+        max_score=sub.max_score,
+        attempted_at=sub.attempted_at,
+        last_attempted_at=sub.last_attempted_at,
+    )
+
+
+# ── Feedback ───────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/assignments/{assignment_id}/students/{student_id}/feedback",
+    response_model=FeedbackOut,
+    summary="Create or update feedback for a student on an assignment",
+)
+async def post_feedback(
+    assignment_id: uuid.UUID,
+    student_id: uuid.UUID,
+    data: FeedbackRequest,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    fb = await teacher_service.create_or_update_feedback(
+        assignment_id, student_id, teacher, data.feedback_text, session
+    )
+    return FeedbackOut.model_validate(fb)
+
+
+@router.get(
+    "/assignments/{assignment_id}/students/{student_id}/feedback",
+    response_model=Optional[FeedbackOut],
+    summary="Get teacher feedback for a student on an assignment",
+)
+async def get_feedback(
+    assignment_id: uuid.UUID,
+    student_id: uuid.UUID,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    fb = await teacher_service.get_feedback(assignment_id, student_id, session)
+    if not fb:
+        return None
+    return FeedbackOut.model_validate(fb)

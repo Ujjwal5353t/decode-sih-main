@@ -36,11 +36,13 @@ from src.schemas.auth import (
     StudentClassSetupRequest,
     StudentLoginRequest,
     StudentRegisterRequest,
+    TeacherLoginRequest,
+    TeacherRegisterRequest,
     TokenRefreshRequest,
 )
 from src.schemas.common import MessageResponse, TokenResponse
 from src.schemas.student import StudentProfile
-from src.services import parent_service, school_service, student_service
+from src.services import parent_service, school_service, student_service, teacher_service
 from src.models.admin import Admin
 from sqlmodel import select
 from src.core.security import verify_password
@@ -238,6 +240,45 @@ async def admin_login(
 
     token = create_access_token(subject=str(admin.id), role="admin")
     return TokenResponse(access_token=token, role="admin")
+
+
+# ── Teacher ────────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/teacher/register",
+    response_model=TokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register a new teacher account",
+)
+async def teacher_register(
+    data: TeacherRegisterRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    teacher = await teacher_service.register_teacher(data, session)
+    token = create_access_token(
+        subject=str(teacher.id),
+        role="teacher",
+        extra_claims={"branch": teacher.branch_name},
+    )
+    return TokenResponse(access_token=token, role="teacher")
+
+
+@router.post(
+    "/teacher/login",
+    response_model=TokenResponse,
+    summary="Login to a teacher account using phone number and branch",
+)
+async def teacher_login(
+    data: TeacherLoginRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    teacher = await teacher_service.login_teacher(data, session)
+    token = create_access_token(
+        subject=str(teacher.id),
+        role="teacher",
+        extra_claims={"branch": teacher.branch_name},
+    )
+    return TokenResponse(access_token=token, role="teacher")
 
 
 # ── Token refresh ──────────────────────────────────────────────────────────────

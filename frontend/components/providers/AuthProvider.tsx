@@ -7,6 +7,7 @@ import {
   SchoolProfile,
   ParentProfile,
   AdminProfile,
+  TeacherProfile,
   getStoredToken,
   getStoredRole,
   clearStoredAuth,
@@ -14,17 +15,20 @@ import {
   loginSchool,
   loginParent,
   loginAdmin,
+  loginTeacher,
   registerStudent,
   registerSchool,
   registerParent,
+  registerTeacher,
   getStudentProfile,
   getSchoolProfile,
   getParentProfile,
   getAdminProfile,
+  getTeacherProfile,
   setupStudentClass as setupStudentClassApi,
 } from "@/lib/api";
 
-type UserProfile = StudentProfile | SchoolProfile | ParentProfile | AdminProfile | null;
+type UserProfile = StudentProfile | SchoolProfile | ParentProfile | AdminProfile | TeacherProfile | null;
 
 interface AuthContextType {
   user: UserProfile;
@@ -62,6 +66,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(profile);
       } else if (currentRole === "admin") {
         const profile = await getAdminProfile();
+        setUser(profile);
+      } else if (currentRole === "teacher") {
+        const profile = await getTeacherProfile();
         setUser(profile);
       }
     } catch (err: any) {
@@ -111,6 +118,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         res = await loginParent(data);
       } else if (loginRole === "admin") {
         res = await loginAdmin(data);
+      } else if (loginRole === "teacher") {
+        res = await loginTeacher(data);
       }
       if (res) {
         setToken(res.access_token);
@@ -136,6 +145,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         res = await registerSchool(data);
       } else if (regRole === "parent") {
         res = await registerParent(data);
+      } else if (regRole === "teacher") {
+        res = await registerTeacher(data);
       }
       if (res) {
         setToken(res.access_token);

@@ -3,7 +3,13 @@ Student dashboard routes (protected — student role required).
 
 GET  /student/me             — student profile (includes unique_number, class, section)
 GET  /student/modules        — modules for the student's class (from their school branch)
+GET  /student/assignments    — assignments for the student's class+section
+POST /student/assignments/{assignment_id}/submit  — mark as submitted
+GET  /student/assignments/{assignment_id}/feedback — get teacher feedback
 """
+
+import uuid
+from typing import Optional
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +19,8 @@ from src.core.dependencies import get_current_student
 from src.models.student import Student
 from src.schemas.module import ModuleOut
 from src.schemas.student import StudentProfile
-from src.services import module_service
+from src.schemas.teacher import AssignmentOut, FeedbackOut, SubmissionOut
+from src.services import module_service, teacher_service
 
 router = APIRouter(prefix="/student", tags=["Student Dashboard"])
 
@@ -43,3 +50,54 @@ async def get_student_modules(
     return await module_service.get_class_modules(
         student.branch_name, student.class_number, session
     )
+
+
+@router.get(
+    "/assignments",
+    response_model=list[AssignmentOut],
+    summary="Get assignments for the student's class section",
+)
+async def get_student_assignments(
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    assignments = await teacher_service.get_student_assignments(student, session)
+    return [AssignmentOut.model_validate(a) for a in assignments]
+
+
+@router.post(
+    "/assignments/{assignment_id}/submit",
+    response_model=SubmissionOut,
+    summary="Mark an assignment as submitted (creates or updates submission record)",
+)
+async def submit_assignment(
+    assignment_id: uuid.UUID,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    sub = await teacher_service.student_submit(assignment_id, student, session)
+    return SubmissionOut(
+        id=sub.id,
+        student_id=sub.student_id,
+        student_unique_number=sub.student_unique_number,
+        score=sub.score,
+        max_score=sub.max_score,
+        attempted_at=sub.attempted_at,
+        last_attempted_at=sub.last_attempted_at,
+    )
+
+
+@router.get(
+    "/assignments/{assignment_id}/feedback",
+    response_model=Optional[FeedbackOut],
+    summary="Get teacher feedback for this assignment",
+)
+async def get_assignment_feedback(
+    assignment_id: uuid.UUID,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    fb = await teacher_service.get_feedback(assignment_id, student.id, session)
+    if not fb:
+        return None
+    return FeedbackOut.model_validate(fb)

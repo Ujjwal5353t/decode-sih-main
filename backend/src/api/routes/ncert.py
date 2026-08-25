@@ -72,3 +72,95 @@ async def get_ncert_book(
     if not book:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="NCERT book not found.")
     return NCERTBookOut.model_validate(book)
+
+
+# ── Management routes (School Branch Admin & Superadmin protected) ─────────────
+
+from typing import Annotated
+from fastapi import File, Form, UploadFile
+from src.core.dependencies import get_current_school_or_admin
+from src.schemas.module import NCERTBookCreateRequest, NCERTBookUpdateRequest
+from src.services import ncert_service
+
+
+@router.post(
+    "/books/{book_id}/upload-pdf",
+    response_model=NCERTBookOut,
+    summary="Upload/attach a PDF file content to an NCERT book",
+)
+async def upload_ncert_book_pdf(
+    book_id: uuid.UUID,
+    file: Annotated[UploadFile, File(description="PDF file for NCERT book (max 50 MB)")],
+    _: Annotated[object, Depends(get_current_school_or_admin)],
+    session: AsyncSession = Depends(get_session),
+):
+    book = await ncert_service.upload_ncert_pdf(book_id, file, session)
+    return NCERTBookOut.model_validate(book)
+
+
+@router.post(
+    "/books",
+    response_model=NCERTBookOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new NCERT book entry (optionally with PDF file)",
+)
+async def create_ncert_book(
+    class_number: Annotated[int, Form()],
+    subject: Annotated[str, Form()],
+    title: Annotated[str, Form()],
+    description: Annotated[Optional[str], Form()] = None,
+    file: Annotated[Optional[UploadFile], File(description="Optional PDF file")] = None,
+    _: Annotated[object, Depends(get_current_school_or_admin)] = None,
+    session: AsyncSession = Depends(get_session),
+):
+    data = NCERTBookCreateRequest(
+        class_number=class_number,
+        subject=subject,
+        title=title,
+        description=description,
+    )
+    book = await ncert_service.create_ncert_book(data, file, session)
+    return NCERTBookOut.model_validate(book)
+
+
+@router.put(
+    "/books/{book_id}",
+    response_model=NCERTBookOut,
+    summary="Update NCERT book metadata (title, subject, description, class_number)",
+)
+async def update_ncert_book(
+    book_id: uuid.UUID,
+    data: NCERTBookUpdateRequest,
+    _: Annotated[object, Depends(get_current_school_or_admin)],
+    session: AsyncSession = Depends(get_session),
+):
+    book = await ncert_service.update_ncert_book(book_id, data, session)
+    return NCERTBookOut.model_validate(book)
+
+
+@router.delete(
+    "/books/{book_id}/file",
+    response_model=NCERTBookOut,
+    summary="Detach the PDF file from an NCERT book",
+)
+async def detach_ncert_book_file(
+    book_id: uuid.UUID,
+    _: Annotated[object, Depends(get_current_school_or_admin)],
+    session: AsyncSession = Depends(get_session),
+):
+    book = await ncert_service.detach_ncert_file(book_id, session)
+    return NCERTBookOut.model_validate(book)
+
+
+@router.delete(
+    "/books/{book_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an NCERT book entry",
+)
+async def delete_ncert_book(
+    book_id: uuid.UUID,
+    _: Annotated[object, Depends(get_current_school_or_admin)],
+    session: AsyncSession = Depends(get_session),
+):
+    await ncert_service.delete_ncert_book(book_id, session)
+
