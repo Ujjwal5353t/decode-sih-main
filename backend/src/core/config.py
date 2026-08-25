@@ -26,5 +26,9 @@ class Settings(BaseSettings):
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = False
 
+    # Startup DB & Seed flags (disabled by default on server restart)
+    AUTO_CREATE_TABLES: bool = False
+    AUTO_SEED: bool = False
+
 
 settings = Settings()  # type: ignore[call-arg]

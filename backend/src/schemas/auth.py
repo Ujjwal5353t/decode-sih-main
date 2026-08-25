@@ -115,3 +115,35 @@ class AdminLoginRequest(BaseModel):
 class TokenRefreshRequest(BaseModel):
     """Optional explicit refresh — frontend can call this to get a new 7-day token."""
     access_token: str
+
+
+# ── Teacher ────────────────────────────────────────────────────────────────────
+
+class TeacherRegisterRequest(BaseModel):
+    name: str
+    phone_number: str
+    school_name: str
+    branch_name: str
+    password: str
+
+    @field_validator("phone_number")
+    @classmethod
+    def valid_phone(cls, v: str) -> str:
+        v = v.strip()
+        digits = v.replace("+", "").replace("-", "").replace(" ", "")
+        if not digits.isdigit() or not (7 <= len(digits) <= 15):
+            raise ValueError("Phone number must be 7–15 digits.")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters.")
+        return v
+
+
+class TeacherLoginRequest(BaseModel):
+    phone_number: str
+    branch_name: str
+    password: str

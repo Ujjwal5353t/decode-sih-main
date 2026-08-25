@@ -202,7 +202,7 @@ export function Footer() {
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
               <span className="font-[family-name:var(--font-display)] text-lg font-bold text-text-primary">
-                IncluLearn
+                VidyaSetu
               </span>
             </a>
             <p className="text-sm text-text-secondary leading-relaxed max-w-xs">
@@ -268,7 +268,7 @@ export function Footer() {
                     justify-between gap-4"
         >
           <p className="text-xs text-text-tertiary">
-            © {new Date().getFullYear()} IncluLearn • AI for Inclusive Education.
+            © {new Date().getFullYear()} VidyaSetu • AI for Inclusive Education.
           </p>
           <div className="flex items-center gap-6">
             <a href="#why" className="text-xs text-text-tertiary hover:text-brand transition-colors">

@@ -17,13 +17,15 @@ import {
   Eye,
   EyeOff,
   BookOpen,
+  UserCog,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { SchoolAutocomplete } from "@/components/ui/SchoolAutocomplete";
 import { useAuth } from "@/hooks/useAuth";
 
-type LoginRole = "student" | "school" | "parent";
+type LoginRole = "student" | "school" | "parent" | "teacher";
 type StudentLoginType = "self" | "school";
 
 const rolesConfig: {
@@ -50,6 +52,12 @@ const rolesConfig: {
     icon: Users,
     description: "Monitor child's progress and learning roadmap",
   },
+  {
+    id: "teacher",
+    label: "Teacher",
+    icon: UserCog,
+    description: "Manage assigned classes, create assessments and track progress",
+  },
 ];
 
 export default function LoginPage() {
@@ -63,12 +71,29 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [branchName, setBranchName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
     clearError();
+
+    if (selectedRole === "teacher") {
+      if (!phoneNumber.trim() || !branchName.trim() || !password.trim()) {
+        setLocalError("Please fill in all required fields.");
+        return;
+      }
+      try {
+        await login("teacher", {
+          phone_number: phoneNumber.trim(),
+          branch_name: branchName.trim(),
+          password,
+        });
+        router.push("/dashboard");
+      } catch (err: any) {}
+      return;
+    }
 
     if (!email.trim() || !password.trim()) {
       setLocalError("Please fill in all required fields.");
@@ -112,7 +137,9 @@ export default function LoginPage() {
 
   const activeError = localError || error;
   const showBranchField =
-    selectedRole === "school" || (selectedRole === "student" && studentLoginType === "school");
+    selectedRole === "school" ||
+    selectedRole === "teacher" ||
+    (selectedRole === "student" && studentLoginType === "school");
 
   return (
     <div className="min-h-screen flex flex-col bg-background relative overflow-hidden">
@@ -136,7 +163,7 @@ export default function LoginPage() {
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           <span className="font-[family-name:var(--font-display)] text-xl font-bold text-text-primary group-hover:text-brand transition-colors">
-            IncluLearn
+            VidyaSetu
           </span>
         </Link>
         <div className="flex items-center gap-4">
@@ -170,7 +197,7 @@ export default function LoginPage() {
             </div>
 
             {/* Role Selector Tabs */}
-            <div className="grid grid-cols-3 gap-1.5 p-1 bg-surface-hover rounded-[var(--radius-md)] mb-6">
+            <div className="grid grid-cols-4 gap-1.5 p-1 bg-surface-hover rounded-[var(--radius-md)] mb-6">
               {rolesConfig.map((r) => {
                 const Icon = r.icon;
                 const isSelected = selectedRole === r.id;
@@ -284,23 +311,42 @@ export default function LoginPage() {
                 </motion.div>
               )}
 
-              {/* Email Field */}
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1.5">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
-                  <input
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-surface text-text-primary text-sm rounded-[var(--radius-md)] border border-border-primary focus:border-brand focus:outline-none transition-colors"
-                    required
-                  />
+              {/* Email or Phone Field */}
+              {selectedRole === "teacher" ? (
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1.5">
+                    Phone Number
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                    <input
+                      type="tel"
+                      placeholder="e.g. 9876543210"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-surface text-text-primary text-sm rounded-[var(--radius-md)] border border-border-primary focus:border-brand focus:outline-none transition-colors"
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1.5">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                    <input
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-surface text-text-primary text-sm rounded-[var(--radius-md)] border border-border-primary focus:border-brand focus:outline-none transition-colors"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Password Field */}
               <div>

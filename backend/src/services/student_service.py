@@ -42,7 +42,7 @@ async def register_student(data: StudentRegisterRequest, session: AsyncSession) 
                 school_name="NCERT Self-Educated",
                 branch_name="SELF",
                 student_prefix="SELF",
-                email="self@inclulearn.ai",
+                email="self@vidyasetu.ai",
                 password_hash=hash_password("SelfEducated123!"),
                 state="All India",
             )

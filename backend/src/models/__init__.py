@@ -9,3 +9,10 @@ from src.models.ncert import NCERTBook  # noqa: F401
 from src.models.parent import Parent, ParentChildLink  # noqa: F401
 from src.models.school import BranchCounter, School  # noqa: F401
 from src.models.student import Student  # noqa: F401
+from src.models.teacher import (  # noqa: F401
+    Teacher,
+    TeacherClassAssignment,
+    Assignment,
+    AssignmentSubmission,
+    TeacherFeedback,
+)

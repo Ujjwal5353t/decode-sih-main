@@ -11,6 +11,7 @@ Environment variables required:
   CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 """
 import io
+import os
 import uuid
 from typing import Sequence
 
@@ -34,6 +35,10 @@ _MAX_FILE_SIZE_MB = 50
 _MAX_FILE_SIZE_BYTES = _MAX_FILE_SIZE_MB * 1024 * 1024
 
 
+UPLOADS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "uploads"))
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
+
 def _check_size(data: bytes) -> None:
     if len(data) > _MAX_FILE_SIZE_BYTES:
         raise HTTPException(
@@ -42,9 +47,19 @@ def _check_size(data: bytes) -> None:
         )
 
 
+def save_local_pdf(data: bytes, subfolder: str = "modules") -> str:
+    folder_path = os.path.join(UPLOADS_DIR, subfolder)
+    os.makedirs(folder_path, exist_ok=True)
+    filename = f"{uuid.uuid4()}.pdf"
+    file_path = os.path.join(folder_path, filename)
+    with open(file_path, "wb") as f:
+        f.write(data)
+    return f"/uploads/{subfolder}/{filename}"
+
+
 async def upload_pdf(file: UploadFile, folder: str = "decode-sih/modules") -> dict:
     """
-    Validate and upload a PDF file to Cloudinary.
+    Validate and save a PDF file locally for reliable browser PDF viewing.
 
     Returns:
         {"url": str, "public_id": str}
@@ -58,14 +73,8 @@ async def upload_pdf(file: UploadFile, folder: str = "decode-sih/modules") -> di
     data = await file.read()
     _check_size(data)
 
-    public_id = f"{folder}/{uuid.uuid4()}"
-    result = cloudinary.uploader.upload(
-        data,
-        public_id=public_id,
-        resource_type="raw",   # PDFs must use resource_type="raw"
-        overwrite=False,
-    )
-    return {"url": result["secure_url"], "public_id": result["public_id"]}
+    url = save_local_pdf(data, subfolder="modules")
+    return {"url": url, "public_id": url}
 
 
 async def upload_images_as_pdf(
@@ -120,16 +129,10 @@ async def upload_images_as_pdf(
     # Merge all images into one PDF in memory
     pdf_bytes = img2pdf.convert(jpeg_bytes_list)
 
-    public_id = f"{folder}/{uuid.uuid4()}"
-    result = cloudinary.uploader.upload(
-        pdf_bytes,
-        public_id=public_id,
-        resource_type="raw",
-        overwrite=False,
-    )
+    url = save_local_pdf(pdf_bytes, subfolder="modules")
     return {
-        "url": result["secure_url"],
-        "public_id": result["public_id"],
+        "url": url,
+        "public_id": url,
         "image_bytes_list": raw_bytes_list,   # passed through to OCR pipeline
     }
 

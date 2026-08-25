@@ -11,6 +11,11 @@ PUT  /school/classes/{class_number}/modules/{module_id}/replace-pdf    — repla
 PUT  /school/classes/{class_number}/modules/{module_id}/replace-images — replace with new images
 PATCH /school/classes/{class_number}/modules/{module_id}/title         — update title only
 DELETE /school/classes/{class_number}/modules/{module_id}              — delete module
+
+Teacher management (school admin):
+GET  /school/teachers                                         — list teachers in this branch
+POST /school/teachers/{teacher_id}/assign-class               — assign a class+section
+DELETE /school/teachers/{teacher_id}/assign-class/{class_number}/{section} — de-assign
 """
 
 import uuid
@@ -26,7 +31,8 @@ from src.models.module import Module, OcrStatus
 from src.models.school import School
 from src.schemas.module import ModuleOut, NCERTModuleAddRequest, UpdateModuleTitleRequest
 from src.schemas.school import SchoolProfile
-from src.services import module_service
+from src.schemas.teacher import AssignClassRequest, TeacherClassOut, TeacherListItem
+from src.services import module_service, teacher_service
 
 router = APIRouter(prefix="/school", tags=["School Dashboard"])
 
@@ -286,4 +292,83 @@ async def retry_module_ocr(
             "To re-run OCR, please use PUT /school/classes/{class_number}/modules/{module_id}/replace-images "
             "to re-upload the images. This will automatically trigger fresh OCR."
         ),
+    )
+
+
+# ── Teacher management (school admin) ─────────────────────────────────────────
+
+@router.get(
+    "/teachers",
+    response_model=list[TeacherListItem],
+    summary="List all teachers registered in this school branch",
+)
+async def list_teachers(
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    teachers = await teacher_service.list_branch_teachers(school.branch_name, session)
+    result = []
+    for t in teachers:
+        classes = await teacher_service.get_assigned_classes(t, session)
+        class_outs = [
+            TeacherClassOut(
+                id=c.id,
+                class_number=c.class_number,
+                section=c.section,
+                label=f"{c.class_number}{c.section}",
+                assigned_at=c.assigned_at,
+            )
+            for c in classes
+        ]
+        result.append(
+            TeacherListItem(
+                id=t.id,
+                name=t.name,
+                phone_number=t.phone_number,
+                is_active=t.is_active,
+                assigned_classes=class_outs,
+                created_at=t.created_at,
+            )
+        )
+    return result
+
+
+@router.post(
+    "/teachers/{teacher_id}/assign-class",
+    response_model=TeacherClassOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Assign a class section to a teacher",
+)
+async def assign_class_to_teacher(
+    teacher_id: uuid.UUID,
+    data: AssignClassRequest,
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    tca = await teacher_service.assign_class_to_teacher(
+        teacher_id, school.branch_name, data, session
+    )
+    return TeacherClassOut(
+        id=tca.id,
+        class_number=tca.class_number,
+        section=tca.section,
+        label=f"{tca.class_number}{tca.section}",
+        assigned_at=tca.assigned_at,
+    )
+
+
+@router.delete(
+    "/teachers/{teacher_id}/assign-class/{class_number}/{section}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a class section assignment from a teacher",
+)
+async def deassign_class_from_teacher(
+    teacher_id: uuid.UUID,
+    class_number: int,
+    section: str,
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    await teacher_service.deassign_class_from_teacher(
+        teacher_id, school.branch_name, class_number, section, session
     )

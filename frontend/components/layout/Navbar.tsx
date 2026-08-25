@@ -60,7 +60,7 @@ export function Navbar() {
           <Link
             href="/"
             className="flex items-center gap-2.5 group"
-            aria-label="IncluLearn — Go to home"
+            aria-label="VidyaSetu — Go to home"
           >
             <motion.div
               whileHover={{ scale: 1.08, rotate: 5 }}
@@ -75,7 +75,7 @@ export function Navbar() {
               className="font-[family-name:var(--font-display)] text-lg font-bold text-text-primary
                            group-hover:text-brand transition-colors duration-200"
             >
-              IncluLearn
+              VidyaSetu
             </span>
           </Link>
 

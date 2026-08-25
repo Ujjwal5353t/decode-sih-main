@@ -29,13 +29,15 @@ import src.models  # noqa: F401  (side-effect import)
 async def lifespan(app: FastAPI):
     """Application lifespan — runs on startup and shutdown."""
     # ── Startup ────────────────────────────────────────────────────────────────
-    print("[startup] Creating database tables...")
-    await init_db()
-    print("[startup] Running seed data...")
-    async with AsyncSessionFactory() as session:
-        from src.db.seed import run_all_seeds
-        await run_all_seeds(session)
-    print("[startup] Ready.")
+    if settings.AUTO_CREATE_TABLES:
+        print("[startup] Creating database tables...")
+        await init_db()
+    if settings.AUTO_SEED:
+        print("[startup] Running seed data...")
+        async with AsyncSessionFactory() as session:
+            from src.db.seed import run_all_seeds
+            await run_all_seeds(session)
+    print("[startup] Server ready.")
     yield
     # ── Shutdown ───────────────────────────────────────────────────────────────
     print("[shutdown] Goodbye.")
@@ -72,6 +74,13 @@ app.add_middleware(
 )
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
+import os
+from fastapi.staticfiles import StaticFiles
+
+uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+
 app.include_router(api_router, prefix="/api/v1")
 
 

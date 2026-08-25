@@ -132,3 +132,23 @@ async def get_current_admin(
     if not admin:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin not found.")
     return admin
+
+
+# ── Teacher ────────────────────────────────────────────────────────────────────
+
+async def get_current_teacher(
+    response: Response,
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    session: AsyncSession = Depends(get_session),
+):
+    from src.models.teacher import Teacher
+
+    payload = _extract_payload(credentials)
+    _check_role(payload, "teacher")
+    _maybe_refresh(payload, response)
+
+    teacher_id = uuid.UUID(payload["sub"])
+    teacher = await session.get(Teacher, teacher_id)
+    if not teacher:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found.")
+    return teacher

@@ -1,7 +1,7 @@
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
-export type Role = "student" | "school" | "parent" | "admin";
+export type Role = "student" | "school" | "parent" | "admin" | "teacher";
 
 export interface TokenResponse {
   access_token: string;
@@ -350,4 +350,273 @@ export async function submitContactForm(data: {
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+// ── Teacher Types ──────────────────────────────────────────────────────────────
+
+export interface TeacherProfile {
+  id: string;
+  name: string;
+  phone_number: string;
+  school_name: string;
+  branch_name: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface TeacherClassOut {
+  id: string;
+  class_number: number;
+  section: string;
+  label: string;  // e.g. "4A"
+  assigned_at: string;
+}
+
+export interface AssignmentOut {
+  id: string;
+  teacher_id: string;
+  branch_name: string;
+  class_number: number;
+  section: string;
+  title: string;
+  description: string | null;
+  assignment_type: "pdf_upload" | "ai_quiz";
+  file_url: string | null;
+  module_ids: string | null;  // JSON array string
+  deadline_at: string | null;
+  is_locked: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubmissionOut {
+  id: string;
+  student_id: string;
+  student_unique_number: string;
+  student_name: string | null;
+  student_email: string | null;
+  score: number | null;
+  max_score: number | null;
+  attempted_at: string;
+  last_attempted_at: string;
+}
+
+export interface FeedbackOut {
+  id: string;
+  assignment_id: string;
+  student_id: string;
+  teacher_id: string;
+  feedback_text: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeacherListItem {
+  id: string;
+  name: string;
+  phone_number: string;
+  is_active: boolean;
+  assigned_classes: TeacherClassOut[];
+  created_at: string;
+}
+
+// ── Teacher Auth ───────────────────────────────────────────────────────────────
+
+export async function loginTeacher(payload: {
+  phone_number: string;
+  branch_name: string;
+  password: string;
+}): Promise<TokenResponse> {
+  const res = await fetchApi<TokenResponse>("/auth/teacher/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  setStoredAuth(res.access_token, "teacher");
+  return res;
+}
+
+export async function registerTeacher(payload: {
+  name: string;
+  phone_number: string;
+  school_name: string;
+  branch_name: string;
+  password: string;
+}): Promise<TokenResponse> {
+  const res = await fetchApi<TokenResponse>("/auth/teacher/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  setStoredAuth(res.access_token, "teacher");
+  return res;
+}
+
+export async function getTeacherProfile(): Promise<TeacherProfile> {
+  return fetchApi<TeacherProfile>("/teacher/me");
+}
+
+// ── Teacher Dashboard APIs ────────────────────────────────────────────────────
+
+export async function getTeacherClasses(): Promise<TeacherClassOut[]> {
+  return fetchApi<TeacherClassOut[]>("/teacher/classes");
+}
+
+export async function getTeacherClassStudents(
+  class_number: number,
+  section: string
+): Promise<StudentProfile[]> {
+  return fetchApi<StudentProfile[]>(`/teacher/classes/${class_number}/${section}/students`);
+}
+
+export async function getTeacherClassModules(
+  class_number: number,
+  section: string
+): Promise<ModuleOut[]> {
+  return fetchApi<ModuleOut[]>(`/teacher/classes/${class_number}/${section}/modules`);
+}
+
+export async function getTeacherAssignments(
+  class_number: number,
+  section: string
+): Promise<AssignmentOut[]> {
+  return fetchApi<AssignmentOut[]>(`/teacher/classes/${class_number}/${section}/assignments`);
+}
+
+export async function createPdfAssignment(
+  class_number: number,
+  section: string,
+  formData: FormData
+): Promise<AssignmentOut> {
+  const token = getStoredToken();
+  const response = await fetch(
+    `${API_BASE_URL}/teacher/classes/${class_number}/${section}/assignments/upload-pdf`,
+    {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    }
+  );
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      typeof err.detail === "string" ? err.detail : "Failed to create PDF assignment."
+    );
+  }
+  return response.json();
+}
+
+export async function createAiQuizAssignment(
+  class_number: number,
+  section: string,
+  payload: {
+    title: string;
+    description?: string | null;
+    module_ids: string[];
+    deadline_days?: number | null;
+  }
+): Promise<AssignmentOut> {
+  return fetchApi<AssignmentOut>(
+    `/teacher/classes/${class_number}/${section}/assignments/ai-quiz`,
+    { method: "POST", body: JSON.stringify(payload) }
+  );
+}
+
+export async function updateAssignment(
+  assignment_id: string,
+  payload: { title?: string; description?: string; deadline_days?: number }
+): Promise<AssignmentOut> {
+  return fetchApi<AssignmentOut>(`/teacher/assignments/${assignment_id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteAssignment(assignment_id: string): Promise<void> {
+  await fetchApi<{}>(`/teacher/assignments/${assignment_id}`, { method: "DELETE" });
+}
+
+export async function getAssignmentSubmissions(
+  assignment_id: string
+): Promise<SubmissionOut[]> {
+  return fetchApi<SubmissionOut[]>(`/teacher/assignments/${assignment_id}/submissions`);
+}
+
+export async function setSubmissionScore(
+  assignment_id: string,
+  student_id: string,
+  score: number,
+  max_score: number
+): Promise<SubmissionOut> {
+  return fetchApi<SubmissionOut>(
+    `/teacher/assignments/${assignment_id}/submissions/${student_id}/score`,
+    { method: "PATCH", body: JSON.stringify({ score, max_score }) }
+  );
+}
+
+export async function postStudentFeedback(
+  assignment_id: string,
+  student_id: string,
+  feedback_text: string
+): Promise<FeedbackOut> {
+  return fetchApi<FeedbackOut>(
+    `/teacher/assignments/${assignment_id}/students/${student_id}/feedback`,
+    { method: "POST", body: JSON.stringify({ feedback_text }) }
+  );
+}
+
+export async function getStudentFeedbackForAssignment(
+  assignment_id: string,
+  student_id: string
+): Promise<FeedbackOut | null> {
+  return fetchApi<FeedbackOut | null>(
+    `/teacher/assignments/${assignment_id}/students/${student_id}/feedback`
+  );
+}
+
+// ── Student Assignment APIs ────────────────────────────────────────────────────
+
+export async function getStudentAssignments(): Promise<AssignmentOut[]> {
+  return fetchApi<AssignmentOut[]>("/student/assignments");
+}
+
+export async function submitStudentAssignment(
+  assignment_id: string
+): Promise<SubmissionOut> {
+  return fetchApi<SubmissionOut>(`/student/assignments/${assignment_id}/submit`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function getStudentAssignmentFeedback(
+  assignment_id: string
+): Promise<FeedbackOut | null> {
+  return fetchApi<FeedbackOut | null>(`/student/assignments/${assignment_id}/feedback`);
+}
+
+// ── School Admin Teacher Management ───────────────────────────────────────────
+
+export async function getSchoolTeachers(): Promise<TeacherListItem[]> {
+  return fetchApi<TeacherListItem[]>("/school/teachers");
+}
+
+export async function assignClassToTeacher(
+  teacher_id: string,
+  class_number: number,
+  section: string
+): Promise<TeacherClassOut> {
+  return fetchApi<TeacherClassOut>(`/school/teachers/${teacher_id}/assign-class`, {
+    method: "POST",
+    body: JSON.stringify({ class_number, section }),
+  });
+}
+
+export async function deassignClassFromTeacher(
+  teacher_id: string,
+  class_number: number,
+  section: string
+): Promise<void> {
+  await fetchApi<{}>(
+    `/school/teachers/${teacher_id}/assign-class/${class_number}/${section}`,
+    { method: "DELETE" }
+  );
 }
