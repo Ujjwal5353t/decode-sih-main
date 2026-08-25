@@ -45,3 +45,18 @@ class NCERTBookOut(BaseModel):
     file_url: Optional[str]
 
     model_config = {"from_attributes": True}
+
+
+class NCERTBookCreateRequest(BaseModel):
+    class_number: int
+    subject: str
+    title: str
+    description: Optional[str] = None
+
+
+class NCERTBookUpdateRequest(BaseModel):
+    class_number: Optional[int] = None
+    subject: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+

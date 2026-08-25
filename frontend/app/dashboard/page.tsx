@@ -54,6 +54,13 @@ import {
   ChildLinkOut,
   getStudentModules,
   getNCERTBooksForClass,
+  getAllNCERTBooks,
+  uploadNCERTBookPdf,
+  createNCERTBook,
+  updateNCERTBook,
+  deleteNCERTBook,
+  detachNCERTBookFile,
+  addNCERTModuleToSchool,
   getSchoolClassModules,
   getParentChildren,
   addParentChild,
@@ -76,6 +83,7 @@ import {
   assignClassToTeacher,
   deassignClassFromTeacher,
 } from "@/lib/api";
+
 
 function formatPdfUrl(url: string | null | undefined): string | undefined {
   if (!url) return undefined;
@@ -387,10 +395,23 @@ function StudentDashboardView({
 
                   <div className="mt-4 pt-3 border-t border-border-primary/50 flex items-center justify-between">
                     <span className="text-[11px] text-text-tertiary">Official NCERT Standard</span>
-                    <span className="text-xs text-brand font-semibold hover:underline cursor-pointer">
-                      Study Book →
-                    </span>
+                    {book.file_url ? (
+                      <a
+                        href={formatPdfUrl(book.file_url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-brand font-semibold hover:underline"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        Study Book PDF →
+                      </a>
+                    ) : (
+                      <span className="text-xs text-amber-500 font-semibold italic">
+                        PDF Pending Upload
+                      </span>
+                    )}
                   </div>
+
                 </div>
               ))}
             </div>
@@ -575,17 +596,24 @@ function StudentAssignmentsSection() {
 // ── School Dashboard View ────────────────────────────────────────────────────
 
 function SchoolDashboardView({ school }: { school: SchoolProfile }) {
+  const [activeTab, setActiveTab] = useState<"modules" | "ncert" | "teachers">("modules");
   const [selectedClass, setSelectedClass] = useState<number>(1);
   const [modules, setModules] = useState<ModuleOut[]>([]);
   const [loadingModules, setLoadingModules] = useState<boolean>(false);
 
-  useEffect(() => {
+  const fetchModules = () => {
     setLoadingModules(true);
     getSchoolClassModules(selectedClass)
       .then((res) => setModules(res))
       .catch((err) => console.log("School module fetch note:", err.message))
       .finally(() => setLoadingModules(false));
-  }, [selectedClass]);
+  };
+
+  useEffect(() => {
+    if (activeTab === "modules") {
+      fetchModules();
+    }
+  }, [selectedClass, activeTab]);
 
   return (
     <div className="space-y-6">
@@ -615,86 +643,153 @@ function SchoolDashboardView({ school }: { school: SchoolProfile }) {
         </div>
       </div>
 
-      {/* Class Selector & Modules Header */}
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-          <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-brand" />
-            <span>Class Curriculum & Modules</span>
-          </h2>
+      {/* School Admin Section Tabs */}
+      <div className="flex flex-col sm:flex-row items-center gap-2 p-1.5 glass rounded-[var(--radius-lg)] border border-border-primary">
+        <button
+          onClick={() => setActiveTab("modules")}
+          className={`w-full sm:w-auto flex-1 py-2.5 px-4 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            activeTab === "modules"
+              ? "bg-brand text-white shadow-md"
+              : "text-text-secondary hover:text-text-primary hover:bg-surface"
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          <span>Class Curriculum & Modules</span>
+        </button>
 
-          {/* Class Tabs */}
-          <div className="flex items-center gap-1 bg-surface-hover p-1 rounded-[var(--radius-md)]">
-            {[1, 2, 3, 4, 5].map((cls) => (
-              <button
-                key={cls}
-                onClick={() => setSelectedClass(cls)}
-                className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
-                  selectedClass === cls
-                    ? "bg-surface text-brand shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                Class {cls}
-              </button>
-            ))}
-          </div>
-        </div>
+        <button
+          onClick={() => setActiveTab("ncert")}
+          className={`w-full sm:w-auto flex-1 py-2.5 px-4 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            activeTab === "ncert"
+              ? "bg-brand text-white shadow-md"
+              : "text-text-secondary hover:text-text-primary hover:bg-surface"
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>NCERT Books & Content Management</span>
+        </button>
 
-        {/* Modules List or Empty State */}
-        {loadingModules ? (
-          <div className="py-12 flex justify-center">
-            <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : modules.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {modules.map((mod) => (
-              <div
-                key={mod.id}
-                className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                      {mod.subject}
-                    </span>
-                    <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
-                  </div>
-                  <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
-                </div>
-
-                {mod.file_url ? (
-                  <a
-                    href={formatPdfUrl(mod.file_url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    View Module Document
-                  </a>
-                ) : (
-                  <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module</span>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          /* Empty state if roles/modules are not seeded */
-          <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
-            <BookOpen className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-            <h3 className="text-sm font-semibold text-text-primary">
-              No Uploaded Modules for Class {selectedClass}
-            </h3>
-            <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
-              Modules uploaded by your school branch will appear here. No modules have been added for this class yet.
-            </p>
-          </div>
-        )}
+        <button
+          onClick={() => setActiveTab("teachers")}
+          className={`w-full sm:w-auto flex-1 py-2.5 px-4 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            activeTab === "teachers"
+              ? "bg-brand text-white shadow-md"
+              : "text-text-secondary hover:text-text-primary hover:bg-surface"
+          }`}
+        >
+          <UserCog className="w-4 h-4" />
+          <span>Teacher Directory & Assignments</span>
+        </button>
       </div>
 
-      {/* School Branch Teacher Directory & Class Assignment Panel */}
-      <SchoolTeacherManagement />
+      {/* TAB 1: MODULES */}
+      {activeTab === "modules" && (
+        <div className="space-y-6">
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-brand" />
+                <span>Class Curriculum & Modules</span>
+              </h2>
+
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActiveTab("ncert")}
+                  className="text-xs"
+                >
+                  <BookOpen className="w-3.5 h-3.5 mr-1" />
+                  Import from NCERT Library
+                </Button>
+
+                {/* Class Tabs */}
+                <div className="flex items-center gap-1 bg-surface-hover p-1 rounded-[var(--radius-md)]">
+                  {[1, 2, 3, 4, 5].map((cls) => (
+                    <button
+                      key={cls}
+                      onClick={() => setSelectedClass(cls)}
+                      className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
+                        selectedClass === cls
+                          ? "bg-surface text-brand shadow-sm"
+                          : "text-text-secondary hover:text-text-primary"
+                      }`}
+                    >
+                      Class {cls}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Modules List or Empty State */}
+            {loadingModules ? (
+              <div className="py-12 flex justify-center">
+                <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : modules.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {modules.map((mod) => (
+                  <div
+                    key={mod.id}
+                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
+                          {mod.subject}
+                        </span>
+                        <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
+                      </div>
+                      <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
+                    </div>
+
+                    {mod.file_url ? (
+                      <a
+                        href={formatPdfUrl(mod.file_url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        View Module Document
+                      </a>
+                    ) : (
+                      <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module (No File)</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed space-y-3">
+                <BookOpen className="w-10 h-10 text-text-tertiary mx-auto opacity-50" />
+                <h3 className="text-sm font-semibold text-text-primary">
+                  No Modules Added for Class {selectedClass}
+                </h3>
+                <p className="text-xs text-text-secondary max-w-sm mx-auto">
+                  Attach NCERT books with uploaded PDF files from the NCERT Library tab to make content available for Class {selectedClass} students & AI quizzes.
+                </p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setActiveTab("ncert")}
+                  className="text-xs mt-2"
+                >
+                  Go to NCERT Catalogue & Upload PDFs
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: NCERT BOOKS MANAGEMENT */}
+      {activeTab === "ncert" && (
+        <NCERTBookManagementPanel onModuleAttached={fetchModules} />
+      )}
+
+      {/* TAB 3: TEACHER MANAGEMENT */}
+      {activeTab === "teachers" && <SchoolTeacherManagement />}
     </div>
   );
 }
@@ -799,17 +894,13 @@ function ParentDashboardView({ parent }: { parent: ParentProfile }) {
             {childrenList.map((child) => (
               <div
                 key={child.id}
-                className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all"
+                className="glass rounded-[var(--radius-md)] p-5 border border-border-primary flex items-center justify-between"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-xs">
-                    ID
-                  </div>
-                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface border border-border-primary font-bold text-brand">
-                    {child.student_unique_number}
-                  </span>
+                <div>
+                  <span className="text-xs text-text-tertiary block">Unique Student ID</span>
+                  <span className="font-mono font-bold text-sm text-brand">{child.student_unique_number}</span>
                 </div>
-                <p className="text-xs text-text-secondary">
+                <p className="text-xs text-text-tertiary">
                   Linked on {new Date(child.created_at).toLocaleDateString()}
                 </p>
               </div>
@@ -833,6 +924,8 @@ function ParentDashboardView({ parent }: { parent: ParentProfile }) {
 // ── Admin Dashboard View ─────────────────────────────────────────────────────
 
 function AdminDashboardView({ admin }: { admin: AdminProfile }) {
+  const [activeTab, setActiveTab] = useState<"ncert" | "overview">("ncert");
+
   return (
     <div className="space-y-6">
       {/* Admin Profile Overview */}
@@ -857,29 +950,60 @@ function AdminDashboardView({ admin }: { admin: AdminProfile }) {
         </div>
       </div>
 
-      {/* Admin Quick Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary">
-          <span className="text-xs text-text-tertiary block">Role Status</span>
-          <span className="text-lg font-bold text-text-primary mt-1 block">Active Administrator</span>
-          <span className="text-xs text-brand mt-2 inline-block">Pre-seeded DB Account</span>
-        </div>
+      {/* Admin Sub-tabs */}
+      <div className="flex items-center gap-2 p-1.5 glass rounded-[var(--radius-lg)] border border-border-primary">
+        <button
+          onClick={() => setActiveTab("ncert")}
+          className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === "ncert"
+              ? "bg-brand text-white shadow-md"
+              : "text-text-secondary hover:text-text-primary hover:bg-surface"
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>NCERT Books & Content Management</span>
+        </button>
 
-        <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary">
-          <span className="text-xs text-text-tertiary block">NCERT Catalogue</span>
-          <span className="text-lg font-bold text-text-primary mt-1 block">Classes 1–5 Seeded</span>
-          <span className="text-xs text-emerald-500 mt-2 inline-block">Database Active</span>
-        </div>
-
-        <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary">
-          <span className="text-xs text-text-tertiary block">API Framework</span>
-          <span className="text-lg font-bold text-text-primary mt-1 block">FastAPI + SQLModel</span>
-          <span className="text-xs text-sky-500 mt-2 inline-block">JWT Bearer Security</span>
-        </div>
+        <button
+          onClick={() => setActiveTab("overview")}
+          className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === "overview"
+              ? "bg-brand text-white shadow-md"
+              : "text-text-secondary hover:text-text-primary hover:bg-surface"
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          <span>System Overview</span>
+        </button>
       </div>
+
+      {activeTab === "ncert" && <NCERTBookManagementPanel />}
+
+      {activeTab === "overview" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary">
+            <span className="text-xs text-text-tertiary block">Role Status</span>
+            <span className="text-lg font-bold text-text-primary mt-1 block">Active Administrator</span>
+            <span className="text-xs text-brand mt-2 inline-block">Pre-seeded DB Account</span>
+          </div>
+
+          <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary">
+            <span className="text-xs text-text-tertiary block">NCERT Catalogue</span>
+            <span className="text-lg font-bold text-text-primary mt-1 block">Classes 1–5 Seeded</span>
+            <span className="text-xs text-emerald-500 mt-2 inline-block">Database Active</span>
+          </div>
+
+          <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary">
+            <span className="text-xs text-text-tertiary block">API Framework</span>
+            <span className="text-lg font-bold text-text-primary mt-1 block">FastAPI + SQLModel</span>
+            <span className="text-xs text-sky-500 mt-2 inline-block">JWT Bearer Security</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
 // ── Teacher Dashboard View ───────────────────────────────────────────────────
 
@@ -1763,6 +1887,654 @@ function TeacherDashboardView({ teacher }: { teacher: TeacherProfile }) {
                 >
                   {isSubmittingQuiz ? "Generating..." : "Generate Quiz"}
                 </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── NCERT Books & Content Management Panel (School Branch Admin & Superadmin) ─────
+
+function NCERTBookManagementPanel({ onModuleAttached }: { onModuleAttached?: () => void }) {
+  const [classFilter, setClassFilter] = useState<number>(0); // 0 = All Classes
+  const [subjectFilter, setSubjectFilter] = useState<string>("");
+  const [books, setBooks] = useState<NCERTBookOut[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
+
+  // Upload PDF Modal
+  const [uploadBook, setUploadBook] = useState<NCERTBookOut | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Create Book Modal
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [createClass, setCreateClass] = useState<number>(1);
+  const [createSubject, setCreateSubject] = useState<string>("Mathematics");
+  const [createTitle, setCreateTitle] = useState<string>("");
+  const [createDesc, setCreateDesc] = useState<string>("");
+  const [createFile, setCreateFile] = useState<File | null>(null);
+  const [isCreating, setIsCreating] = useState<boolean>(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  // Edit Book Modal
+  const [editingBook, setEditingBook] = useState<NCERTBookOut | null>(null);
+  const [editTitle, setEditTitle] = useState<string>("");
+  const [editSubject, setEditSubject] = useState<string>("");
+  const [editDesc, setEditDesc] = useState<string>("");
+  const [editClass, setEditClass] = useState<number>(1);
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Attaching module loading ID
+  const [attachingId, setAttachingId] = useState<string | null>(null);
+
+  const fetchBooks = () => {
+    setLoading(true);
+    getAllNCERTBooks(classFilter || undefined, subjectFilter.trim() || undefined)
+      .then((res) => setBooks(res))
+      .catch((err) => console.log("Fetch NCERT books error:", err.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchBooks();
+  }, [classFilter, subjectFilter]);
+
+  const handleUploadPdfSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadBook || !pdfFile) return;
+
+    if (pdfFile.size > 50 * 1024 * 1024) {
+      setUploadError("PDF file size cannot exceed 50 MB.");
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      await uploadNCERTBookPdf(uploadBook.id, pdfFile);
+      setActionMsg(`PDF content successfully attached to "${uploadBook.title}"!`);
+      setUploadBook(null);
+      setPdfFile(null);
+      fetchBooks();
+      if (onModuleAttached) onModuleAttached();
+      setTimeout(() => setActionMsg(null), 4000);
+    } catch (err: any) {
+      setUploadError(err.message || "Failed to upload PDF file.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleCreateBookSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createTitle.trim() || !createSubject.trim()) return;
+
+    setIsCreating(true);
+    setCreateError(null);
+    try {
+      const formData = new FormData();
+      formData.append("class_number", createClass.toString());
+      formData.append("subject", createSubject.trim());
+      formData.append("title", createTitle.trim());
+      if (createDesc.trim()) formData.append("description", createDesc.trim());
+      if (createFile) formData.append("file", createFile);
+
+      await createNCERTBook(formData);
+      setShowCreateModal(false);
+      setCreateTitle("");
+      setCreateDesc("");
+      setCreateFile(null);
+      setActionMsg("New NCERT book created successfully!");
+      fetchBooks();
+      setTimeout(() => setActionMsg(null), 4000);
+    } catch (err: any) {
+      setCreateError(err.message || "Failed to create NCERT book.");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleUpdateBookSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBook || !editTitle.trim()) return;
+
+    setIsUpdating(true);
+    setEditError(null);
+    try {
+      await updateNCERTBook(editingBook.id, {
+        title: editTitle.trim(),
+        subject: editSubject.trim(),
+        description: editDesc.trim() || undefined,
+        class_number: editClass,
+      });
+      setEditingBook(null);
+      setActionMsg("NCERT book details updated successfully!");
+      fetchBooks();
+      setTimeout(() => setActionMsg(null), 4000);
+    } catch (err: any) {
+      setEditError(err.message || "Failed to update NCERT book.");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteBook = async (book: NCERTBookOut) => {
+    if (!confirm(`Are you sure you want to delete "${book.title}"?`)) return;
+    try {
+      await deleteNCERTBook(book.id);
+      setActionMsg(`NCERT book "${book.title}" deleted.`);
+      fetchBooks();
+      setTimeout(() => setActionMsg(null), 4000);
+    } catch (err: any) {
+      alert(err.message || "Failed to delete NCERT book.");
+    }
+  };
+
+  const handleDetachFile = async (book: NCERTBookOut) => {
+    if (!confirm(`Remove the attached PDF file from "${book.title}"?`)) return;
+    try {
+      await detachNCERTBookFile(book.id);
+      setActionMsg(`PDF file detached from "${book.title}".`);
+      fetchBooks();
+      setTimeout(() => setActionMsg(null), 4000);
+    } catch (err: any) {
+      alert(err.message || "Failed to detach PDF file.");
+    }
+  };
+
+  const handleAttachToSchoolModules = async (book: NCERTBookOut) => {
+    setAttachingId(book.id);
+    try {
+      await addNCERTModuleToSchool(book.class_number, book.id, book.title);
+      setActionMsg(`"${book.title}" attached to Class ${book.class_number} school modules!`);
+      if (onModuleAttached) onModuleAttached();
+      setTimeout(() => setActionMsg(null), 4000);
+    } catch (err: any) {
+      alert(err.message || "Failed to attach module.");
+    } finally {
+      setAttachingId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header & Action Bar */}
+      <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-brand" />
+              <span>NCERT Books & Catalogue Management</span>
+            </h2>
+            <p className="text-xs text-text-secondary mt-1">
+              Upload real textbook PDF files, attach them to classes and subjects, and seed them into your school module library for learning and diagnostic quiz generation.
+            </p>
+          </div>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setCreateError(null);
+              setShowCreateModal(true);
+            }}
+            className="text-xs shrink-0"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
+            Add New NCERT Book
+          </Button>
+        </div>
+
+        {/* Filter Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 border-t border-border-primary/50">
+          {/* Class Filter Tabs */}
+          <div className="flex items-center gap-1 bg-surface-hover p-1 rounded-[var(--radius-md)] overflow-x-auto">
+            <button
+              onClick={() => setClassFilter(0)}
+              className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
+                classFilter === 0
+                  ? "bg-surface text-brand shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              All Classes
+            </button>
+            {[1, 2, 3, 4, 5].map((cls) => (
+              <button
+                key={cls}
+                onClick={() => setClassFilter(cls)}
+                className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
+                  classFilter === cls
+                    ? "bg-surface text-brand shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                Class {cls}
+              </button>
+            ))}
+          </div>
+
+          {/* Subject Filter Input */}
+          <div className="relative max-w-xs w-full">
+            <Search className="w-4 h-4 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search by subject (e.g. Math, EVS)..."
+              value={subjectFilter}
+              onChange={(e) => setSubjectFilter(e.target.value)}
+              className="w-full pl-9 pr-3.5 py-1.5 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none"
+            />
+          </div>
+        </div>
+      </div>
+
+      {actionMsg && (
+        <div className="p-3 rounded bg-emerald-500/10 text-emerald-500 text-xs font-semibold flex items-center gap-2">
+          <Check className="w-4 h-4" />
+          <span>{actionMsg}</span>
+        </div>
+      )}
+
+      {/* NCERT Books Grid */}
+      {loading ? (
+        <div className="py-12 flex justify-center">
+          <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : books.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {books.map((book) => {
+            const hasPdf = Boolean(book.file_url);
+
+            return (
+              <div
+                key={book.id}
+                className="glass rounded-[var(--radius-lg)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between space-y-4"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-brand/10 text-brand">
+                      {book.subject}
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface text-text-secondary border border-border-primary">
+                      Class {book.class_number}
+                    </span>
+                  </div>
+
+                  <h3 className="text-sm font-bold text-text-primary">{book.title}</h3>
+                  {book.description && (
+                    <p className="text-xs text-text-secondary mt-1 line-clamp-2">
+                      {book.description}
+                    </p>
+                  )}
+
+                  {/* PDF Status Badge */}
+                  <div className="mt-3 flex items-center gap-2">
+                    {hasPdf ? (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" /> PDF File Attached
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> No File Content
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions Footer */}
+                <div className="pt-3 border-t border-border-primary/50 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    {hasPdf ? (
+                      <a
+                        href={formatPdfUrl(book.file_url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-brand font-semibold hover:underline"
+                      >
+                        <FileText className="w-3.5 h-3.5" /> View PDF
+                      </a>
+                    ) : (
+                      <span className="text-text-tertiary italic text-[11px]">Attach file to seed</span>
+                    )}
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setEditTitle(book.title);
+                          setEditSubject(book.subject);
+                          setEditDesc(book.description || "");
+                          setEditClass(book.class_number);
+                          setEditError(null);
+                          setEditingBook(book);
+                        }}
+                        className="text-text-tertiary hover:text-brand transition-colors p-1 rounded hover:bg-surface"
+                        title="Edit Book Details"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteBook(book)}
+                        className="text-text-tertiary hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-500/10"
+                        title="Delete NCERT Book"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={hasPdf ? "outline" : "primary"}
+                      size="sm"
+                      onClick={() => {
+                        setUploadError(null);
+                        setPdfFile(null);
+                        setUploadBook(book);
+                      }}
+                      className="w-full text-xs py-1.5"
+                    >
+                      <Upload className="w-3.5 h-3.5 mr-1" />
+                      {hasPdf ? "Replace PDF" : "Upload PDF File"}
+                    </Button>
+
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={attachingId === book.id}
+                      onClick={() => handleAttachToSchoolModules(book)}
+                      className="w-full text-xs py-1.5"
+                      title="Instantly add this NCERT book into Class Modules"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      {attachingId === book.id ? "Attaching..." : "Attach to Modules"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
+          <BookOpen className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
+          <h3 className="text-sm font-semibold text-text-primary">No NCERT Books Found</h3>
+          <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
+            No NCERT books match your filter criteria. Use the "Add New NCERT Book" button above to add a title and upload PDF content.
+          </p>
+        </div>
+      )}
+
+      {/* UPLOAD PDF MODAL */}
+      {uploadBook && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass rounded-[var(--radius-xl)] p-6 max-w-md w-full border border-border-primary space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+                <Upload className="w-5 h-5 text-brand" />
+                <span>Upload PDF for {uploadBook.title}</span>
+              </h3>
+              <button
+                onClick={() => setUploadBook(null)}
+                className="text-text-tertiary hover:text-text-primary cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-text-secondary">
+              Upload the official textbook PDF content for Class {uploadBook.class_number} {uploadBook.subject}. This content will be attached to all linked modules and used for student reading & diagnostic quiz generation.
+            </p>
+
+            {uploadError && (
+              <div className="p-3 rounded bg-rose-500/10 text-rose-500 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{uploadError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUploadPdfSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                  Select PDF File (Max 50 MB) *
+                </label>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-text-secondary file:mr-3 file:py-2 file:px-4 file:rounded-[var(--radius-md)] file:border-0 file:text-xs file:font-semibold file:bg-brand/10 file:text-brand hover:file:bg-brand/20 cursor-pointer"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="ghost" size="sm" type="button" onClick={() => setUploadBook(null)}>
+                  Cancel
+                </Button>
+                <Button variant="primary" size="sm" type="submit" disabled={isUploading || !pdfFile}>
+                  {isUploading ? "Uploading..." : "Upload & Attach PDF"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE NEW NCERT BOOK MODAL */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass rounded-[var(--radius-xl)] p-6 max-w-md w-full border border-border-primary space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+                <Plus className="w-5 h-5 text-brand" />
+                <span>Add New NCERT Book Entry</span>
+              </h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-text-tertiary hover:text-text-primary cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {createError && (
+              <div className="p-3 rounded bg-rose-500/10 text-rose-500 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{createError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateBookSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">
+                    Target Class *
+                  </label>
+                  <select
+                    value={createClass}
+                    onChange={(e) => setCreateClass(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-surface text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
+                  >
+                    {[1, 2, 3, 4, 5].map((cls) => (
+                      <option key={cls} value={cls}>
+                        Class {cls}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">
+                    Subject Name *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Mathematics"
+                    value={createSubject}
+                    onChange={(e) => setCreateSubject(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                  Textbook Title *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Math Magic - Class 1"
+                  value={createTitle}
+                  onChange={(e) => setCreateTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                  Description
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Brief description of textbook content..."
+                  value={createDesc}
+                  onChange={(e) => setCreateDesc(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">
+                  Attach PDF File (Optional)
+                </label>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => setCreateFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-text-secondary file:mr-3 file:py-2 file:px-4 file:rounded-[var(--radius-md)] file:border-0 file:text-xs file:font-semibold file:bg-brand/10 file:text-brand hover:file:bg-brand/20 cursor-pointer"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="ghost" size="sm" type="button" onClick={() => setShowCreateModal(false)}>
+                  Cancel
+                </Button>
+                <Button variant="primary" size="sm" type="submit" disabled={isCreating}>
+                  {isCreating ? "Creating..." : "Create NCERT Book"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT NCERT BOOK MODAL */}
+      {editingBook && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass rounded-[var(--radius-xl)] p-6 max-w-md w-full border border-border-primary space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+                <Edit className="w-5 h-5 text-brand" />
+                <span>Edit NCERT Book Entry</span>
+              </h3>
+              <button
+                onClick={() => setEditingBook(null)}
+                className="text-text-tertiary hover:text-text-primary cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editError && (
+              <div className="p-3 rounded bg-rose-500/10 text-rose-500 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{editError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateBookSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Class</label>
+                  <select
+                    value={editClass}
+                    onChange={(e) => setEditClass(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-surface text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
+                  >
+                    {[1, 2, 3, 4, 5].map((cls) => (
+                      <option key={cls} value={cls}>
+                        Class {cls}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Subject</label>
+                  <input
+                    type="text"
+                    value={editSubject}
+                    onChange={(e) => setEditSubject(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">Title</label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1">Description</label>
+                <textarea
+                  rows={2}
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
+                />
+              </div>
+
+              <div className="flex justify-between items-center pt-2">
+                {editingBook.file_url ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const bookToDetach = editingBook;
+                      setEditingBook(null);
+                      handleDetachFile(bookToDetach);
+                    }}
+                    className="text-xs text-rose-500 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Detach PDF File
+                  </button>
+                ) : (
+                  <span />
+                )}
+
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" type="button" onClick={() => setEditingBook(null)}>
+                    Cancel
+                  </Button>
+                  <Button variant="primary" size="sm" type="submit" disabled={isUpdating}>
+                    {isUpdating ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
               </div>
             </form>
           </div>

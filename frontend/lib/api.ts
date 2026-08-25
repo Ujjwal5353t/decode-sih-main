@@ -332,6 +332,85 @@ export async function getNCERTBooksForClass(class_number: number): Promise<NCERT
   return fetchApi<NCERTBookOut[]>(`/ncert/books/class/${class_number}`);
 }
 
+export async function getAllNCERTBooks(class_number?: number, subject?: string): Promise<NCERTBookOut[]> {
+  const params = new URLSearchParams();
+  if (class_number) params.append("class_number", class_number.toString());
+  if (subject) params.append("subject", subject);
+  const q = params.toString() ? `?${params.toString()}` : "";
+  return fetchApi<NCERTBookOut[]>(`/ncert/books${q}`);
+}
+
+export async function uploadNCERTBookPdf(book_id: string, file: File): Promise<NCERTBookOut> {
+  const token = getStoredToken();
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/ncert/books/${book_id}/upload-pdf`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      typeof err.detail === "string" ? err.detail : "Failed to upload NCERT PDF file."
+    );
+  }
+  return response.json();
+}
+
+export async function createNCERTBook(formData: FormData): Promise<NCERTBookOut> {
+  const token = getStoredToken();
+  const response = await fetch(`${API_BASE_URL}/ncert/books`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      typeof err.detail === "string" ? err.detail : "Failed to create NCERT book."
+    );
+  }
+  return response.json();
+}
+
+export async function updateNCERTBook(
+  book_id: string,
+  payload: { title?: string; subject?: string; description?: string; class_number?: number }
+): Promise<NCERTBookOut> {
+  return fetchApi<NCERTBookOut>(`/ncert/books/${book_id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function detachNCERTBookFile(book_id: string): Promise<NCERTBookOut> {
+  return fetchApi<NCERTBookOut>(`/ncert/books/${book_id}/file`, {
+    method: "DELETE",
+  });
+}
+
+export async function deleteNCERTBook(book_id: string): Promise<void> {
+  await fetchApi<{}>(`/ncert/books/${book_id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function addNCERTModuleToSchool(
+  class_number: number,
+  ncert_book_id: string,
+  title?: string
+): Promise<ModuleOut> {
+  return fetchApi<ModuleOut>(`/school/classes/${class_number}/modules/ncert`, {
+    method: "POST",
+    body: JSON.stringify({ ncert_book_id, title }),
+  });
+}
+
+
 export interface ContactInquiryResponse {
   id: string;
   name: string;

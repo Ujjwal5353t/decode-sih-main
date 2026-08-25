@@ -222,27 +222,32 @@ async def seed_self_school(session: AsyncSession) -> None:
 async def seed_demo_accounts(session: AsyncSession) -> None:
     """Seed demo accounts for School Admin, Teacher, Student, Parent & Modules."""
     # 1. School Admin Branch: LKD
+    # 1. School Admin Branch: LPS Karkarduma Branch
     sch_res = await session.execute(
         select(School).where(
-            (School.branch_name == "LKD") | (School.student_prefix == "LKD")
+            (School.email == "school@lps.edu") | (School.branch_name == "LPS Karkarduma Branch")
         )
     )
     school = sch_res.scalar_one_or_none()
     if not school:
         school = School(
-            school_name="Delhi Public School",
-            branch_name="LKD",
+            school_name="LPS Karkarduma",
+            branch_name="LPS Karkarduma Branch",
             student_prefix="LKD",
-            email="dps.lkd@vidyasetu.ai",
-            password_hash=hash_password("Password123!"),
+            email="school@lps.edu",
+            password_hash=hash_password("123456789"),
             state="Delhi",
         )
         session.add(school)
         await session.commit()
         await session.refresh(school)
-        print("[seed] Demo School Branch 'LKD' created.")
+        print("[seed] Demo School Branch 'LPS Karkarduma Branch' created.")
     else:
-        print(f"[seed] School Branch '{school.branch_name}' (prefix '{school.student_prefix}') already exists.")
+        school.password_hash = hash_password("123456789")
+        session.add(school)
+        await session.commit()
+        print(f"[seed] School Branch '{school.branch_name}' (prefix '{school.student_prefix}') password verified.")
+
 
     b_name = school.branch_name
     s_name = school.school_name
