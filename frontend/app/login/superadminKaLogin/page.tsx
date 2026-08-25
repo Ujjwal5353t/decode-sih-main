@@ -77,6 +77,7 @@ export default function SuperAdminLoginPage() {
             VidyaSetu
           </span>
         </Link>
+
         <div className="flex items-center gap-4">
           <ThemeToggle />
           <Link href="/login">

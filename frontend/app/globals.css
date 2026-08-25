@@ -74,8 +74,12 @@
   --glass-blur: 16px;
 
   /* Nav */
-  --nav-height: 72px;
+  --nav-height: 76px;
 }
+
+
+
+
 
 [data-theme="dark"] {
   --bg-primary: #0A0F1C;

@@ -166,6 +166,7 @@ export default function LoginPage() {
             VidyaSetu
           </span>
         </Link>
+
         <div className="flex items-center gap-4">
           <ThemeToggle />
           <Link href="/register">
@@ -266,16 +267,7 @@ export default function LoginPage() {
             )}
 
             {/* Role Description Badge */}
-            <div className="mb-6 p-3 rounded-[var(--radius-md)] bg-brand/5 border border-border-brand text-xs text-text-secondary flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-brand shrink-0" />
-              <span>
-                {selectedRole === "student"
-                  ? studentLoginType === "self"
-                    ? "🌟 Self-Enrolled Login: No branch name required."
-                    : "🏫 School-Enrolled Login: Enter your school branch name below."
-                  : rolesConfig.find((r) => r.id === selectedRole)?.description}
-              </span>
-            </div>
+            
 
             {/* Error Alert */}
             {activeError && (

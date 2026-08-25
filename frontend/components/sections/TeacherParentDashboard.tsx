@@ -190,6 +190,7 @@ export function TeacherParentDashboard() {
                 <p className="text-xs text-text-tertiary">
                   VidyaSetu AI Connected Ecosystem · Real-Time Sync
                 </p>
+
               </div>
             </div>
 

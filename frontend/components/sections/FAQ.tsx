@@ -7,14 +7,14 @@ import { SectionWrapper } from "@/components/shared/SectionWrapper";
 
 const faqData = [
   {
-    question: "01 — What is Inclusive Education AI?",
+    question: "01 — What is VidyaSetu?",
     answer:
-      "Inclusive Education AI is an AI-powered learning platform built to make education accessible to every child—regardless of language, learning needs, or internet connectivity.\n\nIt combines adaptive learning, regional languages, offline-first education, assistive technology, life-skills learning, and AI-powered support for teachers and parents in one ecosystem.",
+      "VidyaSetu is an AI-powered learning platform built to make education accessible to every child—regardless of language, learning needs, or internet connectivity.\n\nIt combines adaptive learning, regional languages, offline-first education, assistive technology, life-skills learning, and AI-powered support for teachers and parents in one ecosystem.",
   },
   {
     question: "02 — What makes it different from a normal AI tutor?",
     answer:
-      "We don't just make AI explain a lesson—we make the learning experience adapt to the learner.\n\nUnlike a conventional AI tutor, Inclusive Education AI combines personalized learning + accessibility + regional languages + offline learning + assistive technology + teacher/parent collaboration.\n\nA child doesn't simply receive an answer. The platform learns from their progress and adapts what they learn, how they learn it, and how much support they receive.",
+      "We don't just make AI explain a lesson—we make the learning experience adapt to the learner.\n\nUnlike a conventional AI tutor, VidyaSetu combines personalized learning + accessibility + regional languages + offline learning + assistive technology + teacher/parent collaboration.\n\nA child doesn't simply receive an answer. The platform learns from their progress and adapts what they learn, how they learn it, and how much support they receive.",
   },
   {
     question: "03 — How does AI personalize learning for my child?",
@@ -42,7 +42,7 @@ const faqData = [
       "Learning shouldn't stop at the student's screen.\n\nOur Teacher/Parent AI Co-Pilot turns learning progress into useful, human-friendly insights.\n\nTeachers can receive actionable recommendations about where a child may need additional support, while parents can receive simple updates—potentially through voice in their preferred language—so they understand what the child is learning and how they can help.\n\nAI connects the child, teacher, and parent instead of isolating learning to an app.",
   },
   {
-    question: "08 — Does Inclusive Education AI replace teachers?",
+    question: "08 — Does VidyaSetu replace teachers?",
     answer:
       "No. It makes teachers more powerful.\n\nAI can handle repetitive tasks such as identifying learning patterns, adapting content, and summarizing progress. Teachers remain responsible for the human side of education—understanding the child, building confidence, mentoring, encouraging, and making important decisions.\n\nAI personalizes the learning. Humans personalize the care.",
   },

@@ -124,6 +124,7 @@ export default function DashboardPage() {
             </span>
           </Link>
 
+
           <div className="flex items-center gap-4">
             {/* Role Badge */}
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand/10 border border-border-brand text-xs font-semibold text-brand uppercase tracking-wider">

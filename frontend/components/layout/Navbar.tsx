@@ -8,6 +8,8 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
+import Image from "next/image";
+
 const navLinks = [
   { label: "Product",    href: "#how-it-works" },
   { label: "Features",  href: "#features" },
@@ -59,25 +61,24 @@ export function Navbar() {
           {/* Logo */}
           <Link
             href="/"
-            className="flex items-center gap-2.5 group"
+            className="flex items-center group py-0.5"
             aria-label="VidyaSetu — Go to home"
           >
-            <motion.div
-              whileHover={{ scale: 1.08, rotate: 5 }}
-              transition={{ type: "spring", stiffness: 400, damping: 15 }}
-              className="w-9 h-9 rounded-[var(--radius-md)] flex items-center justify-center
-                       shadow-[var(--shadow-brand)]"
-              style={{ background: "var(--gradient-brand)" }}
-            >
-              <Sparkles className="w-5 h-5 text-white" />
-            </motion.div>
-            <span
-              className="font-[family-name:var(--font-display)] text-lg font-bold text-text-primary
-                           group-hover:text-brand transition-colors duration-200"
-            >
-              VidyaSetu
-            </span>
+            <Image
+              src="/vidyasetu-logo.png"
+              alt="VidyaSetu — LEARN • GROW • BELONG — AI for Inclusive Education"
+              width={360}
+              height={108}
+              className="h-14 sm:h-16 md:h-17 lg:h-18 w-auto object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+              priority
+            />
           </Link>
+
+
+
+
+
+
 
           {/* Desktop Nav Links */}
           <div className="hidden lg:flex items-center gap-1">
