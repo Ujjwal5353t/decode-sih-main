@@ -60,6 +60,11 @@ export interface AdminProfile {
   created_at: string;
 }
 
+export type ModuleSourceType = "pdf_upload" | "image_upload" | "ncert";
+
+/** Mirrors backend `OcrStatus` — pending | processing | done | failed | na. */
+export type OcrStatusValue = "pending" | "processing" | "done" | "failed" | "na";
+
 export interface ModuleOut {
   id: string;
   branch_name: string;
@@ -68,6 +73,21 @@ export interface ModuleOut {
   title: string;
   file_url: string | null;
   created_at: string;
+  // Fields the backend always returns for school modules. Optional here so
+  // existing callers that only read the properties above stay unchanged.
+  source_type?: ModuleSourceType;
+  ncert_book_id?: string | null;
+  updated_at?: string;
+  ocr_status?: OcrStatusValue;
+  ocr_pdf_url?: string | null;
+}
+
+/** Response of GET /school/classes/{n}/modules/{id}/ocr */
+export interface OcrStatusOut {
+  module_id: string;
+  ocr_status: OcrStatusValue;
+  ocr_pdf_url: string | null;
+  message: string;
 }
 
 export interface ChildLinkOut {
@@ -698,4 +718,190 @@ export async function deassignClassFromTeacher(
     `/school/teachers/${teacher_id}/assign-class/${class_number}/${section}`,
     { method: "DELETE" }
   );
+}
+
+// ── School Module Upload & OCR ────────────────────────────────────────────────
+// Wrappers around the module endpoints already exposed by the School Dashboard
+// router (see backend `src/api/routes/school.py`). Nothing here is new backend
+// surface — these are the same contracts the dashboard already relies on.
+
+/**
+ * Build the backend proxy URL used to view a stored PDF inline.
+ * Mirrors `GET /files/view-pdf`, which streams both local `/uploads/...` paths
+ * and remote Cloudinary URLs with the right `Content-Type`.
+ */
+export function buildPdfViewUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  return `${API_BASE_URL}/files/view-pdf?url=${encodeURIComponent(url)}`;
+}
+
+/**
+ * Multipart POST/PUT with real upload-progress reporting.
+ *
+ * `fetchApi` is used everywhere else, but `fetch` cannot report upload
+ * progress, so the multipart module endpoints go through XHR instead. Auth,
+ * error shape and the sliding-window token refresh behave identically.
+ */
+function uploadFormData<T>(
+  endpoint: string,
+  formData: FormData,
+  options: { method?: "POST" | "PUT"; onProgress?: (percent: number) => void } = {}
+): Promise<T> {
+  const { method = "POST", onProgress } = options;
+
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, `${API_BASE_URL}${endpoint}`);
+
+    const token = getStoredToken();
+    if (token) {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
+
+    if (onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && event.total > 0) {
+          onProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      // Sliding window token update check from backend header
+      const refreshedToken = xhr.getResponseHeader("x-access-token");
+      if (refreshedToken) {
+        const currentRole = getStoredRole();
+        if (currentRole) {
+          setStoredAuth(refreshedToken, currentRole);
+        }
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        if (xhr.status === 204 || !xhr.responseText) {
+          resolve({} as T);
+          return;
+        }
+        try {
+          resolve(JSON.parse(xhr.responseText) as T);
+        } catch {
+          reject(new Error("Received an invalid response from the server."));
+        }
+        return;
+      }
+
+      let errorMessage = "An unexpected error occurred.";
+      try {
+        const errorData = JSON.parse(xhr.responseText);
+        if (typeof errorData.detail === "string") {
+          errorMessage = errorData.detail;
+        } else if (Array.isArray(errorData.detail)) {
+          errorMessage = errorData.detail
+            .map((e: { msg?: string }) => e.msg)
+            .join(", ");
+        }
+      } catch {
+        errorMessage = xhr.statusText || errorMessage;
+      }
+      reject(new Error(errorMessage));
+    };
+
+    xhr.onerror = () =>
+      reject(new Error("Network error — could not reach the server."));
+    xhr.onabort = () => reject(new Error("Upload cancelled."));
+    xhr.ontimeout = () => reject(new Error("The upload timed out."));
+
+    xhr.send(formData);
+  });
+}
+
+/** POST /school/classes/{class_number}/modules/pdf — upload a PDF as a module. */
+export async function uploadSchoolPdfModule(
+  class_number: number,
+  title: string,
+  file: File,
+  onProgress?: (percent: number) => void
+): Promise<ModuleOut> {
+  const formData = new FormData();
+  formData.append("title", title);
+  formData.append("file", file);
+  return uploadFormData<ModuleOut>(
+    `/school/classes/${class_number}/modules/pdf`,
+    formData,
+    { onProgress }
+  );
+}
+
+/**
+ * POST /school/classes/{class_number}/modules/images — upload page images.
+ * The backend merges them into one PDF and starts EasyOCR in the background,
+ * so the created module comes back with `ocr_status: "pending"`.
+ */
+export async function uploadSchoolImagesModule(
+  class_number: number,
+  title: string,
+  files: File[],
+  onProgress?: (percent: number) => void
+): Promise<ModuleOut> {
+  const formData = new FormData();
+  formData.append("title", title);
+  files.forEach((file) => formData.append("files", file));
+  return uploadFormData<ModuleOut>(
+    `/school/classes/${class_number}/modules/images`,
+    formData,
+    { onProgress }
+  );
+}
+
+/**
+ * PUT /school/classes/{class_number}/modules/{module_id}/replace-images
+ * Replaces the module's pages and re-runs OCR from scratch. This is the retry
+ * path the backend documents for a failed extraction.
+ */
+export async function replaceSchoolModuleImages(
+  class_number: number,
+  module_id: string,
+  files: File[],
+  title?: string,
+  onProgress?: (percent: number) => void
+): Promise<ModuleOut> {
+  const formData = new FormData();
+  if (title) formData.append("title", title);
+  files.forEach((file) => formData.append("files", file));
+  return uploadFormData<ModuleOut>(
+    `/school/classes/${class_number}/modules/${module_id}/replace-images`,
+    formData,
+    { method: "PUT", onProgress }
+  );
+}
+
+/** GET /school/classes/{class_number}/modules/{module_id}/ocr — poll OCR state. */
+export async function getModuleOcrStatus(
+  class_number: number,
+  module_id: string
+): Promise<OcrStatusOut> {
+  return fetchApi<OcrStatusOut>(
+    `/school/classes/${class_number}/modules/${module_id}/ocr`
+  );
+}
+
+/** PATCH /school/classes/{class_number}/modules/{module_id}/title */
+export async function updateSchoolModuleTitle(
+  class_number: number,
+  module_id: string,
+  title: string
+): Promise<ModuleOut> {
+  return fetchApi<ModuleOut>(
+    `/school/classes/${class_number}/modules/${module_id}/title`,
+    { method: "PATCH", body: JSON.stringify({ title }) }
+  );
+}
+
+/** DELETE /school/classes/{class_number}/modules/{module_id} */
+export async function deleteSchoolModule(
+  class_number: number,
+  module_id: string
+): Promise<void> {
+  await fetchApi<void>(`/school/classes/${class_number}/modules/${module_id}`, {
+    method: "DELETE",
+  });
 }
