@@ -86,6 +86,12 @@ export interface ChildLinkOut {
   id: string;
   parent_id: string;
   student_unique_number: string;
+  full_name?: string;
+  class_number?: number | null;
+  section?: string | null;
+  school_name?: string | null;
+  branch_name?: string | null;
+  enrollment_type?: string | null;
   created_at: string;
 }
 

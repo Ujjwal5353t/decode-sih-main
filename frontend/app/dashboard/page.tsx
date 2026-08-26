@@ -313,252 +313,288 @@ function StudentDashboardView({
 
   return (
     <div className="space-y-6">
-      {/* Profile Overview Card */}
-      <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary relative overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-text-primary">
-                Welcome, {student.full_name || `Student #${student.unique_number}`}
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-mono bg-brand/10 text-brand border border-border-brand">
-                {student.unique_number}
-              </span>
+      {/* TAB: OVERVIEW */}
+      {activeTab === "overview" && (
+        <div className="space-y-6">
+          {/* Profile Overview Card */}
+          <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary relative overflow-hidden">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-text-primary">
+                    Welcome, {student.full_name || `Student #${student.unique_number}`}
+                  </h1>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono bg-brand/10 text-brand border border-border-brand">
+                    {student.unique_number}
+                  </span>
+                </div>
+                <p className="text-sm text-text-secondary mt-1">
+                  {isSelfEnrolled ? (
+                    <span className="font-semibold text-brand">🌟 Self-Educated Student (NCERT Curriculum)</span>
+                  ) : (
+                    <span>{student.school_name} — {student.branch_name} ({student.state})</span>
+                  )}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="px-3.5 py-1.5 rounded-full bg-surface border border-border-primary text-xs flex items-center gap-2">
+                  {isSelfEnrolled ? (
+                    <span className="text-brand font-bold flex items-center gap-1">
+                      <BookOpen className="w-3.5 h-3.5" /> Self Enrolled
+                    </span>
+                  ) : (
+                    <span className="text-text-primary font-bold flex items-center gap-1">
+                      <Building2 className="w-3.5 h-3.5 text-brand" /> School Enrolled
+                    </span>
+                  )}
+                </div>
+
+                <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
+                  <span className="text-text-tertiary block">
+                    {isSelfEnrolled ? "Class" : "Class & Section"}
+                  </span>
+                  <span className="font-semibold text-text-primary">
+                    {student.class_number
+                      ? isSelfEnrolled
+                        ? `Class ${student.class_number}`
+                        : `Class ${student.class_number} - Section ${student.section}`
+                      : "Not Configured"}
+                  </span>
+                </div>
+              </div>
             </div>
-            <p className="text-sm text-text-secondary mt-1">
-              {isSelfEnrolled ? (
-                <span className="font-semibold text-brand">🌟 Self-Educated Student (NCERT Curriculum)</span>
-              ) : (
-                <span>{student.school_name} — {student.branch_name} ({student.state})</span>
-              )}
-            </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="px-3.5 py-1.5 rounded-full bg-surface border border-border-primary text-xs flex items-center gap-2">
-              {isSelfEnrolled ? (
-                <span className="text-brand font-bold flex items-center gap-1">
-                  <BookOpen className="w-3.5 h-3.5" /> Self Enrolled
-                </span>
-              ) : (
-                <span className="text-text-primary font-bold flex items-center gap-1">
-                  <Building2 className="w-3.5 h-3.5 text-brand" /> School Enrolled
-                </span>
-              )}
+          {/* Class Setup Card if Class/Section not set */}
+          {needsSetup && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass rounded-[var(--radius-lg)] p-6 border border-brand/30 bg-brand/5"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-[var(--radius-sm)] bg-brand text-white flex items-center justify-center shrink-0">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-base font-bold text-text-primary">
+                    {isSelfEnrolled ? "Select Your Class" : "Complete Your Class & Section Setup"}
+                  </h2>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    {isSelfEnrolled
+                      ? "Select your class (1–5) to view your official NCERT learning curriculum."
+                      : "Select your class (1–5) and section to view your assigned school learning modules."}
+                  </p>
+
+                  {errorMsg && (
+                    <div className="mt-3 p-2.5 rounded bg-rose-500/10 text-rose-500 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{errorMsg}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSetupSubmit} className="mt-4 flex flex-wrap items-center gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1">Class</label>
+                      <select
+                        value={selectedClass}
+                        onChange={(e) => setSelectedClass(Number(e.target.value))}
+                        className="px-3 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none"
+                      >
+                        {[1, 2, 3, 4, 5].map((num) => (
+                          <option key={num} value={num}>
+                            Class {num}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {!isSelfEnrolled && (
+                      <div>
+                        <label className="block text-xs font-medium text-text-secondary mb-1">Section</label>
+                        <select
+                          value={selectedSection}
+                          onChange={(e) => setSelectedSection(e.target.value)}
+                          className="px-3 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none"
+                        >
+                          {["A", "B", "C", "D"].map((sec) => (
+                            <option key={sec} value={sec}>
+                              Section {sec}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div className="self-end">
+                      <Button type="submit" variant="primary" size="sm" disabled={isSettingUp}>
+                        {isSettingUp
+                          ? "Saving..."
+                          : isSelfEnrolled
+                          ? "Save Class"
+                          : "Save Class & Section"}
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+              <span className="text-xs text-text-tertiary block">Available Modules</span>
+              <span className="text-2xl font-bold text-text-primary">
+                {isSelfEnrolled ? ncertBooks.length : modules.length}
+              </span>
+              <span className="text-[11px] text-brand">
+                {isSelfEnrolled ? "NCERT Official Books" : "School Branch Syllabus"}
+              </span>
             </div>
 
-            <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
-              <span className="text-text-tertiary block">
-                {isSelfEnrolled ? "Class" : "Class & Section"}
-              </span>
-              <span className="font-semibold text-text-primary">
-                {student.class_number
-                  ? isSelfEnrolled
-                    ? `Class ${student.class_number}`
-                    : `Class ${student.class_number} - Section ${student.section}`
-                  : "Not Configured"}
-              </span>
+            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+              <span className="text-xs text-text-tertiary block">Learning Format</span>
+              <span className="text-2xl font-bold text-text-primary">Interactive AI</span>
+              <span className="text-[11px] text-emerald-500">PDF Reader & AI Diagnostic Quizzes</span>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Class Setup Card if Class/Section not set */}
-      {needsSetup && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass rounded-[var(--radius-lg)] p-6 border border-brand/30 bg-brand/5"
-        >
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-[var(--radius-sm)] bg-brand text-white flex items-center justify-center shrink-0">
-              <BookOpen className="w-5 h-5" />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-base font-bold text-text-primary">
-                {isSelfEnrolled ? "Select Your Class" : "Complete Your Class & Section Setup"}
-              </h2>
-              <p className="text-xs text-text-secondary mt-0.5">
-                {isSelfEnrolled
-                  ? "Select your class (1–5) to view your official NCERT learning curriculum."
-                  : "Select your class (1–5) and section to view your assigned school learning modules."}
-              </p>
-
-              {errorMsg && (
-                <div className="mt-3 p-2.5 rounded bg-rose-500/10 text-rose-500 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleSetupSubmit} className="mt-4 flex flex-wrap items-center gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1">Class</label>
-                  <select
-                    value={selectedClass}
-                    onChange={(e) => setSelectedClass(Number(e.target.value))}
-                    className="px-3 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none"
-                  >
-                    {[1, 2, 3, 4, 5].map((num) => (
-                      <option key={num} value={num}>
-                        Class {num}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {!isSelfEnrolled && (
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1">Section</label>
-                    <select
-                      value={selectedSection}
-                      onChange={(e) => setSelectedSection(e.target.value)}
-                      className="px-3 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none"
-                    >
-                      {["A", "B", "C", "D"].map((sec) => (
-                        <option key={sec} value={sec}>
-                          Section {sec}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="self-end">
-                  <Button type="submit" variant="primary" size="sm" disabled={isSettingUp}>
-                    {isSettingUp
-                      ? "Saving..."
-                      : isSelfEnrolled
-                      ? "Save Class"
-                      : "Save Class & Section"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </motion.div>
       )}
 
-      {/* Student Learning Curriculum View */}
-      <div>
-        <h2 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
-          <Layers className="w-5 h-5 text-brand" />
-          <span>
-            {isSelfEnrolled
-              ? `NCERT Official Curriculum (Class ${student.class_number || 1})`
-              : "School-Provided Learning Modules"}
-          </span>
-        </h2>
+      {/* TAB: MODULES */}
+      {activeTab === "modules" && (
+        <div>
+          <h2 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
+            <Layers className="w-5 h-5 text-brand" />
+            <span>
+              {isSelfEnrolled
+                ? `NCERT Official Curriculum (Class ${student.class_number || 1})`
+                : "School-Provided Learning Modules"}
+            </span>
+          </h2>
 
-        {loadingModules ? (
-          <div className="py-12 flex justify-center">
-            <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : isSelfEnrolled ? (
-          /* Self-Enrolled NCERT Curriculum Display */
-          ncertBooks.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {ncertBooks.map((book) => (
-                <div
-                  key={book.id}
-                  className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                        {book.subject}
-                      </span>
-                      <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">
-                        NCERT Book
-                      </span>
+          {loadingModules ? (
+            <div className="py-12 flex justify-center">
+              <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : isSelfEnrolled ? (
+            /* Self-Enrolled NCERT Curriculum Display */
+            ncertBooks.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {ncertBooks.map((book) => (
+                  <div
+                    key={book.id}
+                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
+                          {book.subject}
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">
+                          NCERT Book
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-bold text-text-primary">{book.title}</h3>
+                      <p className="text-xs text-text-secondary mt-1 line-clamp-2">
+                        {book.description}
+                      </p>
                     </div>
-                    <h3 className="text-sm font-bold text-text-primary">{book.title}</h3>
-                    <p className="text-xs text-text-secondary mt-1 line-clamp-2">
-                      {book.description}
-                    </p>
-                  </div>
 
-                  <div className="mt-4 pt-3 border-t border-border-primary/50 flex items-center justify-between">
-                    <span className="text-[11px] text-text-tertiary">Official NCERT Standard</span>
-                    {book.file_url ? (
+                    <div className="mt-4 pt-3 border-t border-border-primary/50 flex items-center justify-between">
+                      <span className="text-[11px] text-text-tertiary">Official NCERT Standard</span>
+                      {book.file_url ? (
+                        <a
+                          href={formatPdfUrl(book.file_url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-brand font-semibold hover:underline"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          Study Book PDF →
+                        </a>
+                      ) : (
+                        <span className="text-xs text-amber-500 font-semibold italic">
+                          PDF Pending Upload
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
+                <BookOpen className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
+                <h3 className="text-sm font-semibold text-text-primary">Loading NCERT Curriculum</h3>
+                <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
+                  Official NCERT textbooks for Class {student.class_number || 1} are being loaded for your learning roadmap.
+                </p>
+              </div>
+            )
+          ) : (
+            /* School-Enrolled Modules Display */
+            modules.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {modules.map((mod) => (
+                  <div
+                    key={mod.id}
+                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
+                          {mod.subject}
+                        </span>
+                        <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
+                      </div>
+                      <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
+                    </div>
+
+                    {mod.file_url ? (
                       <a
-                        href={formatPdfUrl(book.file_url)}
+                        href={formatPdfUrl(mod.file_url)}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-brand font-semibold hover:underline"
+                        className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
                       >
                         <FileText className="w-3.5 h-3.5" />
-                        Study Book PDF →
+                        Open PDF Module
                       </a>
                     ) : (
-                      <span className="text-xs text-amber-500 font-semibold italic">
-                        PDF Pending Upload
-                      </span>
+                      <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module Content</span>
                     )}
                   </div>
+                ))}
+              </div>
+            ) : (
+              /* Empty state if roles/data are not seeded */
+              <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
+                <BookOpen className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
+                <h3 className="text-sm font-semibold text-text-primary">No School Modules Uploaded Yet</h3>
+                <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
+                  No learning modules have been uploaded for Class {student.class_number || 1} at your school branch yet.
+                </p>
+              </div>
+            )
+          )}
+        </div>
+      )}
 
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
-              <BookOpen className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-              <h3 className="text-sm font-semibold text-text-primary">Loading NCERT Curriculum</h3>
-              <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
-                Official NCERT textbooks for Class {student.class_number || 1} are being loaded for your learning roadmap.
-              </p>
-            </div>
-          )
-        ) : (
-          /* School-Enrolled Modules Display */
-          modules.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {modules.map((mod) => (
-                <div
-                  key={mod.id}
-                  className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                        {mod.subject}
-                      </span>
-                      <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
-                    </div>
-                    <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
-                  </div>
+      {/* TAB: ASSIGNMENTS */}
+      {activeTab === "assignments" && !isSelfEnrolled && <StudentAssignmentsSection />}
 
-                  {mod.file_url ? (
-                    <a
-                      href={formatPdfUrl(mod.file_url)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      Open PDF Module
-                    </a>
-                  ) : (
-                    <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module Content</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            /* Empty state if roles/data are not seeded */
-            <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
-              <BookOpen className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-              <h3 className="text-sm font-semibold text-text-primary">No School Modules Uploaded Yet</h3>
-              <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
-                No learning modules have been uploaded for Class {student.class_number || 1} at your school branch yet.
-              </p>
-            </div>
-          )
-        )}
-      </div>
-
-      {/* Student Class Assignments & Teacher Feedback */}
-      {!isSelfEnrolled && <StudentAssignmentsSection />}
+      {/* TAB: QUIZZES */}
+      {activeTab === "quizzes" && (
+        <div className="glass rounded-[var(--radius-lg)] p-8 text-center border border-border-primary space-y-3">
+          <Sparkles className="w-10 h-10 text-brand mx-auto" />
+          <h3 className="text-base font-bold text-text-primary">AI Practice Quizzes</h3>
+          <p className="text-xs text-text-secondary max-w-md mx-auto">
+            Adaptive diagnostic questions generated dynamically from your syllabus modules.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -687,19 +723,9 @@ function SchoolDashboardView({
   school: SchoolProfile;
   activeTab?: string;
 }) {
-  const [localTab, setLocalTab] = useState<"modules" | "ncert" | "teachers">("modules");
   const [selectedClass, setSelectedClass] = useState<number>(1);
   const [modules, setModules] = useState<ModuleOut[]>([]);
   const [loadingModules, setLoadingModules] = useState<boolean>(false);
-
-  const effectiveTab: "modules" | "ncert" | "teachers" =
-    activeTab === "teachers"
-      ? "teachers"
-      : activeTab === "ncert"
-      ? "ncert"
-      : activeTab === "modules"
-      ? "modules"
-      : localTab;
 
   const fetchModules = () => {
     setLoadingModules(true);
@@ -710,186 +736,154 @@ function SchoolDashboardView({
   };
 
   useEffect(() => {
-    if (effectiveTab === "modules") {
+    if (activeTab === "modules" || activeTab === "overview") {
       fetchModules();
     }
-  }, [selectedClass, effectiveTab]);
+  }, [selectedClass, activeTab]);
 
   return (
     <div className="space-y-6">
-      {/* School Branch Profile Banner */}
-      <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-text-primary">
-                {school.school_name}
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand">
-                {school.branch_name}
-              </span>
-            </div>
-            <p className="text-sm text-text-secondary mt-1">
-              Prefix: <span className="font-mono font-bold text-brand">{school.student_prefix}</span> | {school.email} | {school.state}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
-              <span className="text-text-tertiary block">Registered Branch</span>
-              <span className="font-semibold text-text-primary">{school.branch_name}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* School Admin Section Tabs */}
-      <div className="flex flex-col sm:flex-row items-center gap-2 p-1.5 glass rounded-[var(--radius-lg)] border border-border-primary">
-        <button
-          onClick={() => setLocalTab("modules")}
-          className={`w-full sm:w-auto flex-1 py-2.5 px-4 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            effectiveTab === "modules"
-              ? "bg-brand text-white shadow-md"
-              : "text-text-secondary hover:text-text-primary hover:bg-surface"
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Class Curriculum & Modules</span>
-        </button>
-
-        <button
-          onClick={() => setLocalTab("ncert")}
-          className={`w-full sm:w-auto flex-1 py-2.5 px-4 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            effectiveTab === "ncert"
-              ? "bg-brand text-white shadow-md"
-              : "text-text-secondary hover:text-text-primary hover:bg-surface"
-          }`}
-        >
-          <BookOpen className="w-4 h-4" />
-          <span>NCERT Books & Content Management</span>
-        </button>
-
-        <button
-          onClick={() => setLocalTab("teachers")}
-          className={`w-full sm:w-auto flex-1 py-2.5 px-4 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            effectiveTab === "teachers"
-              ? "bg-brand text-white shadow-md"
-              : "text-text-secondary hover:text-text-primary hover:bg-surface"
-          }`}
-        >
-          <UserCog className="w-4 h-4" />
-          <span>Teacher Directory & Assignments</span>
-        </button>
-      </div>
-
-      {/* TAB 1: MODULES */}
-      {effectiveTab === "modules" && (
+      {/* TAB: OVERVIEW */}
+      {activeTab === "overview" && (
         <div className="space-y-6">
-          <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-              <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-brand" />
-                <span>Class Curriculum & Modules</span>
-              </h2>
+          <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-text-primary">
+                    {school.school_name}
+                  </h1>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand">
+                    {school.branch_name}
+                  </span>
+                </div>
+                <p className="text-sm text-text-secondary mt-1">
+                  Prefix: <span className="font-mono font-bold text-brand">{school.student_prefix}</span> | {school.email} | {school.state}
+                </p>
+              </div>
 
               <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setLocalTab("ncert")}
-                  className="text-xs"
-                >
-                  <BookOpen className="w-3.5 h-3.5 mr-1" />
-                  Import from NCERT Library
-                </Button>
-
-                {/* Class Tabs */}
-                <div className="flex items-center gap-1 bg-surface-hover p-1 rounded-[var(--radius-md)]">
-                  {[1, 2, 3, 4, 5].map((cls) => (
-                    <button
-                      key={cls}
-                      onClick={() => setSelectedClass(cls)}
-                      className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
-                        selectedClass === cls
-                          ? "bg-surface text-brand shadow-sm"
-                          : "text-text-secondary hover:text-text-primary"
-                      }`}
-                    >
-                      Class {cls}
-                    </button>
-                  ))}
+                <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
+                  <span className="text-text-tertiary block">Registered Branch</span>
+                  <span className="font-semibold text-text-primary">{school.branch_name}</span>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Modules List or Empty State */}
-            {loadingModules ? (
-              <div className="py-12 flex justify-center">
-                <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : modules.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {modules.map((mod) => (
-                  <div
-                    key={mod.id}
-                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                          {mod.subject}
-                        </span>
-                        <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
-                      </div>
-                      <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
-                    </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+              <span className="text-xs text-text-tertiary block">Institution Prefix</span>
+              <span className="text-lg font-bold text-brand font-mono">{school.student_prefix}</span>
+              <span className="text-[11px] text-text-secondary">Student ID auto-prefix</span>
+            </div>
 
-                    {mod.file_url ? (
-                      <a
-                        href={formatPdfUrl(mod.file_url)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        View Module Document
-                      </a>
-                    ) : (
-                      <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module (No File)</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed space-y-3">
-                <BookOpen className="w-10 h-10 text-text-tertiary mx-auto opacity-50" />
-                <h3 className="text-sm font-semibold text-text-primary">
-                  No Modules Added for Class {selectedClass}
-                </h3>
-                <p className="text-xs text-text-secondary max-w-sm mx-auto">
-                  Attach NCERT books with uploaded PDF files from the NCERT Library tab to make content available for Class {selectedClass} students & AI quizzes.
-                </p>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setLocalTab("ncert")}
-                  className="text-xs mt-2"
-                >
-                  Go to NCERT Catalogue & Upload PDFs
-                </Button>
-              </div>
-            )}
+            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+              <span className="text-xs text-text-tertiary block">Curriculum Grades</span>
+              <span className="text-lg font-bold text-text-primary">Classes 1–5</span>
+              <span className="text-[11px] text-emerald-500">Active Syllabus</span>
+            </div>
+
+            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+              <span className="text-xs text-text-tertiary block">Branch Location</span>
+              <span className="text-lg font-bold text-text-primary">{school.state || "India"}</span>
+              <span className="text-[11px] text-text-secondary">{school.email}</span>
+            </div>
           </div>
         </div>
       )}
 
-      {/* TAB 2: NCERT BOOKS MANAGEMENT */}
-      {effectiveTab === "ncert" && (
+      {/* TAB: MODULES */}
+      {activeTab === "modules" && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-brand" />
+                <span>Class Curriculum & Learning Modules</span>
+              </h2>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Manage PDF modules, OCR documents, and curriculum content for each class.
+              </p>
+            </div>
+
+            {/* Class Tabs */}
+            <div className="flex items-center gap-1 bg-surface-hover p-1 rounded-[var(--radius-md)] border border-border-primary">
+              {[1, 2, 3, 4, 5].map((cls) => (
+                <button
+                  key={cls}
+                  onClick={() => setSelectedClass(cls)}
+                  className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
+                    selectedClass === cls
+                      ? "bg-brand text-white shadow-sm"
+                      : "text-text-secondary hover:text-text-primary hover:bg-surface"
+                  }`}
+                >
+                  Class {cls}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Modules List or Empty State */}
+          {loadingModules ? (
+            <div className="py-12 flex justify-center">
+              <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : modules.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {modules.map((mod) => (
+                <div
+                  key={mod.id}
+                  className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
+                        {mod.subject}
+                      </span>
+                      <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
+                    </div>
+                    <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
+                  </div>
+
+                  {mod.file_url ? (
+                    <a
+                      href={formatPdfUrl(mod.file_url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      View Module Document
+                    </a>
+                  ) : (
+                    <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module (No File)</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed space-y-3">
+              <BookOpen className="w-10 h-10 text-text-tertiary mx-auto opacity-50" />
+              <h3 className="text-sm font-semibold text-text-primary">
+                No Modules Added for Class {selectedClass}
+              </h3>
+              <p className="text-xs text-text-secondary max-w-sm mx-auto">
+                Attach NCERT books with uploaded PDF files from the NCERT Library tab to make content available for Class {selectedClass} students & AI quizzes.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB: NCERT BOOKS MANAGEMENT */}
+      {activeTab === "ncert" && (
         <NCERTBookManagementPanel onModuleAttached={fetchModules} />
       )}
 
-      {/* TAB 3: TEACHER MANAGEMENT */}
-      {effectiveTab === "teachers" && <SchoolTeacherManagement />}
+      {/* TAB: TEACHER MANAGEMENT */}
+      {activeTab === "teachers" && <SchoolTeacherManagement />}
     </div>
   );
 }
@@ -940,93 +934,262 @@ function ParentDashboardView({
 
   return (
     <div className="space-y-6">
-      {/* Parent Profile Card */}
-      <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-text-primary">
-              Welcome, {parent.full_name || "Parent"}
-            </h1>
-            <p className="text-sm text-text-secondary mt-1">
-              Account: {parent.phone_number || parent.email || "Registered Parent"}
-            </p>
-          </div>
-
-          <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
-            <span className="text-text-tertiary block">Linked Children</span>
-            <span className="font-semibold text-text-primary">{childrenList.length} Child(ren)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Add Child Link Form */}
-      <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
-        <h2 className="text-sm font-bold text-text-primary mb-1">Link an Additional Child</h2>
-        <p className="text-xs text-text-secondary mb-4">
-          Enter your child's Unique Student ID (e.g. LKD0001) to link their learning progress.
-        </p>
-
-        {linkError && (
-          <div className="mb-4 p-2.5 rounded bg-rose-500/10 text-rose-500 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{linkError}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleAddChild} className="flex gap-3 max-w-md">
-          <input
-            type="text"
-            placeholder="Unique Student ID (e.g. LKD0001)"
-            value={newStudentId}
-            onChange={(e) => setNewStudentId(e.target.value.toUpperCase())}
-            className="flex-1 px-3.5 py-2 bg-surface text-text-primary text-xs uppercase rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none"
-            required
-          />
-          <Button type="submit" variant="primary" size="sm" disabled={isLinking}>
-            {isLinking ? "Linking..." : "Link Child"}
-          </Button>
-        </form>
-      </div>
-
-      {/* Linked Children List */}
-      <div>
-        <h2 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
-          <Users className="w-5 h-5 text-brand" />
-          <span>Your Linked Children</span>
-        </h2>
-
-        {loadingChildren ? (
-          <div className="py-12 flex justify-center">
-            <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : childrenList.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {childrenList.map((child) => (
-              <div
-                key={child.id}
-                className="glass rounded-[var(--radius-md)] p-5 border border-border-primary flex items-center justify-between"
-              >
-                <div>
-                  <span className="text-xs text-text-tertiary block">Unique Student ID</span>
-                  <span className="font-mono font-bold text-sm text-brand">{child.student_unique_number}</span>
-                </div>
-                <p className="text-xs text-text-tertiary">
-                  Linked on {new Date(child.created_at).toLocaleDateString()}
+      {/* TAB: OVERVIEW */}
+      {activeTab === "overview" && (
+        <div className="space-y-6">
+          <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-xl font-bold text-text-primary">
+                  Welcome, {parent.full_name || "Parent"}
+                </h1>
+                <p className="text-sm text-text-secondary mt-1 flex items-center gap-2">
+                  <span>Guardian Account:</span>
+                  <span className="font-medium text-text-primary font-mono">{parent.phone_number || parent.email || "Registered Guardian"}</span>
                 </p>
               </div>
-            ))}
+
+              <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
+                <span className="text-text-tertiary block">Linked Wards</span>
+                <span className="font-semibold text-brand text-sm">{childrenList.length} Child(ren)</span>
+              </div>
+            </div>
           </div>
-        ) : (
-          /* Empty state if roles/children are not seeded */
-          <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
-            <Users className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-            <h3 className="text-sm font-semibold text-text-primary">No Linked Children Found</h3>
-            <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
-              Link your child using their Unique Student ID above to monitor their academic performance and adaptive learning progress.
+
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+              <span className="text-xs text-text-tertiary block">Monitored Wards</span>
+              <span className="text-2xl font-bold text-text-primary">{childrenList.length}</span>
+              <span className="text-[11px] text-brand">Registered Students</span>
+            </div>
+
+            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+              <span className="text-xs text-text-tertiary block">Progress Tracking</span>
+              <span className="text-2xl font-bold text-emerald-500">Active</span>
+              <span className="text-[11px] text-text-secondary">Syncing School & NCERT Modules</span>
+            </div>
+
+            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+              <span className="text-xs text-text-tertiary block">Guardian Feedback</span>
+              <span className="text-2xl font-bold text-purple-500">Connected</span>
+              <span className="text-[11px] text-purple-400">Direct Teacher Remarks & Alerts</span>
+            </div>
+          </div>
+
+          {/* Wards Overview Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+                <Users className="w-5 h-5 text-brand" />
+                <span>Your Wards / Children</span>
+              </h2>
+              {childrenList.length > 0 && (
+                <span className="text-xs text-text-tertiary">
+                  Showing {childrenList.length} linked student(s)
+                </span>
+              )}
+            </div>
+
+            {loadingChildren ? (
+              <div className="py-12 flex justify-center">
+                <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : childrenList.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {childrenList.map((child) => (
+                  <div
+                    key={child.id}
+                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand/40 transition-all flex flex-col justify-between space-y-4"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-sm shrink-0 border border-border-brand">
+                            <GraduationCap className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-base text-text-primary leading-tight">
+                              {child.full_name || `Student #${child.student_unique_number}`}
+                            </h3>
+                            <span className="inline-block mt-0.5 text-xs font-mono font-bold text-brand bg-brand/5 px-2 py-0.5 rounded border border-border-brand">
+                              {child.student_unique_number}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-border-primary/50 space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-tertiary">Class & Section:</span>
+                          <span className="font-semibold text-text-primary">
+                            {child.class_number
+                              ? child.enrollment_type === "self" || child.branch_name === "SELF"
+                                ? `Class ${child.class_number} (Self)`
+                                : `Class ${child.class_number} - Section ${child.section || "A"}`
+                              : "Class not set"}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-tertiary">School / Branch:</span>
+                          <span className="font-medium text-text-secondary text-right truncate max-w-[180px]">
+                            {child.enrollment_type === "self" || child.branch_name === "SELF"
+                              ? "NCERT Self-Educated"
+                              : `${child.school_name || "School"} (${child.branch_name || "Branch"})`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-border-primary/40 flex items-center justify-between text-[11px] text-text-tertiary">
+                      <span>Linked {new Date(child.created_at).toLocaleDateString()}</span>
+                      <span className="text-emerald-500 font-medium flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Monitoring
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
+                <Users className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
+                <h3 className="text-sm font-semibold text-text-primary">No Wards Linked Yet</h3>
+                <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
+                  Students who register with your mobile number will automatically appear here. You can also link a child directly using their Unique Student ID.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: CHILDREN */}
+      {activeTab === "children" && (
+        <div className="space-y-6">
+          {/* Add Child Link Form */}
+          <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
+            <h2 className="text-sm font-bold text-text-primary mb-1">Link an Additional Child</h2>
+            <p className="text-xs text-text-secondary mb-4">
+              Enter your child's Unique Student ID (e.g. LKD0001) to link their learning progress to your dashboard.
             </p>
+
+            {linkError && (
+              <div className="mb-4 p-2.5 rounded bg-rose-500/10 text-rose-500 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{linkError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAddChild} className="flex gap-3 max-w-md">
+              <input
+                type="text"
+                placeholder="Unique Student ID (e.g. LKD0001)"
+                value={newStudentId}
+                onChange={(e) => setNewStudentId(e.target.value.toUpperCase())}
+                className="flex-1 px-3.5 py-2 bg-surface text-text-primary text-xs uppercase rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none font-mono"
+                required
+              />
+              <Button type="submit" variant="primary" size="sm" disabled={isLinking}>
+                {isLinking ? "Linking..." : "Link Child"}
+              </Button>
+            </form>
           </div>
-        )}
-      </div>
+
+          {/* Linked Children List */}
+          <div>
+            <h2 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
+              <Users className="w-5 h-5 text-brand" />
+              <span>Your Linked Children & Wards</span>
+            </h2>
+
+            {loadingChildren ? (
+              <div className="py-12 flex justify-center">
+                <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : childrenList.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {childrenList.map((child) => (
+                  <div
+                    key={child.id}
+                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-4 hover:border-brand/40 transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-base shrink-0 border border-border-brand">
+                          <GraduationCap className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-base text-text-primary leading-tight">
+                            {child.full_name || `Student #${child.student_unique_number}`}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs font-mono font-bold text-brand bg-brand/5 px-2 py-0.5 rounded border border-border-brand">
+                              {child.student_unique_number}
+                            </span>
+                            <span className="text-[11px] px-2 py-0.5 rounded bg-surface border border-border-primary text-text-secondary font-medium">
+                              {child.enrollment_type === "self" || child.branch_name === "SELF" ? "Self Enrolled" : "School Enrolled"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-border-primary/50 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-text-tertiary">Enrolled Class:</span>
+                        <span className="font-semibold text-text-primary">
+                          {child.class_number
+                            ? child.enrollment_type === "self" || child.branch_name === "SELF"
+                              ? `Class ${child.class_number}`
+                              : `Class ${child.class_number} - Section ${child.section || "A"}`
+                            : "Not Configured"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-text-tertiary">School / Institution:</span>
+                        <span className="font-medium text-text-secondary truncate max-w-[170px]">
+                          {child.enrollment_type === "self" || child.branch_name === "SELF"
+                            ? "NCERT Self-Educated"
+                            : `${child.school_name || "School"} (${child.branch_name || "Branch"})`}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-text-tertiary">Linked Date:</span>
+                        <span className="text-text-secondary">
+                          {new Date(child.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
+                <Users className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
+                <h3 className="text-sm font-semibold text-text-primary">No Linked Children Found</h3>
+                <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
+                  Link your child using their Unique Student ID above to monitor their academic performance and adaptive learning progress.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: REPORTS */}
+      {activeTab === "reports" && (
+        <div className="glass rounded-[var(--radius-lg)] p-8 text-center border border-border-primary space-y-3">
+          <Award className="w-10 h-10 text-brand mx-auto" />
+          <h3 className="text-base font-bold text-text-primary">Academic Reports & Progress Analytics</h3>
+          <p className="text-xs text-text-secondary max-w-md mx-auto">
+            View detailed quiz performance, completion rates, and personalized feedback for all linked children.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1040,87 +1203,65 @@ function AdminDashboardView({
   admin: AdminProfile;
   activeTab?: string;
 }) {
-  const [localTab, setLocalTab] = useState<"ncert" | "overview">("ncert");
-
-  const effectiveTab =
-    activeTab === "ncert_master"
-      ? "ncert"
-      : activeTab === "overview"
-      ? "overview"
-      : localTab;
-
   return (
     <div className="space-y-6">
-      {/* Admin Profile Overview */}
-      <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-text-primary">Platform Administrator</h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand">
-                Superadmin
-              </span>
+      {/* TAB: OVERVIEW */}
+      {activeTab === "overview" && (
+        <div className="space-y-6">
+          <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-text-primary">Platform Administrator</h1>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand">
+                    Superadmin
+                  </span>
+                </div>
+                <p className="text-sm text-text-secondary mt-1">
+                  Account: <span className="font-mono text-brand">{admin.email}</span>
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                <span className="text-xs font-semibold text-emerald-500">System Healthy</span>
+              </div>
             </div>
-            <p className="text-sm text-text-secondary mt-1">
-              Account: <span className="font-mono text-brand">{admin.email}</span>
-            </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-            <span className="text-xs font-semibold text-emerald-500">System Healthy</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+              <span className="text-xs text-text-tertiary block">Role Status</span>
+              <span className="text-lg font-bold text-text-primary mt-1 block">Active Administrator</span>
+              <span className="text-xs text-brand inline-block">Platform Security Master</span>
+            </div>
+
+            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+              <span className="text-xs text-text-tertiary block">NCERT Master Catalogue</span>
+              <span className="text-lg font-bold text-text-primary mt-1 block">Classes 1–5 Central DB</span>
+              <span className="text-xs text-emerald-500 inline-block">Central Repository Active</span>
+            </div>
+
+            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+              <span className="text-xs text-text-tertiary block">API Framework</span>
+              <span className="text-lg font-bold text-text-primary mt-1 block">FastAPI + SQLModel</span>
+              <span className="text-xs text-sky-500 inline-block">JWT Bearer Security</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Admin Sub-tabs */}
-      <div className="flex items-center gap-2 p-1.5 glass rounded-[var(--radius-lg)] border border-border-primary">
-        <button
-          onClick={() => setLocalTab("ncert")}
-          className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            effectiveTab === "ncert"
-              ? "bg-brand text-white shadow-md"
-              : "text-text-secondary hover:text-text-primary hover:bg-surface"
-          }`}
-        >
-          <BookOpen className="w-4 h-4" />
-          <span>NCERT Books & Content Management</span>
-        </button>
+      {/* TAB: NCERT MASTER CATALOGUE */}
+      {activeTab === "ncert_master" && <NCERTBookManagementPanel />}
 
-        <button
-          onClick={() => setLocalTab("overview")}
-          className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            effectiveTab === "overview"
-              ? "bg-brand text-white shadow-md"
-              : "text-text-secondary hover:text-text-primary hover:bg-surface"
-          }`}
-        >
-          <ShieldCheck className="w-4 h-4" />
-          <span>System Overview</span>
-        </button>
-      </div>
-
-      {effectiveTab === "ncert" && <NCERTBookManagementPanel />}
-
-      {effectiveTab === "overview" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary">
-            <span className="text-xs text-text-tertiary block">Role Status</span>
-            <span className="text-lg font-bold text-text-primary mt-1 block">Active Administrator</span>
-            <span className="text-xs text-brand mt-2 inline-block">Pre-seeded DB Account</span>
-          </div>
-
-          <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary">
-            <span className="text-xs text-text-tertiary block">NCERT Catalogue</span>
-            <span className="text-lg font-bold text-text-primary mt-1 block">Classes 1–5 Seeded</span>
-            <span className="text-xs text-emerald-500 mt-2 inline-block">Database Active</span>
-          </div>
-
-          <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary">
-            <span className="text-xs text-text-tertiary block">API Framework</span>
-            <span className="text-lg font-bold text-text-primary mt-1 block">FastAPI + SQLModel</span>
-            <span className="text-xs text-sky-500 mt-2 inline-block">JWT Bearer Security</span>
-          </div>
+      {/* TAB: SCHOOLS / INSTITUTIONS */}
+      {activeTab === "schools" && (
+        <div className="glass rounded-[var(--radius-lg)] p-8 text-center border border-border-primary space-y-3">
+          <Building2 className="w-10 h-10 text-brand mx-auto" />
+          <h3 className="text-base font-bold text-text-primary">Registered Institutions & Branches</h3>
+          <p className="text-xs text-text-secondary max-w-md mx-auto">
+            All registered school branches across India are operating under VidyaSetu RBAC governance.
+          </p>
         </div>
       )}
     </div>
@@ -1363,31 +1504,6 @@ function TeacherDashboardView({
 
   return (
     <div className="space-y-6">
-      {/* Teacher Profile Banner */}
-      <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-text-primary">{teacher.name}</h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand">
-                Teacher
-              </span>
-            </div>
-            <p className="text-sm text-text-secondary mt-1">
-              School: <span className="font-semibold text-text-primary">{teacher.school_name}</span> | Branch:{" "}
-              <span className="font-mono font-bold text-brand">{teacher.branch_name}</span> | Phone: {teacher.phone_number}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
-              <span className="text-text-tertiary block">Assigned Classes</span>
-              <span className="font-semibold text-text-primary">{assignedClasses.length} Class(es)</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content: Unassigned vs Assigned State */}
       {loading ? (
         <div className="py-12 flex justify-center">
@@ -1408,426 +1524,490 @@ function TeacherDashboardView({
           </div>
         </div>
       ) : (
-        /* Assigned State: Class Tabs + Details */
         <div className="space-y-6">
-          {/* Class Selector Bar */}
-          <div className="glass rounded-[var(--radius-lg)] p-4 border border-border-primary flex items-center gap-3 flex-wrap">
-            <span className="text-xs font-bold text-text-secondary uppercase tracking-wider mr-2">
-              Your Classes:
-            </span>
-            {assignedClasses.map((c) => {
-              const isSelected = selectedClass?.id === c.id;
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setSelectedClass(c)}
-                  className={`px-4 py-2 rounded-[var(--radius-md)] text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                    isSelected
-                      ? "bg-brand text-white shadow-md"
-                      : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
-                  }`}
-                >
-                  <BookOpen className="w-4 h-4" />
-                  <span>Class {c.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          {/* Active Class Switcher (only shown if teacher has multiple classes) */}
+          {assignedClasses.length > 1 && (
+            <div className="flex items-center gap-2 p-1.5 glass rounded-[var(--radius-md)] border border-border-primary w-fit">
+              <span className="text-[11px] font-bold text-text-tertiary uppercase px-2">
+                Active Class:
+              </span>
+              {assignedClasses.map((c) => {
+                const isSelected = selectedClass?.id === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelectedClass(c)}
+                    className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      isSelected
+                        ? "bg-brand text-white shadow-sm"
+                        : "text-text-secondary hover:text-text-primary hover:bg-surface"
+                    }`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>Class {c.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-          {/* Active Class Section */}
-          {selectedClass && (
+          {/* TAB: OVERVIEW */}
+          {activeTab === "overview" && selectedClass && (
             <div className="space-y-6">
-              {/* Class Header & View Tabs */}
-              <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-4">
+              <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-xl font-bold text-text-primary">
-                      Class {selectedClass.label} Overview
-                    </h2>
-                    <p className="text-xs text-text-secondary mt-0.5">
-                      Class {selectedClass.class_number}, Section {selectedClass.section} • Branch: {teacher.branch_name}
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-xl font-bold text-text-primary">{teacher.name}</h1>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand">
+                        Educator
+                      </span>
+                    </div>
+                    <p className="text-sm text-text-secondary mt-1">
+                      School: <span className="font-semibold text-text-primary">{teacher.school_name}</span> • Branch:{" "}
+                      <span className="font-mono font-bold text-brand">{teacher.branch_name}</span>
                     </p>
                   </div>
 
-                  {/* Sub-tabs: Students | Assignments | Progress */}
-                  <div className="flex items-center gap-1.5 p-1 bg-surface-hover rounded-[var(--radius-md)] border border-border-primary">
-                    <button
-                      onClick={() => setLocalTab("students")}
-                      className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        effectiveTab === "students"
-                          ? "bg-surface text-brand shadow-sm font-bold"
-                          : "text-text-secondary hover:text-text-primary"
-                      }`}
-                    >
-                      <Users className="w-3.5 h-3.5" />
-                      <span>Students ({students.length})</span>
-                    </button>
-
-                    <button
-                      onClick={() => setLocalTab("assignments")}
-                      className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        effectiveTab === "assignments"
-                          ? "bg-surface text-brand shadow-sm font-bold"
-                          : "text-text-secondary hover:text-text-primary"
-                      }`}
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>Assignments ({assignments.length})</span>
-                    </button>
-
-                    <button
-                      onClick={() => setLocalTab("progress")}
-                      className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        effectiveTab === "progress"
-                          ? "bg-surface text-brand shadow-sm font-bold"
-                          : "text-text-secondary hover:text-text-primary"
-                      }`}
-                    >
-                      <Award className="w-3.5 h-3.5" />
-                      <span>Progress & Scores</span>
-                    </button>
+                  <div className="flex items-center gap-3">
+                    <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
+                      <span className="text-text-tertiary block">Current Class</span>
+                      <span className="font-semibold text-brand">Class {selectedClass.label}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* TAB 1: STUDENTS LIST */}
-              {effectiveTab === "students" && (
-                <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-4">
-                  <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+              {/* Quick Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+                  <div className="flex items-center justify-between text-text-tertiary text-xs">
+                    <span>Enrolled Students</span>
                     <Users className="w-4 h-4 text-brand" />
-                    <span>Students Enrolled in Class {selectedClass.label}</span>
-                  </h3>
+                  </div>
+                  <div className="text-2xl font-bold text-text-primary">{students.length}</div>
+                  <span className="text-[11px] text-text-secondary">Class {selectedClass.label}</span>
+                </div>
 
-                  {loadingStudents ? (
-                    <div className="py-8 flex justify-center">
-                      <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  ) : students.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="border-b border-border-primary text-text-tertiary uppercase font-bold text-[10px]">
-                            <th className="py-2.5 px-3">Unique ID</th>
-                            <th className="py-2.5 px-3">Email Address</th>
-                            <th className="py-2.5 px-3">Enrollment Mode</th>
-                            <th className="py-2.5 px-3">Joined Date</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border-primary/50">
-                          {students.map((s) => (
-                            <tr key={s.id} className="hover:bg-surface/50 transition-colors">
-                              <td className="py-3 px-3 font-mono font-bold text-brand">{s.unique_number}</td>
-                              <td className="py-3 px-3 font-medium text-text-primary">{s.email}</td>
-                              <td className="py-3 px-3 capitalize text-text-secondary">{s.enrollment_type}</td>
-                              <td className="py-3 px-3 text-text-tertiary">
-                                {new Date(s.created_at).toLocaleDateString()}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center text-text-tertiary text-xs">
-                      No students enrolled in Class {selectedClass.label} yet.
-                    </div>
-                  )}
+                <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+                  <div className="flex items-center justify-between text-text-tertiary text-xs">
+                    <span>Active Assignments</span>
+                    <FileText className="w-4 h-4 text-purple-500" />
+                  </div>
+                  <div className="text-2xl font-bold text-text-primary">{assignments.length}</div>
+                  <span className="text-[11px] text-text-secondary">PDF & AI Quizzes</span>
+                </div>
+
+                <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+                  <div className="flex items-center justify-between text-text-tertiary text-xs">
+                    <span>Curriculum Modules</span>
+                    <Layers className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="text-2xl font-bold text-text-primary">{classModules.length}</div>
+                  <span className="text-[11px] text-text-secondary">Available for AI Quiz</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: ASSIGNED CLASSES / STUDENTS ROSTER */}
+          {activeTab === "classes" && selectedClass && (
+            <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                  <Users className="w-4 h-4 text-brand" />
+                  <span>Students Enrolled in Class {selectedClass.label}</span>
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand">
+                  {students.length} Student(s)
+                </span>
+              </div>
+
+              {loadingStudents ? (
+                <div className="py-8 flex justify-center">
+                  <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : students.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-border-primary text-text-tertiary uppercase font-bold text-[10px]">
+                        <th className="py-2.5 px-3">Unique ID</th>
+                        <th className="py-2.5 px-3">Student Name / Email</th>
+                        <th className="py-2.5 px-3">Enrollment Mode</th>
+                        <th className="py-2.5 px-3">Joined Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-primary/50">
+                      {students.map((s) => (
+                        <tr key={s.id} className="hover:bg-surface/50 transition-colors">
+                          <td className="py-3 px-3 font-mono font-bold text-brand">{s.unique_number}</td>
+                          <td className="py-3 px-3 font-medium text-text-primary">
+                            {s.full_name || s.email}
+                          </td>
+                          <td className="py-3 px-3 capitalize text-text-secondary">{s.enrollment_type}</td>
+                          <td className="py-3 px-3 text-text-tertiary">
+                            {new Date(s.created_at).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-8 text-center text-text-tertiary text-xs">
+                  No students enrolled in Class {selectedClass.label} yet.
                 </div>
               )}
+            </div>
+          )}
 
-              {/* TAB 2: ASSIGNMENTS MANAGEMENT */}
-              {effectiveTab === "assignments" && (
-                <div className="space-y-6">
-                  {/* Action Bar */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-brand" />
-                      <span>Class {selectedClass.label} Assignments</span>
-                    </h3>
+          {/* TAB: ASSIGNMENTS & QUIZZES */}
+          {activeTab === "assignments" && selectedClass && (
+            <div className="space-y-6">
+              {/* Action Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-brand" />
+                    <span>Class {selectedClass.label} Assignments & Quizzes</span>
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    Upload homework documents or generate automatic AI quizzes from curriculum modules.
+                  </p>
+                </div>
 
-                    <div className="flex items-center gap-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setPdfError(null);
-                          setShowPdfModal(true);
-                        }}
-                        className="text-xs"
-                      >
-                        <Upload className="w-3.5 h-3.5 mr-1.5" />
-                        Upload PDF Assignment (Max 5MB)
-                      </Button>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setPdfError(null);
+                      setShowPdfModal(true);
+                    }}
+                    className="text-xs"
+                  >
+                    <Upload className="w-3.5 h-3.5 mr-1.5" />
+                    Upload PDF Assignment (Max 5MB)
+                  </Button>
 
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => {
-                          setQuizError(null);
-                          setShowQuizModal(true);
-                        }}
-                        className="text-xs"
-                      >
-                        <Brain className="w-3.5 h-3.5 mr-1.5" />
-                        Generate AI Quiz from Modules
-                      </Button>
-                    </div>
-                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      setQuizError(null);
+                      setShowQuizModal(true);
+                    }}
+                    className="text-xs"
+                  >
+                    <Brain className="w-3.5 h-3.5 mr-1.5" />
+                    Generate AI Quiz from Modules
+                  </Button>
+                </div>
+              </div>
 
-                  {/* Assignments List */}
-                  {loadingAssignments ? (
-                    <div className="py-8 flex justify-center">
-                      <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  ) : assignments.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {assignments.map((asgn) => (
-                        <div
-                          key={asgn.id}
-                          className="glass rounded-[var(--radius-lg)] p-5 border border-border-primary space-y-3 relative group"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                    asgn.assignment_type === "pdf_upload"
-                                      ? "bg-sky-500/10 text-sky-500 border border-sky-500/20"
-                                      : "bg-purple-500/10 text-purple-500 border border-purple-500/20"
-                                  }`}
-                                >
-                                  {asgn.assignment_type === "pdf_upload" ? "PDF Upload" : "AI Quiz"}
-                                </span>
-
-                                <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                    asgn.is_locked
-                                      ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
-                                      : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                  }`}
-                                >
-                                  {asgn.is_locked ? "Locked" : "Active"}
-                                </span>
-                              </div>
-
-                              <h4 className="font-bold text-text-primary text-sm mt-2">{asgn.title}</h4>
-                              {asgn.description && (
-                                <p className="text-xs text-text-secondary line-clamp-2 mt-1">
-                                  {asgn.description}
-                                </p>
-                              )}
-                            </div>
-
-                            <button
-                              onClick={() => handleDeleteAssignment(asgn.id)}
-                              className="text-text-tertiary hover:text-rose-500 transition-colors p-1.5 rounded hover:bg-rose-500/10 cursor-pointer"
-                              title="Delete assignment"
+              {/* Assignments List */}
+              {loadingAssignments ? (
+                <div className="py-8 flex justify-center">
+                  <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : assignments.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {assignments.map((asgn) => (
+                    <div
+                      key={asgn.id}
+                      className="glass rounded-[var(--radius-lg)] p-5 border border-border-primary space-y-3 relative group"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                asgn.assignment_type === "pdf_upload"
+                                  ? "bg-sky-500/10 text-sky-500 border border-sky-500/20"
+                                  : "bg-purple-500/10 text-purple-500 border border-purple-500/20"
+                              }`}
                             >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-
-                          <div className="pt-2 border-t border-border-primary/50 flex items-center justify-between text-xs text-text-tertiary">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3.5 h-3.5" />
-                              {new Date(asgn.created_at).toLocaleDateString()}
+                              {asgn.assignment_type === "pdf_upload" ? "PDF Upload" : "AI Quiz"}
                             </span>
 
-                            {asgn.deadline_at ? (
-                              <span className="flex items-center gap-1 text-amber-500 font-medium">
-                                <Clock className="w-3.5 h-3.5" />
-                                Deadline: {new Date(asgn.deadline_at).toLocaleDateString()}
-                              </span>
-                            ) : (
-                              <span>No Deadline Set</span>
-                            )}
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                asgn.is_locked
+                                  ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                                  : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                              }`}
+                            >
+                              {asgn.is_locked ? "Locked" : "Active"}
+                            </span>
                           </div>
 
-                          {asgn.file_url && (
-                            <a
-                              href={formatPdfUrl(asgn.file_url)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-brand font-semibold hover:underline mt-1"
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                              View Assignment PDF
-                            </a>
+                          <h4 className="font-bold text-text-primary text-sm mt-2">{asgn.title}</h4>
+                          {asgn.description && (
+                            <p className="text-xs text-text-secondary line-clamp-2 mt-1">
+                              {asgn.description}
+                            </p>
                           )}
                         </div>
-                      ))}
+
+                        <button
+                          onClick={() => handleDeleteAssignment(asgn.id)}
+                          className="text-text-tertiary hover:text-rose-500 transition-colors p-1.5 rounded hover:bg-rose-500/10 cursor-pointer"
+                          title="Delete assignment"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="pt-2 border-t border-border-primary/50 flex items-center justify-between text-xs text-text-tertiary">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {new Date(asgn.created_at).toLocaleDateString()}
+                        </span>
+
+                        {asgn.deadline_at ? (
+                          <span className="flex items-center gap-1 text-amber-500 font-medium">
+                            <Clock className="w-3.5 h-3.5" />
+                            Deadline: {new Date(asgn.deadline_at).toLocaleDateString()}
+                          </span>
+                        ) : (
+                          <span>No Deadline Set</span>
+                        )}
+                      </div>
+
+                      {asgn.file_url && (
+                        <a
+                          href={formatPdfUrl(asgn.file_url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-brand font-semibold hover:underline mt-1"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          View Assignment PDF
+                        </a>
+                      )}
                     </div>
-                  ) : (
-                    <div className="glass rounded-[var(--radius-lg)] p-8 text-center border border-border-primary border-dashed">
-                      <FileText className="w-8 h-8 text-text-tertiary mx-auto mb-2 opacity-50" />
-                      <h4 className="text-sm font-semibold text-text-primary">No Assignments Created Yet</h4>
-                      <p className="text-xs text-text-secondary mt-1 max-w-sm mx-auto">
-                        Use the buttons above to upload a manual PDF assignment (max 5MB) or generate an adaptive AI quiz from your class modules.
-                      </p>
-                    </div>
-                  )}
+                  ))}
+                </div>
+              ) : (
+                <div className="glass rounded-[var(--radius-lg)] p-8 text-center border border-border-primary border-dashed">
+                  <FileText className="w-8 h-8 text-text-tertiary mx-auto mb-2 opacity-50" />
+                  <h4 className="text-sm font-semibold text-text-primary">No Assignments Created Yet</h4>
+                  <p className="text-xs text-text-secondary mt-1 max-w-sm mx-auto">
+                    Use the buttons above to upload a manual PDF assignment (max 5MB) or generate an adaptive AI quiz from your class modules.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: SUBMISSIONS & GRADING */}
+          {activeTab === "grading" && selectedClass && (
+            <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                    <Award className="w-4 h-4 text-brand" />
+                    <span>Student Progress & Assessment Scores</span>
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    Select an assignment to view student scores and give individual feedback.
+                  </p>
+                </div>
+
+                {assignments.length > 0 && (
+                  <select
+                    value={selectedAssignmentId}
+                    onChange={(e) => setSelectedAssignmentId(e.target.value)}
+                    className="px-3.5 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none font-medium"
+                  >
+                    {assignments.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.title} ({a.assignment_type === "pdf_upload" ? "PDF" : "AI Quiz"})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {feedbackMsg && (
+                <div className="p-3 rounded bg-emerald-500/10 text-emerald-500 text-xs font-semibold flex items-center gap-2">
+                  <Check className="w-4 h-4" />
+                  <span>{feedbackMsg}</span>
                 </div>
               )}
 
-              {/* TAB 3: PROGRESS & FEEDBACK */}
-              {effectiveTab === "progress" && (
-                <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                        <Award className="w-4 h-4 text-brand" />
-                        <span>Student Progress & Assessment Scores</span>
-                      </h3>
-                      <p className="text-xs text-text-secondary mt-0.5">
-                        Select an assignment to view student scores and give individual feedback.
-                      </p>
-                    </div>
-
-                    {assignments.length > 0 && (
-                      <select
-                        value={selectedAssignmentId}
-                        onChange={(e) => setSelectedAssignmentId(e.target.value)}
-                        className="px-3.5 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none font-medium"
-                      >
-                        {assignments.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.title} ({a.assignment_type === "pdf_upload" ? "PDF" : "AI Quiz"})
-                          </option>
-                        ))}
-                      </select>
-                    )}
+              {loadingSubmissions ? (
+                <div className="py-8 flex justify-center">
+                  <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : submissions.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-border-primary text-text-tertiary uppercase font-bold text-[10px]">
+                          <th className="py-2.5 px-3">Student ID</th>
+                          <th className="py-2.5 px-3">Attempt Status</th>
+                          <th className="py-2.5 px-3">Score / Max</th>
+                          <th className="py-2.5 px-3">Last Attempted</th>
+                          <th className="py-2.5 px-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-primary/50">
+                        {submissions.map((sub) => {
+                          const isEditing = editingStudentId === sub.student_id;
+                          return (
+                            <tr key={sub.id} className="hover:bg-surface/50 transition-colors">
+                              <td className="py-3 px-3 font-mono font-bold text-brand">
+                                {sub.student_unique_number}
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                  Attempted
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 font-bold text-text-primary">
+                                {sub.score !== null ? `${sub.score} / ${sub.max_score}` : "Not Graded"}
+                              </td>
+                              <td className="py-3 px-3 text-text-tertiary">
+                                {new Date(sub.last_attempted_at).toLocaleString()}
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingStudentId(isEditing ? null : sub.student_id);
+                                    setScoreInput(sub.score !== null ? sub.score.toString() : "");
+                                    setFeedbackInput("");
+                                  }}
+                                  className="text-xs"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                                  {isEditing ? "Close" : "Grade / Feedback"}
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
 
-                  {feedbackMsg && (
-                    <div className="p-3 rounded bg-emerald-500/10 text-emerald-500 text-xs font-semibold flex items-center gap-2">
-                      <Check className="w-4 h-4" />
-                      <span>{feedbackMsg}</span>
-                    </div>
-                  )}
+                  {/* Inline Feedback / Score Form for Selected Student */}
+                  {editingStudentId && (
+                    <div className="p-4 rounded-[var(--radius-lg)] bg-surface border border-border-brand space-y-4 animate-in fade-in duration-200">
+                      <h4 className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                        <Edit className="w-4 h-4 text-brand" />
+                        <span>Grade & Feedback for Student</span>
+                      </h4>
 
-                  {loadingSubmissions ? (
-                    <div className="py-8 flex justify-center">
-                      <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  ) : submissions.length > 0 ? (
-                    <div className="space-y-4">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead>
-                            <tr className="border-b border-border-primary text-text-tertiary uppercase font-bold text-[10px]">
-                              <th className="py-2.5 px-3">Student ID</th>
-                              <th className="py-2.5 px-3">Attempt Status</th>
-                              <th className="py-2.5 px-3">Score / Max</th>
-                              <th className="py-2.5 px-3">Last Attempted</th>
-                              <th className="py-2.5 px-3 text-right">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border-primary/50">
-                            {submissions.map((sub) => {
-                              const isEditing = editingStudentId === sub.student_id;
-                              return (
-                                <tr key={sub.id} className="hover:bg-surface/50 transition-colors">
-                                  <td className="py-3 px-3 font-mono font-bold text-brand">
-                                    {sub.student_unique_number}
-                                  </td>
-                                  <td className="py-3 px-3">
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                                      Attempted
-                                    </span>
-                                  </td>
-                                  <td className="py-3 px-3 font-bold text-text-primary">
-                                    {sub.score !== null ? `${sub.score} / ${sub.max_score}` : "Not Graded"}
-                                  </td>
-                                  <td className="py-3 px-3 text-text-tertiary">
-                                    {new Date(sub.last_attempted_at).toLocaleString()}
-                                  </td>
-                                  <td className="py-3 px-3 text-right">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        setEditingStudentId(isEditing ? null : sub.student_id);
-                                        setScoreInput(sub.score !== null ? sub.score.toString() : "");
-                                        setFeedbackInput("");
-                                      }}
-                                      className="text-xs"
-                                    >
-                                      <MessageSquare className="w-3.5 h-3.5 mr-1" />
-                                      {isEditing ? "Close" : "Grade / Feedback"}
-                                    </Button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-text-secondary mb-1">
+                            Score (Out of 100)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            placeholder="e.g. 85"
+                            value={scoreInput}
+                            onChange={(e) => setScoreInput(e.target.value)}
+                            className="w-full px-3 py-2 bg-background text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-text-secondary mb-1">
+                            Feedback / Guidance Message
+                          </label>
+                          <textarea
+                            rows={2}
+                            placeholder="Enter feedback or advice for this student..."
+                            value={feedbackInput}
+                            onChange={(e) => setFeedbackInput(e.target.value)}
+                            className="w-full px-3 py-2 bg-background text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
+                          />
+                        </div>
                       </div>
 
-                      {/* Inline Feedback / Score Form for Selected Student */}
-                      {editingStudentId && (
-                        <div className="p-4 rounded-[var(--radius-lg)] bg-surface border border-border-brand space-y-4 animate-in fade-in duration-200">
-                          <h4 className="text-xs font-bold text-text-primary flex items-center gap-1.5">
-                            <Edit className="w-4 h-4 text-brand" />
-                            <span>Grade & Feedback for Student</span>
-                          </h4>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-semibold text-text-secondary mb-1">
-                                Score (Out of 100)
-                              </label>
-                              <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                placeholder="e.g. 85"
-                                value={scoreInput}
-                                onChange={(e) => setScoreInput(e.target.value)}
-                                className="w-full px-3 py-2 bg-background text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
-                              />
-                            </div>
-
-                            <div className="sm:col-span-2">
-                              <label className="block text-xs font-semibold text-text-secondary mb-1">
-                                Feedback / Guidance Message
-                              </label>
-                              <textarea
-                                rows={2}
-                                placeholder="Enter feedback or advice for this student..."
-                                value={feedbackInput}
-                                onChange={(e) => setFeedbackInput(e.target.value)}
-                                className="w-full px-3 py-2 bg-background text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingStudentId(null)}
-                              className="text-xs"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              disabled={savingScore}
-                              onClick={() => handleSaveScoreAndFeedback(editingStudentId)}
-                              className="text-xs"
-                            >
-                              {savingScore ? "Saving..." : "Save Score & Feedback"}
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center text-text-tertiary text-xs">
-                      No student submissions yet for this assignment.
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingStudentId(null)}
+                          className="text-xs"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={savingScore}
+                          onClick={() => handleSaveScoreAndFeedback(editingStudentId)}
+                          className="text-xs"
+                        >
+                          {savingScore ? "Saving..." : "Save Score & Feedback"}
+                        </Button>
+                      </div>
                     </div>
                   )}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-text-tertiary text-xs">
+                  No student submissions yet for this assignment.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: CURRICULUM & BOOKS */}
+          {activeTab === "curriculum" && selectedClass && (
+            <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-brand" />
+                  <span>Curriculum Modules for Class {selectedClass.label}</span>
+                </h3>
+                <span className="text-xs text-text-tertiary">
+                  {classModules.length} Module(s)
+                </span>
+              </div>
+
+              {classModules.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {classModules.map((mod) => (
+                    <div
+                      key={mod.id}
+                      className="glass rounded-[var(--radius-md)] p-4 border border-border-primary space-y-2 flex flex-col justify-between"
+                    >
+                      <div>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
+                          {mod.subject}
+                        </span>
+                        <h4 className="font-bold text-sm text-text-primary mt-1">{mod.title}</h4>
+                      </div>
+                      {mod.file_url ? (
+                        <a
+                          href={formatPdfUrl(mod.file_url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-semibold text-brand hover:underline inline-flex items-center gap-1 mt-2"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          View Module PDF
+                        </a>
+                      ) : (
+                        <span className="text-xs text-text-tertiary italic mt-2">NCERT Module</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-text-tertiary text-xs">
+                  No curriculum modules found for Class {selectedClass.label}.
                 </div>
               )}
             </div>

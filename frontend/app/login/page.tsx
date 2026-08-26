@@ -457,7 +457,7 @@ export default function LoginPage() {
                         </div>
                         <p className="text-[11px] text-text-tertiary flex items-center gap-1.5 mt-1">
                           <ShieldCheck className="w-3.5 h-3.5 text-brand" />
-                          <span>Dummy OTP printed to server terminal for hackathon testing</span>
+                          
                         </p>
                       </motion.div>
                     )}

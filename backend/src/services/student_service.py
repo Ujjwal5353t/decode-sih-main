@@ -94,16 +94,20 @@ async def register_student(data: StudentRegisterRequest, session: AsyncSession) 
 
     # 6 — Map child to Parent if a Parent account is already registered with this phone number or email
     if clean_phone or clean_email:
-        parent_query = select(Parent)
         conditions = []
         if clean_phone:
             conditions.append(Parent.phone_number == clean_phone)
+            if data.phone_number and data.phone_number.strip() != clean_phone:
+                conditions.append(Parent.phone_number == data.phone_number.strip())
+            raw_digits = "".join(ch for ch in clean_phone if ch.isdigit())
+            if len(raw_digits) >= 10:
+                last10 = raw_digits[-10:]
+                conditions.append(Parent.phone_number.like(f"%{last10}"))
         if clean_email:
             conditions.append(func.lower(Parent.email) == clean_email)
         
         if conditions:
-            parent_query = parent_query.where(or_(*conditions))
-            parent_result = await session.execute(parent_query)
+            parent_result = await session.execute(select(Parent).where(or_(*conditions)))
             parents = parent_result.scalars().all()
 
             for parent in parents:

@@ -51,7 +51,23 @@ async def register_school(data: SchoolRegisterRequest, session: AsyncSession) ->
                 detail="An account with this email already exists.",
             )
 
-    # 4 — Create School
+    # 4 — Check phone uniqueness if phone provided
+    if clean_phone:
+        existing_phone = await session.execute(
+            select(School).where(
+                or_(
+                    School.phone_number == clean_phone,
+                    School.phone_number == data.phone_number.strip(),
+                )
+            )
+        )
+        if existing_phone.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A school branch with this mobile number already exists.",
+            )
+
+    # 5 — Create School
     school = School(
         school_name=data.school_name.strip(),
         branch_name=data.branch_name.strip(),

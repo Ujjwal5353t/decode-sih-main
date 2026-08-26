@@ -20,6 +20,12 @@ class ChildLinkOut(BaseModel):
     id: uuid.UUID
     parent_id: uuid.UUID
     student_unique_number: str
+    full_name: str = ""
+    class_number: Optional[int] = None
+    section: Optional[str] = None
+    school_name: Optional[str] = None
+    branch_name: Optional[str] = None
+    enrollment_type: Optional[str] = "school"
     created_at: datetime
 
     model_config = {"from_attributes": True}
