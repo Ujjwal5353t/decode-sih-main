@@ -1,12 +1,15 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel
 
 
 class ParentProfile(BaseModel):
     id: uuid.UUID
-    email: str
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   GraduationCap,
@@ -34,9 +35,11 @@ import {
   ChevronRight,
   Phone,
   User,
+  Menu,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { DashboardSidebar } from "@/components/dashboard/Sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import {
   StudentProfile,
@@ -52,6 +55,8 @@ import {
   ModuleOut,
   NCERTBookOut,
   ChildLinkOut,
+  RolePermissionsResponse,
+  getRolePermissions,
   getStudentModules,
   getNCERTBooksForClass,
   getAllNCERTBooks,
@@ -95,12 +100,34 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, role, loading, logout, setupClass } = useAuth();
 
+  const [permissions, setPermissions] = useState<RolePermissionsResponse | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("overview");
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
+
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!loading && (!user || !role)) {
       router.push("/login");
     }
   }, [loading, user, role, router]);
+
+  // Fetch RBAC Permissions & Navigation Schema from Backend
+  useEffect(() => {
+    if (role) {
+      getRolePermissions(role)
+        .then((res) => {
+          setPermissions(res);
+          const defaultTab =
+            res.navigation.find((i) => i.is_default)?.id ||
+            res.navigation[0]?.id ||
+            "overview";
+          setActiveTab(defaultTab);
+        })
+        .catch((err) => {
+          console.log("Fetch permissions note:", err.message);
+        });
+    }
+  }, [role]);
 
   if (loading || !user || !role) {
     return (
@@ -115,33 +142,63 @@ export default function DashboardPage() {
     );
   }
 
+  const activePermissionItem =
+    permissions?.navigation.find((i) => i.id === activeTab) ||
+    permissions?.navigation[0];
+
   return (
-    <div className="min-h-screen flex flex-col bg-background relative">
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-30 glass border-b border-border-primary px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div
-              className="w-9 h-9 rounded-[var(--radius-sm)] flex items-center justify-center"
-              style={{ background: "var(--gradient-brand)" }}
+    <div className="min-h-screen bg-background relative flex">
+      {/* Left Dynamic RBAC Permissions Sidebar */}
+      <DashboardSidebar
+        permissions={permissions}
+        activeTab={activeTab}
+        onSelectTab={(tabId) => setActiveTab(tabId)}
+        user={user}
+        role={role}
+        isMobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+        logout={logout}
+      />
+
+      {/* Main Content Area */}
+      <div className="lg:pl-72 flex-1 flex flex-col min-w-0 min-h-screen">
+        {/* Top Navbar Header */}
+        <header className="sticky top-0 z-30 glass border-b border-border-primary px-4 sm:px-6 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="p-2 rounded-[var(--radius-sm)] text-text-secondary hover:text-text-primary hover:bg-surface lg:hidden cursor-pointer"
+              aria-label="Open navigation sidebar"
             >
-              <Sparkles className="w-5 h-5 text-white" />
+              <Menu className="w-5 h-5" />
+            </button>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-bold text-text-primary truncate">
+                  {activePermissionItem?.label || `${role?.toUpperCase()} Dashboard`}
+                </h1>
+                {activePermissionItem?.badge && (
+                  <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-brand/10 text-brand border border-border-brand">
+                    {activePermissionItem.badge}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-text-secondary truncate hidden sm:block">
+                {activePermissionItem?.description || "Manage your inclusive learning workspace"}
+              </p>
             </div>
-            <span className="font-[family-name:var(--font-display)] text-lg font-bold text-text-primary group-hover:text-brand transition-colors">
-              VidyaSetu
-            </span>
-          </Link>
+          </div>
 
-
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {/* Role Badge */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand/10 border border-border-brand text-xs font-semibold text-brand uppercase tracking-wider">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/10 border border-border-brand text-xs font-semibold text-brand uppercase tracking-wider">
               {role === "student" && <GraduationCap className="w-3.5 h-3.5" />}
               {role === "school" && <Building2 className="w-3.5 h-3.5" />}
               {role === "parent" && <Users className="w-3.5 h-3.5" />}
               {role === "admin" && <ShieldCheck className="w-3.5 h-3.5" />}
               {role === "teacher" && <BookOpen className="w-3.5 h-3.5" />}
-              <span>{role} Dashboard</span>
+              <span>{permissions?.role_label || `${role} Role`}</span>
             </div>
 
             <ThemeToggle />
@@ -154,23 +211,49 @@ export default function DashboardPage() {
                 logout();
                 router.push("/login");
               }}
-              className="text-text-secondary hover:text-rose-500"
+              className="text-text-secondary hover:text-rose-500 text-xs px-2.5 sm:px-3"
             >
-              <LogOut className="w-4 h-4 mr-1.5" />
-              Sign Out
+              <LogOut className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Sign Out</span>
             </Button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Dashboard Body based on RBAC */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-8">
-        {role === "student" && <StudentDashboardView student={user as StudentProfile} setupClass={setupClass} />}
-        {role === "school" && <SchoolDashboardView school={user as SchoolProfile} />}
-        {role === "parent" && <ParentDashboardView parent={user as ParentProfile} />}
-        {role === "admin" && <AdminDashboardView admin={user as AdminProfile} />}
-        {role === "teacher" && <TeacherDashboardView teacher={user as any} />}
-      </main>
+        {/* Dashboard Body with Dynamic View Routing */}
+        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+          {role === "student" && (
+            <StudentDashboardView
+              student={user as StudentProfile}
+              setupClass={setupClass}
+              activeTab={activeTab}
+            />
+          )}
+          {role === "school" && (
+            <SchoolDashboardView
+              school={user as SchoolProfile}
+              activeTab={activeTab}
+            />
+          )}
+          {role === "parent" && (
+            <ParentDashboardView
+              parent={user as ParentProfile}
+              activeTab={activeTab}
+            />
+          )}
+          {role === "admin" && (
+            <AdminDashboardView
+              admin={user as AdminProfile}
+              activeTab={activeTab}
+            />
+          )}
+          {role === "teacher" && (
+            <TeacherDashboardView
+              teacher={user as any}
+              activeTab={activeTab}
+            />
+          )}
+        </main>
+      </div>
     </div>
   );
 }
@@ -180,9 +263,11 @@ export default function DashboardPage() {
 function StudentDashboardView({
   student,
   setupClass,
+  activeTab = "overview",
 }: {
   student: StudentProfile;
   setupClass: (data: { class_number: number; section: string }) => Promise<void>;
+  activeTab?: string;
 }) {
   const [selectedClass, setSelectedClass] = useState<number>(student.class_number || 1);
   const [selectedSection, setSelectedSection] = useState<string>(student.section || "A");
@@ -234,7 +319,7 @@ function StudentDashboardView({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-text-primary">
-                Welcome, Student #{student.unique_number}
+                Welcome, {student.full_name || `Student #${student.unique_number}`}
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-mono bg-brand/10 text-brand border border-border-brand">
                 {student.unique_number}
@@ -595,11 +680,26 @@ function StudentAssignmentsSection() {
 
 // ── School Dashboard View ────────────────────────────────────────────────────
 
-function SchoolDashboardView({ school }: { school: SchoolProfile }) {
-  const [activeTab, setActiveTab] = useState<"modules" | "ncert" | "teachers">("modules");
+function SchoolDashboardView({
+  school,
+  activeTab = "overview",
+}: {
+  school: SchoolProfile;
+  activeTab?: string;
+}) {
+  const [localTab, setLocalTab] = useState<"modules" | "ncert" | "teachers">("modules");
   const [selectedClass, setSelectedClass] = useState<number>(1);
   const [modules, setModules] = useState<ModuleOut[]>([]);
   const [loadingModules, setLoadingModules] = useState<boolean>(false);
+
+  const effectiveTab: "modules" | "ncert" | "teachers" =
+    activeTab === "teachers"
+      ? "teachers"
+      : activeTab === "ncert"
+      ? "ncert"
+      : activeTab === "modules"
+      ? "modules"
+      : localTab;
 
   const fetchModules = () => {
     setLoadingModules(true);
@@ -610,10 +710,10 @@ function SchoolDashboardView({ school }: { school: SchoolProfile }) {
   };
 
   useEffect(() => {
-    if (activeTab === "modules") {
+    if (effectiveTab === "modules") {
       fetchModules();
     }
-  }, [selectedClass, activeTab]);
+  }, [selectedClass, effectiveTab]);
 
   return (
     <div className="space-y-6">
@@ -646,9 +746,9 @@ function SchoolDashboardView({ school }: { school: SchoolProfile }) {
       {/* School Admin Section Tabs */}
       <div className="flex flex-col sm:flex-row items-center gap-2 p-1.5 glass rounded-[var(--radius-lg)] border border-border-primary">
         <button
-          onClick={() => setActiveTab("modules")}
+          onClick={() => setLocalTab("modules")}
           className={`w-full sm:w-auto flex-1 py-2.5 px-4 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            activeTab === "modules"
+            effectiveTab === "modules"
               ? "bg-brand text-white shadow-md"
               : "text-text-secondary hover:text-text-primary hover:bg-surface"
           }`}
@@ -658,9 +758,9 @@ function SchoolDashboardView({ school }: { school: SchoolProfile }) {
         </button>
 
         <button
-          onClick={() => setActiveTab("ncert")}
+          onClick={() => setLocalTab("ncert")}
           className={`w-full sm:w-auto flex-1 py-2.5 px-4 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            activeTab === "ncert"
+            effectiveTab === "ncert"
               ? "bg-brand text-white shadow-md"
               : "text-text-secondary hover:text-text-primary hover:bg-surface"
           }`}
@@ -670,9 +770,9 @@ function SchoolDashboardView({ school }: { school: SchoolProfile }) {
         </button>
 
         <button
-          onClick={() => setActiveTab("teachers")}
+          onClick={() => setLocalTab("teachers")}
           className={`w-full sm:w-auto flex-1 py-2.5 px-4 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            activeTab === "teachers"
+            effectiveTab === "teachers"
               ? "bg-brand text-white shadow-md"
               : "text-text-secondary hover:text-text-primary hover:bg-surface"
           }`}
@@ -683,7 +783,7 @@ function SchoolDashboardView({ school }: { school: SchoolProfile }) {
       </div>
 
       {/* TAB 1: MODULES */}
-      {activeTab === "modules" && (
+      {effectiveTab === "modules" && (
         <div className="space-y-6">
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
@@ -696,7 +796,7 @@ function SchoolDashboardView({ school }: { school: SchoolProfile }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setActiveTab("ncert")}
+                  onClick={() => setLocalTab("ncert")}
                   className="text-xs"
                 >
                   <BookOpen className="w-3.5 h-3.5 mr-1" />
@@ -772,7 +872,7 @@ function SchoolDashboardView({ school }: { school: SchoolProfile }) {
                 <Button
                   variant="primary"
                   size="sm"
-                  onClick={() => setActiveTab("ncert")}
+                  onClick={() => setLocalTab("ncert")}
                   className="text-xs mt-2"
                 >
                   Go to NCERT Catalogue & Upload PDFs
@@ -784,19 +884,25 @@ function SchoolDashboardView({ school }: { school: SchoolProfile }) {
       )}
 
       {/* TAB 2: NCERT BOOKS MANAGEMENT */}
-      {activeTab === "ncert" && (
+      {effectiveTab === "ncert" && (
         <NCERTBookManagementPanel onModuleAttached={fetchModules} />
       )}
 
       {/* TAB 3: TEACHER MANAGEMENT */}
-      {activeTab === "teachers" && <SchoolTeacherManagement />}
+      {effectiveTab === "teachers" && <SchoolTeacherManagement />}
     </div>
   );
 }
 
 // ── Parent Dashboard View ────────────────────────────────────────────────────
 
-function ParentDashboardView({ parent }: { parent: ParentProfile }) {
+function ParentDashboardView({
+  parent,
+  activeTab = "overview",
+}: {
+  parent: ParentProfile;
+  activeTab?: string;
+}) {
   const [childrenList, setChildrenList] = useState<ChildLinkOut[]>([]);
   const [loadingChildren, setLoadingChildren] = useState<boolean>(true);
   const [newStudentId, setNewStudentId] = useState<string>("");
@@ -838,8 +944,12 @@ function ParentDashboardView({ parent }: { parent: ParentProfile }) {
       <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-text-primary">Parent Portal</h1>
-            <p className="text-sm text-text-secondary mt-1">Account: {parent.email}</p>
+            <h1 className="text-xl font-bold text-text-primary">
+              Welcome, {parent.full_name || "Parent"}
+            </h1>
+            <p className="text-sm text-text-secondary mt-1">
+              Account: {parent.phone_number || parent.email || "Registered Parent"}
+            </p>
           </div>
 
           <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
@@ -923,8 +1033,21 @@ function ParentDashboardView({ parent }: { parent: ParentProfile }) {
 
 // ── Admin Dashboard View ─────────────────────────────────────────────────────
 
-function AdminDashboardView({ admin }: { admin: AdminProfile }) {
-  const [activeTab, setActiveTab] = useState<"ncert" | "overview">("ncert");
+function AdminDashboardView({
+  admin,
+  activeTab = "overview",
+}: {
+  admin: AdminProfile;
+  activeTab?: string;
+}) {
+  const [localTab, setLocalTab] = useState<"ncert" | "overview">("ncert");
+
+  const effectiveTab =
+    activeTab === "ncert_master"
+      ? "ncert"
+      : activeTab === "overview"
+      ? "overview"
+      : localTab;
 
   return (
     <div className="space-y-6">
@@ -953,9 +1076,9 @@ function AdminDashboardView({ admin }: { admin: AdminProfile }) {
       {/* Admin Sub-tabs */}
       <div className="flex items-center gap-2 p-1.5 glass rounded-[var(--radius-lg)] border border-border-primary">
         <button
-          onClick={() => setActiveTab("ncert")}
+          onClick={() => setLocalTab("ncert")}
           className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === "ncert"
+            effectiveTab === "ncert"
               ? "bg-brand text-white shadow-md"
               : "text-text-secondary hover:text-text-primary hover:bg-surface"
           }`}
@@ -965,9 +1088,9 @@ function AdminDashboardView({ admin }: { admin: AdminProfile }) {
         </button>
 
         <button
-          onClick={() => setActiveTab("overview")}
+          onClick={() => setLocalTab("overview")}
           className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === "overview"
+            effectiveTab === "overview"
               ? "bg-brand text-white shadow-md"
               : "text-text-secondary hover:text-text-primary hover:bg-surface"
           }`}
@@ -977,9 +1100,9 @@ function AdminDashboardView({ admin }: { admin: AdminProfile }) {
         </button>
       </div>
 
-      {activeTab === "ncert" && <NCERTBookManagementPanel />}
+      {effectiveTab === "ncert" && <NCERTBookManagementPanel />}
 
-      {activeTab === "overview" && (
+      {effectiveTab === "overview" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary">
             <span className="text-xs text-text-tertiary block">Role Status</span>
@@ -1007,11 +1130,27 @@ function AdminDashboardView({ admin }: { admin: AdminProfile }) {
 
 // ── Teacher Dashboard View ───────────────────────────────────────────────────
 
-function TeacherDashboardView({ teacher }: { teacher: TeacherProfile }) {
+function TeacherDashboardView({
+  teacher,
+  activeTab = "overview",
+}: {
+  teacher: TeacherProfile;
+  activeTab?: string;
+}) {
   const [assignedClasses, setAssignedClasses] = useState<TeacherClassOut[]>([]);
   const [selectedClass, setSelectedClass] = useState<TeacherClassOut | null>(null);
-  const [activeTab, setActiveTab] = useState<"students" | "assignments" | "progress">("students");
+  const [localTab, setLocalTab] = useState<"students" | "assignments" | "progress">("students");
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Sync sidebar activeTab with local tab
+  const effectiveTab: "students" | "assignments" | "progress" =
+    activeTab === "classes"
+      ? "students"
+      : activeTab === "assignments"
+      ? "assignments"
+      : activeTab === "grading"
+      ? "progress"
+      : localTab;
 
   // Class Students state
   const [students, setStudents] = useState<StudentProfile[]>([]);
@@ -1313,9 +1452,9 @@ function TeacherDashboardView({ teacher }: { teacher: TeacherProfile }) {
                   {/* Sub-tabs: Students | Assignments | Progress */}
                   <div className="flex items-center gap-1.5 p-1 bg-surface-hover rounded-[var(--radius-md)] border border-border-primary">
                     <button
-                      onClick={() => setActiveTab("students")}
+                      onClick={() => setLocalTab("students")}
                       className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        activeTab === "students"
+                        effectiveTab === "students"
                           ? "bg-surface text-brand shadow-sm font-bold"
                           : "text-text-secondary hover:text-text-primary"
                       }`}
@@ -1325,9 +1464,9 @@ function TeacherDashboardView({ teacher }: { teacher: TeacherProfile }) {
                     </button>
 
                     <button
-                      onClick={() => setActiveTab("assignments")}
+                      onClick={() => setLocalTab("assignments")}
                       className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        activeTab === "assignments"
+                        effectiveTab === "assignments"
                           ? "bg-surface text-brand shadow-sm font-bold"
                           : "text-text-secondary hover:text-text-primary"
                       }`}
@@ -1337,9 +1476,9 @@ function TeacherDashboardView({ teacher }: { teacher: TeacherProfile }) {
                     </button>
 
                     <button
-                      onClick={() => setActiveTab("progress")}
+                      onClick={() => setLocalTab("progress")}
                       className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        activeTab === "progress"
+                        effectiveTab === "progress"
                           ? "bg-surface text-brand shadow-sm font-bold"
                           : "text-text-secondary hover:text-text-primary"
                       }`}
@@ -1352,7 +1491,7 @@ function TeacherDashboardView({ teacher }: { teacher: TeacherProfile }) {
               </div>
 
               {/* TAB 1: STUDENTS LIST */}
-              {activeTab === "students" && (
+              {effectiveTab === "students" && (
                 <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-4">
                   <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
                     <Users className="w-4 h-4 text-brand" />
@@ -1397,7 +1536,7 @@ function TeacherDashboardView({ teacher }: { teacher: TeacherProfile }) {
               )}
 
               {/* TAB 2: ASSIGNMENTS MANAGEMENT */}
-              {activeTab === "assignments" && (
+              {effectiveTab === "assignments" && (
                 <div className="space-y-6">
                   {/* Action Bar */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1531,7 +1670,7 @@ function TeacherDashboardView({ teacher }: { teacher: TeacherProfile }) {
               )}
 
               {/* TAB 3: PROGRESS & FEEDBACK */}
-              {activeTab === "progress" && (
+              {effectiveTab === "progress" && (
                 <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>

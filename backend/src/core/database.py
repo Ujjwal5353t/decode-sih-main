@@ -45,6 +45,31 @@ async def init_db() -> None:
         await conn.execute(
             text("ALTER TABLE students ALTER COLUMN section TYPE VARCHAR(10);")
         )
+        # Migration: add phone_number and full_name columns
+        await conn.execute(
+            text("ALTER TABLE students ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20);")
+        )
+        await conn.execute(
+            text("ALTER TABLE students ADD COLUMN IF NOT EXISTS full_name VARCHAR(150) DEFAULT '';")
+        )
+        await conn.execute(
+            text("ALTER TABLE students ALTER COLUMN email DROP NOT NULL;")
+        )
+        await conn.execute(
+            text("ALTER TABLE parents ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20);")
+        )
+        await conn.execute(
+            text("ALTER TABLE parents ADD COLUMN IF NOT EXISTS full_name VARCHAR(150);")
+        )
+        await conn.execute(
+            text("ALTER TABLE parents ALTER COLUMN email DROP NOT NULL;")
+        )
+        await conn.execute(
+            text("ALTER TABLE schools ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20);")
+        )
+        await conn.execute(
+            text("ALTER TABLE schools ALTER COLUMN email DROP NOT NULL;")
+        )
         # Migration: add OCR tracking columns to modules table
         await conn.execute(
             text("ALTER TABLE modules ADD COLUMN IF NOT EXISTS ocr_status VARCHAR(20) DEFAULT 'pending';")

@@ -9,10 +9,19 @@ export interface TokenResponse {
   role: Role;
 }
 
+export interface OTPResponse {
+  status: string;
+  message: string;
+  phone_number?: string;
+  verified?: boolean;
+}
+
 export interface StudentProfile {
   id: string;
   unique_number: string;
-  email: string;
+  full_name?: string;
+  email?: string | null;
+  phone_number?: string | null;
   state: string;
   school_name: string;
   branch_name: string;
@@ -43,14 +52,17 @@ export interface SchoolProfile {
   school_name: string;
   branch_name: string;
   student_prefix: string;
-  email: string;
+  email?: string | null;
+  phone_number?: string | null;
   state: string;
   created_at: string;
 }
 
 export interface ParentProfile {
   id: string;
-  email: string;
+  full_name?: string | null;
+  email?: string | null;
+  phone_number?: string | null;
   created_at: string;
 }
 
@@ -75,6 +87,37 @@ export interface ChildLinkOut {
   parent_id: string;
   student_unique_number: string;
   created_at: string;
+}
+
+// ── Permission & RBAC Navigation Schema ───────────────────────────────────────
+
+export interface PermissionAction {
+  key: string;
+  label: string;
+  description: string;
+}
+
+export interface DashboardPermissionItem {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  category?: string;
+  badge?: string | null;
+  is_default?: boolean;
+  actions?: PermissionAction[];
+}
+
+export interface RolePermissionsResponse {
+  role: Role;
+  role_label: string;
+  capabilities: string[];
+  navigation: DashboardPermissionItem[];
+}
+
+export async function getRolePermissions(role?: Role): Promise<RolePermissionsResponse> {
+  const q = role ? `?role=${encodeURIComponent(role)}` : "";
+  return fetchApi<RolePermissionsResponse>(`/auth/permissions${q}`);
 }
 
 // Token Helpers
@@ -151,12 +194,44 @@ async function fetchApi<T>(
   return response.json();
 }
 
+// ── OTP Endpoints ─────────────────────────────────────────────────────────────
+
+export async function sendOTP(phone_number: string): Promise<OTPResponse> {
+  return fetchApi<OTPResponse>("/auth/otp/send", {
+    method: "POST",
+    body: JSON.stringify({ phone_number }),
+  });
+}
+
+export async function verifyOTP(phone_number: string, otp_code: string): Promise<OTPResponse> {
+  return fetchApi<OTPResponse>("/auth/otp/verify", {
+    method: "POST",
+    body: JSON.stringify({ phone_number, otp_code }),
+  });
+}
+
+export async function loginWithOTP(payload: {
+  phone_number: string;
+  otp_code: string;
+  role: Role;
+  branch_name?: string;
+}): Promise<TokenResponse> {
+  const res = await fetchApi<TokenResponse>("/auth/login/otp", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  setStoredAuth(res.access_token, payload.role);
+  return res;
+}
+
 // ── Auth Endpoints ─────────────────────────────────────────────────────────────
 
 export async function loginStudent(payload: {
   branch_name?: string;
   enrollment_type?: string;
-  email: string;
+  email?: string;
+  phone_number?: string;
+  identifier?: string;
   password: string;
 }): Promise<TokenResponse> {
   const res = await fetchApi<TokenResponse>("/auth/student/login", {
@@ -168,12 +243,16 @@ export async function loginStudent(payload: {
 }
 
 export async function registerStudent(payload: {
+  full_name?: string;
   enrollment_type?: string;
   school_name?: string;
   branch_name?: string;
-  email: string;
+  email?: string;
+  phone_number?: string;
   password: string;
   state?: string;
+  class_number?: number;
+  section?: string;
 }): Promise<TokenResponse> {
   const res = await fetchApi<TokenResponse>("/auth/student/register", {
     method: "POST",
@@ -185,7 +264,9 @@ export async function registerStudent(payload: {
 
 export async function loginSchool(payload: {
   branch_name: string;
-  email: string;
+  email?: string;
+  phone_number?: string;
+  identifier?: string;
   password: string;
 }): Promise<TokenResponse> {
   const res = await fetchApi<TokenResponse>("/auth/school/login", {
@@ -200,7 +281,8 @@ export async function registerSchool(payload: {
   school_name: string;
   branch_name: string;
   student_prefix: string;
-  email: string;
+  email?: string;
+  phone_number?: string;
   password: string;
   state: string;
 }): Promise<TokenResponse> {
@@ -213,7 +295,9 @@ export async function registerSchool(payload: {
 }
 
 export async function loginParent(payload: {
-  email: string;
+  email?: string;
+  phone_number?: string;
+  identifier?: string;
   password: string;
 }): Promise<TokenResponse> {
   const res = await fetchApi<TokenResponse>("/auth/parent/login", {
@@ -225,9 +309,11 @@ export async function loginParent(payload: {
 }
 
 export async function registerParent(payload: {
-  email: string;
+  full_name?: string;
+  email?: string;
+  phone_number?: string;
   password: string;
-  student_unique_number: string;
+  student_unique_number?: string;
 }): Promise<TokenResponse> {
   const res = await fetchApi<TokenResponse>("/auth/parent/register", {
     method: "POST",
@@ -238,7 +324,8 @@ export async function registerParent(payload: {
 }
 
 export async function loginAdmin(payload: {
-  email: string;
+  email?: string;
+  identifier?: string;
   password: string;
 }): Promise<TokenResponse> {
   const res = await fetchApi<TokenResponse>("/auth/admin/login", {
@@ -409,7 +496,6 @@ export async function addNCERTModuleToSchool(
     body: JSON.stringify({ ncert_book_id, title }),
   });
 }
-
 
 export interface ContactInquiryResponse {
   id: string;
