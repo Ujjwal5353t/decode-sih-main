@@ -43,21 +43,32 @@ _ASSIGNMENT_PDF_MAX_BYTES = _ASSIGNMENT_PDF_MAX_MB * 1024 * 1024
 
 # ── Auth ───────────────────────────────────────────────────────────────────────
 
+from sqlalchemy import func, or_
+from src.services.otp_service import normalize_phone
+
 async def register_teacher(data: TeacherRegisterRequest, session: AsyncSession) -> Teacher:
-    # Check branch exists
+    clean_phone = normalize_phone(data.phone_number)
+    clean_branch = data.branch_name.strip()
+
+    # Check branch exists (case-insensitive)
     branch = await session.execute(
-        select(School).where(School.branch_name == data.branch_name)
+        select(School).where(func.lower(School.branch_name) == clean_branch.lower())
     )
     school = branch.scalar_one_or_none()
     if not school:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"School branch '{data.branch_name}' not found.",
+            detail=f"School branch '{data.branch_name}' not found. Please select a valid branch.",
         )
 
     # Check phone uniqueness
     existing = await session.execute(
-        select(Teacher).where(Teacher.phone_number == data.phone_number)
+        select(Teacher).where(
+            or_(
+                Teacher.phone_number == clean_phone,
+                Teacher.phone_number == data.phone_number.strip(),
+            )
+        )
     )
     if existing.scalar_one_or_none():
         raise HTTPException(
@@ -66,10 +77,10 @@ async def register_teacher(data: TeacherRegisterRequest, session: AsyncSession) 
         )
 
     teacher = Teacher(
-        name=data.name,
-        phone_number=data.phone_number,
+        name=data.name.strip(),
+        phone_number=clean_phone,
         school_name=school.school_name,
-        branch_name=data.branch_name,
+        branch_name=school.branch_name,
         password_hash=hash_password(data.password),
     )
     session.add(teacher)
@@ -79,10 +90,16 @@ async def register_teacher(data: TeacherRegisterRequest, session: AsyncSession) 
 
 
 async def login_teacher(data: TeacherLoginRequest, session: AsyncSession) -> Teacher:
+    clean_phone = normalize_phone(data.phone_number)
+    clean_branch = data.branch_name.strip().lower()
+
     result = await session.execute(
         select(Teacher).where(
-            Teacher.phone_number == data.phone_number,
-            Teacher.branch_name == data.branch_name,
+            or_(
+                Teacher.phone_number == clean_phone,
+                Teacher.phone_number == data.phone_number.strip(),
+            ),
+            func.lower(Teacher.branch_name) == clean_branch,
         )
     )
     teacher = result.scalar_one_or_none()
