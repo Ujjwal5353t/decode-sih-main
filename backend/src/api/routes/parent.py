@@ -37,8 +37,7 @@ async def get_children(
     parent: Parent = Depends(get_current_parent),
     session: AsyncSession = Depends(get_session),
 ):
-    links = await parent_service.get_parent_children(parent, session)
-    return [ChildLinkOut.model_validate(link) for link in links]
+    return await parent_service.get_parent_children(parent, session)
 
 
 @router.post(
@@ -52,8 +51,7 @@ async def add_child(
     parent: Parent = Depends(get_current_parent),
     session: AsyncSession = Depends(get_session),
 ):
-    link = await parent_service.add_child_to_parent(parent, data, session)
-    return ChildLinkOut.model_validate(link)
+    return await parent_service.add_child_to_parent(parent, data, session)
 
 
 @router.get(

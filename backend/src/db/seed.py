@@ -377,7 +377,9 @@ async def seed_demo_accounts(session: AsyncSession) -> None:
     if not student:
         student = Student(
             unique_number="LKD0001",
+            full_name="Aarav Sharma",
             email="student.lkd@vidyasetu.ai",
+            phone_number="9876543210",
             password_hash=hash_password("Password123!"),
             school_name=s_name,
             branch_name=b_name,
@@ -390,18 +392,32 @@ async def seed_demo_accounts(session: AsyncSession) -> None:
         await session.commit()
         await session.refresh(student)
         print("[seed] Demo Student 'LKD0001' created.")
+    elif not student.full_name or student.full_name == "Student":
+        student.full_name = "Aarav Sharma"
+        if not student.phone_number:
+            student.phone_number = "9876543210"
+        session.add(student)
+        await session.commit()
 
     # 4. Parent
     prt_res = await session.execute(select(Parent).where(Parent.email == "parent.lkd@vidyasetu.ai"))
     parent = prt_res.scalar_one_or_none()
     if not parent:
         parent = Parent(
+            full_name="Rajesh Sharma",
             email="parent.lkd@vidyasetu.ai",
+            phone_number="9876543210",
             password_hash=hash_password("Password123!"),
         )
         session.add(parent)
         await session.commit()
         await session.refresh(parent)
+    elif not parent.full_name:
+        parent.full_name = "Rajesh Sharma"
+        if not parent.phone_number:
+            parent.phone_number = "9876543210"
+        session.add(parent)
+        await session.commit()
 
     pcl_res = await session.execute(
         select(ParentChildLink).where(ParentChildLink.student_unique_number == "LKD0001")

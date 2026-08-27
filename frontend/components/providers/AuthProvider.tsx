@@ -16,6 +16,7 @@ import {
   loginParent,
   loginAdmin,
   loginTeacher,
+  loginWithOTP,
   registerStudent,
   registerSchool,
   registerParent,
@@ -37,6 +38,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   login: (role: Role, data: any) => Promise<void>;
+  loginOTP: (role: Role, phone_number: string, otp_code: string, branch_name?: string) => Promise<void>;
   register: (role: Role, data: any) => Promise<void>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
@@ -134,6 +136,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginOTP = async (
+    loginRole: Role,
+    phone_number: string,
+    otp_code: string,
+    branch_name?: string
+  ) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await loginWithOTP({
+        phone_number,
+        otp_code,
+        role: loginRole,
+        branch_name,
+      });
+      if (res) {
+        setToken(res.access_token);
+        setRole(loginRole);
+        await fetchProfileForRole(loginRole);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to log in with OTP.");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const register = async (regRole: Role, data: any) => {
     setLoading(true);
     setError(null);
@@ -194,6 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         error,
         login,
+        loginOTP,
         register,
         logout,
         refreshProfile,

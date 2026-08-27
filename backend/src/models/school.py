@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
@@ -21,7 +22,8 @@ class School(SQLModel, table=True):
     school_name: str
     branch_name: str = Field(unique=True, index=True, max_length=120)
     student_prefix: str = Field(unique=True, index=True, max_length=10)
-    email: str = Field(unique=True, index=True, max_length=255)
+    email: Optional[str] = Field(default=None, index=True, max_length=255)
+    phone_number: Optional[str] = Field(default=None, index=True, max_length=20)
     password_hash: str
     state: str = Field(max_length=100)
     created_at: datetime = Field(default_factory=_utcnow)
