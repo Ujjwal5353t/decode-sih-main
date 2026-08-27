@@ -1,6 +1,8 @@
 """
-Auth routes — registration + login for all four roles.
+Auth routes — registration, login, and OTP verification for all roles.
 
+POST /auth/otp/send
+POST /auth/otp/verify
 POST /auth/school/register
 POST /auth/school/login
 POST /auth/student/register
@@ -10,54 +12,249 @@ POST /auth/parent/register
 POST /auth/parent/login
 POST /auth/admin/login
 POST /auth/token/refresh          (sliding-window explicit refresh)
-
-Token strategy:
-  - All tokens are valid for 7 days.
-  - Every authenticated response includes X-Access-Token if the token
-    is refreshed (< 3.5 days remaining — see core/dependencies.py).
-  - Clients can also explicitly call POST /auth/token/refresh with a
-    still-valid token to get a fresh 7-day token.
 """
 
-from fastapi import APIRouter, Depends, status
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from jose import JWTError
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
 from src.core.database import get_session
 from src.core.dependencies import get_current_student
-from src.core.security import create_access_token, decode_token
+from src.core.security import create_access_token, decode_token, verify_password
+from src.models.admin import Admin
+from src.models.parent import Parent
+from src.models.school import School
 from src.models.student import Student
+from src.models.teacher import Teacher
 from src.schemas.auth import (
     AdminLoginRequest,
+    OTPLoginRequest,
+    OTPResponse,
     ParentLoginRequest,
     ParentRegisterRequest,
     SchoolLoginRequest,
     SchoolRegisterRequest,
+    SendOTPRequest,
     StudentClassSetupRequest,
     StudentLoginRequest,
     StudentRegisterRequest,
     TeacherLoginRequest,
     TeacherRegisterRequest,
     TokenRefreshRequest,
+    VerifyOTPRequest,
 )
 from src.schemas.common import MessageResponse, TokenResponse
+from src.schemas.permission import RolePermissionsResponse
 from src.schemas.student import StudentProfile
 from src.services import parent_service, school_service, student_service, teacher_service
-from src.models.admin import Admin
-from sqlmodel import select
-from src.core.security import verify_password
-from fastapi import HTTPException
-
-from src.models.school import School
-from typing import Optional
-from pydantic import BaseModel
+from src.services.otp_service import generate_and_send_otp, normalize_phone, verify_otp_code
+from src.services.permission_service import get_permissions_for_role
+from sqlalchemy import func, or_
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
 
 class SchoolSearchResult(BaseModel):
     school_name: str
     branch_name: str
     state: str
+
+
+# ── OTP Service Endpoints ──────────────────────────────────────────────────────
+
+@router.post(
+    "/otp/send",
+    response_model=OTPResponse,
+    summary="Generate a dummy OTP and print to the server console (Hackathon MVP)",
+)
+async def send_otp(data: SendOTPRequest):
+    otp = generate_and_send_otp(data.phone_number)
+    return OTPResponse(
+        status="success",
+        message=f"OTP sent to {data.phone_number}. Check your backend server console for the code!",
+        phone_number=data.phone_number,
+    )
+
+
+@router.post(
+    "/otp/verify",
+    response_model=OTPResponse,
+    summary="Verify dummy OTP code",
+)
+async def verify_otp(data: VerifyOTPRequest):
+    valid = verify_otp_code(data.phone_number, data.otp_code)
+    if not valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OTP code. Please check the backend console.",
+        )
+    return OTPResponse(
+        status="success",
+        message="Phone number verified successfully.",
+        phone_number=data.phone_number,
+        verified=True,
+    )
+
+
+@router.post(
+    "/login/otp",
+    response_model=TokenResponse,
+    summary="Login directly with verified mobile OTP code",
+)
+async def login_with_otp(
+    data: OTPLoginRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    valid = verify_otp_code(data.phone_number, data.otp_code)
+    if not valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OTP code. Please check the backend console.",
+        )
+
+    clean_phone = normalize_phone(data.phone_number)
+    role = data.role.lower().strip()
+
+    if role == "teacher":
+        if not data.branch_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Branch name is required for teacher login.",
+            )
+        result = await session.execute(
+            select(Teacher).where(
+                or_(
+                    Teacher.phone_number == clean_phone,
+                    Teacher.phone_number == data.phone_number.strip(),
+                ),
+                func.lower(Teacher.branch_name) == data.branch_name.strip().lower(),
+            )
+        )
+        teacher = result.scalar_one_or_none()
+        if not teacher:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No teacher account found with phone number '{data.phone_number}' in branch '{data.branch_name}'.",
+            )
+        token = create_access_token(
+            subject=str(teacher.id),
+            role="teacher",
+            extra_claims={"branch": teacher.branch_name},
+        )
+        return TokenResponse(access_token=token, role="teacher")
+
+    elif role == "student":
+        result = await session.execute(
+            select(Student).where(
+                or_(
+                    Student.phone_number == clean_phone,
+                    Student.phone_number == data.phone_number.strip(),
+                )
+            )
+        )
+        students = result.scalars().all()
+        if not students:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No student account found with phone number '{data.phone_number}'.",
+            )
+        
+        # If branch specified, match branch
+        matched_student = students[0]
+        if data.branch_name and data.branch_name.strip():
+            for s in students:
+                if s.branch_name.strip().lower() == data.branch_name.strip().lower():
+                    matched_student = s
+                    break
+
+        token = create_access_token(
+            subject=str(matched_student.id),
+            role="student",
+            extra_claims={"unique_number": matched_student.unique_number, "branch": matched_student.branch_name},
+        )
+        return TokenResponse(access_token=token, role="student")
+
+    elif role == "parent":
+        result = await session.execute(
+            select(Parent).where(
+                or_(
+                    Parent.phone_number == clean_phone,
+                    Parent.phone_number == data.phone_number.strip(),
+                )
+            )
+        )
+        parent = result.scalar_one_or_none()
+        if not parent:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No parent account found with phone number '{data.phone_number}'.",
+            )
+        token = create_access_token(subject=str(parent.id), role="parent")
+        return TokenResponse(access_token=token, role="parent")
+
+    elif role == "school":
+        if not data.branch_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Branch name is required for school login.",
+            )
+        result = await session.execute(
+            select(School).where(
+                or_(
+                    School.phone_number == clean_phone,
+                    School.phone_number == data.phone_number.strip(),
+                ),
+                func.lower(School.branch_name) == data.branch_name.strip().lower(),
+            )
+        )
+        school = result.scalar_one_or_none()
+        if not school:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No school branch account found with phone number '{data.phone_number}'.",
+            )
+        token = create_access_token(
+            subject=str(school.id),
+            role="school",
+            extra_claims={"branch": school.branch_name},
+        )
+        return TokenResponse(access_token=token, role="school")
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported role '{role}' for OTP login.",
+        )
+
+
+# ── Role Permissions & Feature Schema ──────────────────────────────────────────
+
+@router.get(
+    "/permissions",
+    response_model=RolePermissionsResponse,
+    summary="Get role permissions, actions, and sidebar navigation schema for a specified or authenticated role",
+)
+async def get_current_role_permissions(
+    role: Optional[str] = None,
+):
+    target_role = role or "student"
+    return get_permissions_for_role(target_role)
+
+
+@router.get(
+    "/permissions/{role}",
+    response_model=RolePermissionsResponse,
+    summary="Get permission capabilities and navigation items for a specific role",
+)
+async def get_role_permissions(role: str):
+    return get_permissions_for_role(role)
+
+
+# ── School Search ──────────────────────────────────────────────────────────────
 
 @router.get(
     "/schools/search",
@@ -193,9 +390,6 @@ async def parent_register(
     parent, created = await parent_service.register_parent(data, session)
     token = create_access_token(subject=str(parent.id), role="parent")
     http_status = status.HTTP_201_CREATED if created else status.HTTP_200_OK
-    # FastAPI doesn't easily change status_code at runtime, so we return 200/201
-    # by using a JSONResponse when needed
-    from fastapi.responses import JSONResponse
     return JSONResponse(
         status_code=http_status,
         content=TokenResponse(access_token=token, role="parent").model_dump(),
@@ -227,8 +421,9 @@ async def admin_login(
     data: AdminLoginRequest,
     session: AsyncSession = Depends(get_session),
 ):
+    target = data.email or data.identifier or ""
     result = await session.execute(
-        select(Admin).where(Admin.email == str(data.email))
+        select(Admin).where(Admin.email == str(target).strip())
     )
     admin = result.scalar_one_or_none()
 
