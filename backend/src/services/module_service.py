@@ -36,11 +36,13 @@ async def add_pdf_module(
     title: str,
     file: UploadFile,
     session: AsyncSession,
+    subject: str = "General",
 ) -> Module:
     upload = await upload_pdf(file, folder=f"decode-sih/{branch_name}/class-{class_number}")
     module = Module(
         branch_name=branch_name,
         class_number=class_number,
+        subject=subject,
         title=title,
         source_type=SourceType.PDF_UPLOAD,
         file_url=upload["url"],
@@ -49,6 +51,21 @@ async def add_pdf_module(
         ocr_status=OcrStatus.NA,
     )
     session.add(module)
+    await session.flush()
+
+    # Ingest initial document chunks for RAG & test creation
+    from src.services.chunk_service import ingest_module_text
+    initial_text = f"Chapter 1: {title}\n\nThis module contains curriculum materials for Class {class_number} {subject}: {title}."
+    await ingest_module_text(
+        session=session,
+        branch_name=branch_name,
+        class_number=class_number,
+        subject=subject,
+        text=initial_text,
+        module_id=module.id,
+        module_title=title,
+    )
+
     return module
 
 
@@ -58,6 +75,7 @@ async def add_images_module(
     title: str,
     files: Sequence[UploadFile],
     session: AsyncSession,
+    subject: str = "General",
 ) -> Module:
     upload = await upload_images_as_pdf(
         files, folder=f"decode-sih/{branch_name}/class-{class_number}"
@@ -65,6 +83,7 @@ async def add_images_module(
     module = Module(
         branch_name=branch_name,
         class_number=class_number,
+        subject=subject,
         title=title,
         source_type=SourceType.IMAGE_UPLOAD,
         file_url=upload["url"],
@@ -83,6 +102,7 @@ async def add_images_module(
             class_number=class_number,
             branch_name=branch_name,
             image_bytes_list=upload["image_bytes_list"],
+            subject=subject,
         )
     )
     return module
@@ -111,6 +131,7 @@ async def add_ncert_module(
     module = Module(
         branch_name=branch_name,
         class_number=class_number,
+        subject=ncert_book.subject,
         title=data.title or ncert_book.title,
         source_type=SourceType.NCERT,
         file_url=ncert_book.file_url or "",
@@ -119,6 +140,53 @@ async def add_ncert_module(
         ocr_status=OcrStatus.NA,
     )
     session.add(module)
+    await session.flush()
+
+    # Link/copy NCERT template chunks to this branch's module chunks
+    from src.models.chunk import DocumentChunk
+    from src.services.chunk_service import ingest_module_text
+
+    # Copy any existing global template chunks for this NCERT book into branch chunks
+    ncert_chunks_res = await session.execute(
+        select(DocumentChunk).where(DocumentChunk.ncert_book_id == ncert_book.id)
+    )
+    ncert_chunks = list(ncert_chunks_res.scalars().all())
+
+    if ncert_chunks:
+        for template_chunk in ncert_chunks:
+            # Create a branch-specific chunk copy linked to module
+            branch_chunk = DocumentChunk(
+                module_id=module.id,
+                ncert_book_id=ncert_book.id,
+                branch_name=branch_name,
+                class_number=class_number,
+                subject=ncert_book.subject,
+                chapter_number=template_chunk.chapter_number,
+                chapter_title=template_chunk.chapter_title,
+                chunk_index=template_chunk.chunk_index,
+                content=template_chunk.content,
+                token_count=template_chunk.token_count,
+                char_count=template_chunk.char_count,
+                start_char=template_chunk.start_char,
+                end_char=template_chunk.end_char,
+                embedding=template_chunk.embedding,
+            )
+            session.add(branch_chunk)
+    else:
+        # Fallback: ingest initial text for the NCERT module
+        book_desc = ncert_book.description or ncert_book.title
+        initial_text = f"Chapter 1: Overview\n\n{book_desc}"
+        await ingest_module_text(
+            session=session,
+            branch_name=branch_name,
+            class_number=class_number,
+            subject=ncert_book.subject,
+            text=initial_text,
+            module_id=module.id,
+            ncert_book_id=ncert_book.id,
+            module_title=module.title,
+        )
+
     return module
 
 

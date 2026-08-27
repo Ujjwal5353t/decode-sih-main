@@ -16,3 +16,5 @@ from src.models.teacher import (  # noqa: F401
     AssignmentSubmission,
     TeacherFeedback,
 )
+from src.models.chunk import DocumentChunk  # noqa: F401
+
