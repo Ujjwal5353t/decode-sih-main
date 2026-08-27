@@ -395,6 +395,7 @@ async def run_ocr_background(
     class_number: int,
     branch_name: str,
     image_bytes_list: list[bytes],
+    subject: str = "General",
 ) -> None:
     """
     Full OCR pipeline — runs as an asyncio background task.
@@ -405,7 +406,8 @@ async def run_ocr_background(
       3. OCR each image — collect text per image
       4. Build formatted text PDF
       5. Upload text PDF to Cloudinary
-      6. Save ocr_pdf_url + ocr_pdf_public_id, set ocr_status = "done"
+      6. Ingest text into chapter chunks for RAG
+      7. Save ocr_pdf_url + ocr_pdf_public_id, set ocr_status = "done"
 
     On any exception the module is marked ocr_status = "failed" so the school
     can retry via POST /school/classes/{n}/modules/{id}/ocr/retry.
@@ -472,7 +474,27 @@ async def run_ocr_background(
         await _mark_failed(module_id)
         return
 
-    # ── Step 6: Persist results ───────────────────────────────────────────────
+    # ── Step 6: Ingest OCR text into chapter chunks ───────────────────────────
+    try:
+        from src.services.chunk_service import ingest_module_text
+        full_ocr_text = "\n\n".join(t for t in page_texts if t.strip())
+        async with AsyncSessionFactory() as session:
+            mod = await session.get(Module, module_id)
+            effective_subject = mod.subject if mod and mod.subject else subject
+            await ingest_module_text(
+                session=session,
+                branch_name=branch_name,
+                class_number=class_number,
+                subject=effective_subject,
+                text=full_ocr_text or f"Chapter 1: {title}\n\n{title}",
+                module_id=module_id,
+                module_title=title,
+            )
+        logger.info("[OCR] Document chunks ingested for module %s", module_id)
+    except Exception as exc:
+        logger.warning("[OCR] Could not chunk OCR text for module %s: %s", module_id, exc)
+
+    # ── Step 7: Persist results ───────────────────────────────────────────────
     try:
         async with AsyncSessionFactory() as session:
             module = await session.get(Module, module_id)

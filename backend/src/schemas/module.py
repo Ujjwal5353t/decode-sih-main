@@ -11,6 +11,7 @@ class ModuleOut(BaseModel):
     id: uuid.UUID
     branch_name: str
     class_number: int
+    subject: str
     title: str
     source_type: SourceType
     file_url: str

@@ -140,11 +140,13 @@ async def upload_pdf_module(
     class_number: int,
     title: Annotated[str, Form()],
     file: Annotated[UploadFile, File(description="PDF file (max 50 MB)")],
+    subject: Annotated[Optional[str], Form()] = "General",
     school: School = Depends(get_current_school),
     session: AsyncSession = Depends(get_session),
 ):
+    eff_subject = subject or "General"
     module = await module_service.add_pdf_module(
-        school.branch_name, class_number, title, file, session
+        school.branch_name, class_number, title, file, session, subject=eff_subject
     )
     return ModuleOut.model_validate(module)
 
@@ -159,11 +161,13 @@ async def upload_images_module(
     class_number: int,
     title: Annotated[str, Form()],
     files: Annotated[list[UploadFile], File(description="JPEG/PNG images (max 50 MB each)")],
+    subject: Annotated[Optional[str], Form()] = "General",
     school: School = Depends(get_current_school),
     session: AsyncSession = Depends(get_session),
 ):
+    eff_subject = subject or "General"
     module = await module_service.add_images_module(
-        school.branch_name, class_number, title, files, session
+        school.branch_name, class_number, title, files, session, subject=eff_subject
     )
     return ModuleOut.model_validate(module)
 
@@ -349,6 +353,80 @@ async def retry_module_ocr(
             "to re-upload the images. This will automatically trigger fresh OCR."
         ),
     )
+
+
+# ── Chunk Ingestion & Inspection ──────────────────────────────────────────────
+
+from src.schemas.chunk import ChunkOut, ModuleIngestRequest
+from src.services import chunk_service
+
+
+@router.post(
+    "/classes/{class_number}/modules/{module_id}/ingest",
+    response_model=list[ChunkOut],
+    summary="Ingest custom or updated text content for a module into document chunks",
+)
+async def ingest_module_chunks(
+    class_number: int,
+    module_id: uuid.UUID,
+    data: Optional[ModuleIngestRequest] = None,
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    module = await session.get(Module, module_id)
+    if not module or module.branch_name != school.branch_name:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found.",
+        )
+
+    text_to_ingest = (data.text if data and data.text else None) or f"Chapter 1: {module.title}\n\n{module.title}"
+    effective_subject = (data.subject if data and data.subject else None) or module.subject
+
+    if data and data.subject:
+        module.subject = data.subject
+        session.add(module)
+
+    chunks = await chunk_service.ingest_module_text(
+        session=session,
+        branch_name=school.branch_name,
+        class_number=class_number,
+        subject=effective_subject,
+        text=text_to_ingest,
+        module_id=module.id,
+        module_title=module.title,
+    )
+    return [ChunkOut.model_validate(c) for c in chunks]
+
+
+@router.get(
+    "/classes/{class_number}/modules/{module_id}/chunks",
+    response_model=list[ChunkOut],
+    summary="Get all chunks formed for a specific module",
+)
+async def get_module_chunks(
+    class_number: int,
+    module_id: uuid.UUID,
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    from sqlmodel import select
+    from src.models.chunk import DocumentChunk
+
+    module = await session.get(Module, module_id)
+    if not module or module.branch_name != school.branch_name:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Module not found.",
+        )
+
+    res = await session.execute(
+        select(DocumentChunk)
+        .where(DocumentChunk.module_id == module_id)
+        .order_by(DocumentChunk.chapter_number, DocumentChunk.chunk_index)
+    )
+    chunks = list(res.scalars().all())
+    return [ChunkOut.model_validate(c) for c in chunks]
 
 
 # ── Teacher management (school admin) ─────────────────────────────────────────

@@ -174,15 +174,93 @@ async def seed_admin(session: AsyncSession) -> None:
 async def seed_ncert_books(session: AsyncSession) -> None:
     # Check if any NCERT books are already seeded
     result = await session.execute(select(NCERTBook).limit(1))
-    if result.scalar_one_or_none():
-        return  # Already seeded
+    if not result.scalar_one_or_none():
+        for book_data in _NCERT_BOOKS:
+            book = NCERTBook(**book_data)
+            session.add(book)
 
-    for book_data in _NCERT_BOOKS:
-        book = NCERTBook(**book_data)
-        session.add(book)
+        await session.commit()
+        print(f"[seed] {len(_NCERT_BOOKS)} NCERT books seeded.")
 
-    await session.commit()
-    print(f"[seed] {len(_NCERT_BOOKS)} NCERT books seeded.")
+    # Seed template chapter chunks for NCERT Class 4 EVS & Math
+    from src.models.chunk import DocumentChunk
+    from src.services.chunk_service import ingest_module_text
+
+    chk_res = await session.execute(select(DocumentChunk).where(DocumentChunk.branch_name == "SELF").limit(1))
+    if not chk_res.scalar_one_or_none():
+        # Fetch Class 4 EVS NCERT Book
+        evs_res = await session.execute(
+            select(NCERTBook).where(NCERTBook.class_number == 4, NCERTBook.subject == "EVS")
+        )
+        evs_book = evs_res.scalar_one_or_none()
+
+        if evs_book:
+            evs_full_text = (
+                "Chapter 1: Going to School\n"
+                "Children use different ways to reach school in different parts of India. "
+                "In Assam, children cross bamboo and rope bridges to reach school when it rains heavily. "
+                "In Ladakh, children use a trolley attached to a strong iron rope over a wide and deep river to cross over. "
+                "In Kerala, children use a Vallam (a small wooden boat) to reach school. "
+                "In Rajasthan desert, children ride in camel carts over hot sand. "
+                "In plains, children ride bullock carts or bicycles through green fields.\n\n"
+                "Chapter 2: Ear to Ear\n"
+                "Different animals have different types of ears. Animals like elephants, rabbits, dogs, and tigers have ears that can be seen. "
+                "Birds, frogs, lizards, and snakes have ears, but they are tiny holes covered with feathers or skin. "
+                "Animals whose ears can be seen and have hair on their skin give birth to young ones (Viviparous). "
+                "Animals whose ears cannot be seen and do not have hair on their skin lay eggs (Oviparous).\n\n"
+                "Chapter 3: A Day with Nandu\n"
+                "Nandu is a three-month-old baby elephant. Elephants live in herds. "
+                "An elephant herd has mainly females and baby elephants. The oldest female elephant is the leader of the herd. "
+                "Adult elephants eat more than 100 kilograms of leaves and twigs in one day. "
+                "Elephants sleep for only 2 to 4 hours a day. They love to play in mud and water to keep their skin cool.\n\n"
+                "Chapter 4: The Story of Amrita\n"
+                "Amrita lived in Khejadli village near Jodhpur in Rajasthan. The village got its name from the many Khejadi trees that grew there. "
+                "The people of Khejadli were called Bishnois. They cared deeply for plants and animals, saying 'Agar ped hain to hum hain'. "
+                "When the King sent soldiers to cut trees to build his palace, Amrita and her three daughters hugged the trees to protect them. "
+                "Over 300 villagers sacrificed their lives protecting the Khejadi trees."
+            )
+            await ingest_module_text(
+                session=session,
+                branch_name="SELF",
+                class_number=4,
+                subject="EVS",
+                text=evs_full_text,
+                ncert_book_id=evs_book.id,
+                module_title=evs_book.title,
+            )
+            print("[seed] Seeded 4 chapters of Class 4 EVS NCERT chunks under SELF.")
+
+        # Fetch Class 4 Math NCERT Book
+        math_res = await session.execute(
+            select(NCERTBook).where(NCERTBook.class_number == 4, NCERTBook.subject == "Mathematics")
+        )
+        math_book = math_res.scalar_one_or_none()
+
+        if math_book:
+            math_full_text = (
+                "Chapter 1: Building with Bricks\n"
+                "Bricks have 6 faces, 12 edges, and 8 corners. Masons in Murshidabad built beautiful brick floor patterns for Jagriti School. "
+                "Arches and brick patterns can be seen in old bridges and kilns. "
+                "A brick kiln bakes thousands of raw clay bricks. One brick usually measures 20 cm by 10 cm by 10 cm.\n\n"
+                "Chapter 2: Long and Short\n"
+                "Distance is measured in millimeters, centimeters, meters, and kilometers. 100 centimeters equals 1 meter, and 1000 meters equals 1 kilometer. "
+                "Marathon races are about 40 kilometers long. Height is measured using a measuring tape. "
+                "Comparing heights of classmates helps understand difference in length.\n\n"
+                "Chapter 3: A Trip to Bhopal\n"
+                "Class 4 students went on a school trip to Bhopal. Each mini bus held 35 children. "
+                "They crossed the Narmada bridge which is 756.8 meters long. "
+                "At Bhimbetka, they saw 10,000-year-old cave paintings of wild bulls, rhinos, and deer drawn on cave walls."
+            )
+            await ingest_module_text(
+                session=session,
+                branch_name="SELF",
+                class_number=4,
+                subject="Mathematics",
+                text=math_full_text,
+                ncert_book_id=math_book.id,
+                module_title=math_book.title,
+            )
+            print("[seed] Seeded 3 chapters of Class 4 Math NCERT chunks under SELF.")
 
 
 from src.models.school import BranchCounter, School
@@ -222,7 +300,6 @@ async def seed_self_school(session: AsyncSession) -> None:
 async def seed_demo_accounts(session: AsyncSession) -> None:
     """Seed demo accounts for School Admin, Teacher, Student, Parent & Modules."""
     # 1. School Admin Branch: LKD
-    # 1. School Admin Branch: LPS Karkarduma Branch
     sch_res = await session.execute(
         select(School).where(
             (School.email == "school@lps.edu") | (School.branch_name == "LPS Karkarduma Branch")
@@ -350,27 +427,53 @@ async def seed_demo_accounts(session: AsyncSession) -> None:
         await session.commit()
         print("[seed] Demo Parent created & linked to student LKD0001.")
 
-    # 5. Demo Module for Class 4 under branch
+    # 5. Demo Modules & Chunks for Class 4 under branch
     mod_res = await session.execute(
         select(Module).where(
             Module.branch_name == b_name,
             Module.class_number == 4,
-            Module.title == "Class 4 Mathematics - Chapter 1 Shapes & Numbers",
+            Module.title == "Looking Around - Class 4 EVS",
         )
     )
-    if not mod_res.scalar_one_or_none():
-        session.add(
-            Module(
-                branch_name=b_name,
-                class_number=4,
-                title="Class 4 Mathematics - Chapter 1 Shapes & Numbers",
-                source_type=SourceType.PDF_UPLOAD,
-                file_url="https://res.cloudinary.com/demo/image/upload/sample.pdf",
-                ocr_status=OcrStatus.NA,
-            )
+    evs_mod = mod_res.scalar_one_or_none()
+    if not evs_mod:
+        evs_mod = Module(
+            branch_name=b_name,
+            class_number=4,
+            subject="EVS",
+            title="Looking Around - Class 4 EVS",
+            source_type=SourceType.PDF_UPLOAD,
+            file_url="https://res.cloudinary.com/demo/image/upload/sample.pdf",
+            ocr_status=OcrStatus.NA,
         )
+        session.add(evs_mod)
         await session.commit()
-        print(f"[seed] Demo Module for Class 4 ({b_name}) created.")
+        await session.refresh(evs_mod)
+
+        from src.services.chunk_service import ingest_module_text
+        evs_text = (
+            "Chapter 1: Going to School\n"
+            "In Assam, children use bamboo and rope bridges to cross river streams and reach school. "
+            "In Ladakh, children use a trolley pulled over an iron rope to cross deep valleys to get to school. "
+            "In Kerala, a Vallam (wooden boat) carries students across backwaters. "
+            "In Rajasthan, children ride camel carts across sandy terrain.\n\n"
+            "Chapter 2: Ear to Ear\n"
+            "Animals with visible ears and hair on their skin give birth to live babies. "
+            "Animals with hidden ear holes covered by feathers or skin lay eggs.\n\n"
+            "Chapter 3: A Day with Nandu\n"
+            "Elephants live in matriarchal herds led by the oldest female elephant. "
+            "Baby elephants play in mud and splash water to keep cool."
+        )
+        await ingest_module_text(
+            session=session,
+            branch_name=b_name,
+            class_number=4,
+            subject="EVS",
+            text=evs_text,
+            module_id=evs_mod.id,
+            module_title=evs_mod.title,
+        )
+        print(f"[seed] Demo EVS Module & Chunks for Class 4 ({b_name}) created.")
 
 
 # ── School directory (official records for school verification) ───────────────

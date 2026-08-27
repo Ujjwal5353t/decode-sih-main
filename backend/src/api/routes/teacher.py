@@ -1,4 +1,4 @@
-﻿"""
+"""
 Teacher dashboard routes (protected -- teacher role required).
 
 GET  /teacher/me
@@ -38,7 +38,8 @@ from src.schemas.teacher import (
 )
 from src.schemas.student import StudentProfile
 from src.schemas.module import ModuleOut
-from src.services import teacher_service, module_service
+from src.schemas.chunk import ChapterOut, ChunkOut, RAGChunkSearchRequest, RAGSearchResult
+from src.services import teacher_service, module_service, chunk_service
 
 router = APIRouter(prefix="/teacher", tags=["Teacher Dashboard"])
 
@@ -105,6 +106,70 @@ async def get_class_modules(
 ):
     await teacher_service.verify_teacher_class_access(teacher, class_number, section, session)
     return await module_service.get_class_modules(teacher.branch_name, class_number, session)
+
+
+@router.get(
+    "/classes/{class_number}/chapters",
+    response_model=list[ChapterOut],
+    summary="Get chapter breakdown for a class & subject seeded by branch admin",
+    description="Subject teachers view their class chapters when creating tests or quizzes.",
+)
+async def get_class_chapters(
+    class_number: int,
+    subject: Optional[str] = None,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    return await chunk_service.get_class_chapters(
+        session=session,
+        branch_name=teacher.branch_name,
+        class_number=class_number,
+        subject=subject,
+    )
+
+
+@router.get(
+    "/classes/{class_number}/chapters/{chapter_number}/chunks",
+    response_model=list[ChunkOut],
+    summary="Get all chunks for a specific chapter of a class & subject",
+)
+async def get_chapter_chunks(
+    class_number: int,
+    chapter_number: int,
+    subject: Optional[str] = None,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    chunks = await chunk_service.get_chapter_chunks(
+        session=session,
+        branch_name=teacher.branch_name,
+        class_number=class_number,
+        chapter_number=chapter_number,
+        subject=subject,
+    )
+    return [ChunkOut.model_validate(c) for c in chunks]
+
+
+@router.post(
+    "/rag/search-chunks",
+    response_model=list[RAGSearchResult],
+    summary="Search RAG chunks for quiz question generation",
+    description="Filters chunks by teacher branch, class number, subject, and optional chapter numbers.",
+)
+async def search_rag_chunks(
+    data: RAGChunkSearchRequest,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    return await chunk_service.search_chunks_for_rag(
+        session=session,
+        branch_name=teacher.branch_name,
+        class_number=data.class_number,
+        subject=data.subject,
+        query=data.query,
+        chapter_numbers=data.chapter_numbers,
+        top_k=data.top_k,
+    )
 
 
 # ── Assignments ────────────────────────────────────────────────────────────────
