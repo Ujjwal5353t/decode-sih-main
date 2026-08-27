@@ -312,14 +312,31 @@ async def seed_demo_accounts(session: AsyncSession) -> None:
             branch_name="LPS Karkarduma Branch",
             student_prefix="LKD",
             email="school@lps.edu",
+            phone_number="919810022002",
             password_hash=hash_password("123456789"),
             state="Delhi",
+            udise_code="07040100305",
+            district="East Delhi",
+            board="CBSE",
+            management="Private Unaided",
+            verification_status="verified",
         )
         session.add(school)
         await session.commit()
         await session.refresh(school)
         print("[seed] Demo School Branch 'LPS Karkarduma Branch' created.")
     else:
+        if not school.udise_code:
+            school.udise_code = "07040100305"
+        if not school.district:
+            school.district = "East Delhi"
+        if not school.board:
+            school.board = "CBSE"
+        if not school.management:
+            school.management = "Private Unaided"
+        if not school.phone_number:
+            school.phone_number = "919810022002"
+        school.verification_status = "verified"
         school.password_hash = hash_password("123456789")
         session.add(school)
         await session.commit()
@@ -559,9 +576,155 @@ async def seed_school_directory(session: AsyncSession) -> None:
         session.add(SchoolDirectory(**entry))
         created += 1
 
-    if created:
+PUBLISHER_SEED = [
+    {
+        "name": "NCERT",
+        "subjects": [
+            "Mathematics (Math-Magic)",
+            "English (Marigold / Mridang)",
+            "Hindi (Rimjhim / Sarangi)",
+            "Environmental Studies (EVS)",
+            "Art & Craft",
+            "Urdu (Ibtidai Urdu)",
+        ],
+    },
+    {
+        "name": "Oxford University Press",
+        "subjects": [
+            "English (New Oxford Modern English)",
+            "Mathematics (New Countdown)",
+            "Environmental Studies (EVS)",
+            "Computer Studies (Keyboard)",
+            "General Knowledge (GK)",
+            "Hindi (Madhur Hindi)",
+        ],
+    },
+    {
+        "name": "Cambridge University Press",
+        "subjects": [
+            "English (Cambridge Express)",
+            "Mathematics (Primary Mathematics)",
+            "Environmental Studies (EVS)",
+            "Computer Science (Click Start)",
+            "General Knowledge (Primary GK)",
+        ],
+    },
+    {
+        "name": "Pearson",
+        "subjects": [
+            "English (Longman Active English)",
+            "Mathematics (Universal Mathematics)",
+            "Environmental Studies (EVS)",
+            "Computer Science (Computer Masti)",
+            "General Knowledge (GK)",
+        ],
+    },
+    {
+        "name": "S. Chand",
+        "subjects": [
+            "Composite Mathematics",
+            "Awareness Environmental Studies (EVS)",
+            "English Grammar & Composition",
+            "General Knowledge (GK)",
+            "Computer Studies (IT Planet)",
+            "Moral Science / Value Education",
+        ],
+    },
+    {
+        "name": "Ratna Sagar",
+        "subjects": [
+            "Communicate in English",
+            "Number Magic (Mathematics)",
+            "Environmental Studies (My Green World)",
+            "Super GK (General Knowledge)",
+            "Living Values (Moral Science)",
+            "Art & Craft",
+        ],
+    },
+    {
+        "name": "Cordova Publications",
+        "subjects": [
+            "Mastering Mathematics",
+            "Enjoying Environmental Studies (EVS)",
+            "Stepping Stones English",
+            "Smart Tech Computer",
+            "Gyan Sarovar Hindi",
+            "Moral Values & Life Skills",
+        ],
+    },
+    {
+        "name": "Madhubun Educational Books",
+        "subjects": [
+            "Madhup Hindi Pathmala",
+            "Vitan Hindi",
+            "Gulmohar English",
+            "Headstart Mathematics",
+            "Green Circle (EVS)",
+            "General Knowledge",
+        ],
+    },
+    {
+        "name": "MacMillan Education",
+        "subjects": [
+            "English Ferry",
+            "Maths Xpress",
+            "Eco-Explorers (EVS)",
+            "Hop Skip and Jump",
+            "Computer Explorers",
+        ],
+    },
+    {
+        "name": "Orient BlackSwan",
+        "subjects": [
+            "Gul Mohar (English)",
+            "Orient Primary Math",
+            "Buzzword English",
+            "New Tree of Life (EVS)",
+            "General Knowledge",
+        ],
+    },
+]
+
+
+
+async def seed_publishers(session: AsyncSession) -> None:
+    """Seed initial list of standard textbook publishers and their subjects."""
+    from src.models.publisher import Publisher, PublisherSubject
+
+    pub_count = 0
+    sub_count = 0
+
+    for pub_data in PUBLISHER_SEED:
+        pub_name = pub_data["name"]
+        res = await session.execute(
+            select(Publisher).where(Publisher.name == pub_name)
+        )
+        pub = res.scalar_one_or_none()
+        if not pub:
+            pub = Publisher(name=pub_name)
+            session.add(pub)
+            await session.flush()
+            pub_count += 1
+
+        for sub_name in pub_data["subjects"]:
+            sub_res = await session.execute(
+                select(PublisherSubject).where(
+                    PublisherSubject.publisher_id == pub.id,
+                    PublisherSubject.subject_name == sub_name,
+                )
+            )
+            if not sub_res.scalar_one_or_none():
+                session.add(
+                    PublisherSubject(
+                        publisher_id=pub.id,
+                        subject_name=sub_name,
+                    )
+                )
+                sub_count += 1
+
+    if pub_count > 0 or sub_count > 0:
         await session.commit()
-    print(f"[seed] School directory ready ({created} new official record(s)).")
+        print(f"[seed] Seeded {pub_count} publishers and {sub_count} publisher subjects.")
 
 
 async def run_all_seeds(session: AsyncSession) -> None:
@@ -569,8 +732,10 @@ async def run_all_seeds(session: AsyncSession) -> None:
     await seed_admin(session)
     await seed_self_school(session)
     await seed_school_directory(session)
+    await seed_publishers(session)
     await seed_ncert_books(session)
     await seed_demo_accounts(session)
+
 
 
 async def _cli_main() -> None:

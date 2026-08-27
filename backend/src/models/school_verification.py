@@ -127,6 +127,9 @@ class SchoolAdminClaim(SQLModel, table=True):
     authority_notes: Optional[str] = Field(default=None, max_length=1000)
     evidence_url: Optional[str] = Field(default=None, max_length=500)
 
+    # Class-wise subjects and publishers submitted during registration
+    class_subjects_json: Optional[str] = Field(default=None)
+
     # ── Decision ──────────────────────────────────────────────────────────────
     status: str = Field(default=ClaimStatus.PENDING, index=True, max_length=20)
     decision_reason: Optional[str] = Field(default=None, max_length=500)

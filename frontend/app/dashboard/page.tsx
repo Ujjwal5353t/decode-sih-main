@@ -98,9 +98,12 @@ import {
   submitStudentAssignment,
   getStudentAssignmentFeedback,
   getSchoolTeachers,
+  getSchoolSubjects,
+  SchoolSubjectDetail,
   assignClassToTeacher,
   deassignClassFromTeacher,
 } from "@/lib/api";
+
 
 
 function formatPdfUrl(url: string | null | undefined): string | undefined {
@@ -743,6 +746,8 @@ function SchoolDashboardView({
   const [selectedClass, setSelectedClass] = useState<number>(1);
   const [modules, setModules] = useState<ModuleOut[]>([]);
   const [loadingModules, setLoadingModules] = useState<boolean>(false);
+  const [schoolSubjects, setSchoolSubjects] = useState<SchoolSubjectDetail[]>([]);
+  const [loadingSubjects, setLoadingSubjects] = useState<boolean>(false);
   const [moduleToDelete, setModuleToDelete] = useState<ModuleOut | null>(null);
 
   const fetchModules = () => {
@@ -753,17 +758,35 @@ function SchoolDashboardView({
       .finally(() => setLoadingModules(false));
   };
 
+  const fetchSubjects = () => {
+    setLoadingSubjects(true);
+    getSchoolSubjects(selectedClass)
+      .then((res) => setSchoolSubjects(res))
+      .catch((err) => console.log("School subjects fetch note:", err.message))
+      .finally(() => setLoadingSubjects(false));
+  };
+
   // `completionNonce` changes when a background extraction reaches a result, so
   // the list re-reads the module records without polling on its own.
   useEffect(() => {
     if (activeTab === "modules" || activeTab === "overview") {
       fetchModules();
+      fetchSubjects();
     }
   }, [selectedClass, activeTab, completionNonce]);
 
   /** Live job status wins over the record fetched with the list. */
   const statusOf = (mod: ModuleOut): ModuleDisplayStatus =>
     jobFor(mod.id)?.status ?? mod.ocr_status ?? "na";
+
+  const classSubjects = schoolSubjects.filter((s) => s.class_number === selectedClass);
+  const unassignedModules = modules.filter(
+    (m) =>
+      !classSubjects.some(
+        (s) =>
+          s.subject.trim().toLowerCase() === (m.subject || "").trim().toLowerCase()
+      )
+  );
 
   return (
     <div className="space-y-6">
@@ -827,7 +850,7 @@ function SchoolDashboardView({
                 <span>Class Curriculum & Learning Modules</span>
               </h2>
               <p className="text-xs text-text-secondary mt-0.5">
-                Manage PDF modules, OCR documents, and curriculum content for each class.
+                Manage PDF modules, textbook chapters, and OCR documents for each registered subject.
               </p>
             </div>
 
@@ -844,136 +867,295 @@ function SchoolDashboardView({
                 Upload Module
               </Button>
 
-            {/* Class Tabs */}
-            <div className="flex items-center gap-1 bg-surface-hover p-1 rounded-[var(--radius-md)] border border-border-primary">
-              {[1, 2, 3, 4, 5].map((cls) => (
-                <button
-                  key={cls}
-                  onClick={() => setSelectedClass(cls)}
-                  className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
-                    selectedClass === cls
-                      ? "bg-brand text-white shadow-sm"
-                      : "text-text-secondary hover:text-text-primary hover:bg-surface"
-                  }`}
-                >
-                  Class {cls}
-                </button>
-              ))}
+              {/* Class Tabs */}
+              <div className="flex items-center gap-1 bg-surface-hover p-1 rounded-[var(--radius-md)] border border-border-primary">
+                {[1, 2, 3, 4, 5].map((cls) => (
+                  <button
+                    key={cls}
+                    onClick={() => setSelectedClass(cls)}
+                    className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
+                      selectedClass === cls
+                        ? "bg-brand text-white shadow-sm"
+                        : "text-text-secondary hover:text-text-primary hover:bg-surface"
+                    }`}
+                  >
+                    Class {cls}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* Modules List or Empty State */}
-          {loadingModules ? (
-            <div className="py-12 flex justify-center">
-              <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+          {/* Subject-Wise Curriculum Sections */}
+          {loadingModules || loadingSubjects ? (
+            <div className="py-16 flex flex-col items-center justify-center gap-3">
+              <div className="w-8 h-8 border-3 border-brand border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-text-tertiary">Loading Class {selectedClass} subjects &amp; modules…</p>
             </div>
-          ) : modules.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {modules.map((mod) => {
-                const status = statusOf(mod);
-                const job = jobFor(mod.id);
-                const ocrPdfUrl = job?.ocrPdfUrl ?? mod.ocr_pdf_url ?? null;
+          ) : classSubjects.length > 0 ? (
+            <div className="space-y-6">
+              {classSubjects.map((sub) => {
+                const subModules = modules.filter(
+                  (m) =>
+                    (m.subject || "").trim().toLowerCase() === sub.subject.trim().toLowerCase()
+                );
 
                 return (
                   <div
-                    key={mod.id}
-                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between gap-4"
+                    key={sub.id || sub.subject}
+                    className="glass rounded-[var(--radius-lg)] border border-border-primary p-5 space-y-4"
                   >
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        {mod.subject ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                            {mod.subject}
-                          </span>
-                        ) : (
-                          <span />
-                        )}
-                        <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-primary/60">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-[var(--radius-md)] bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                          <BookOpen className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm font-bold text-text-primary">
+                              {sub.subject}
+                            </h3>
+                            {sub.publisher_name && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-brand/10 text-brand border border-border-brand">
+                                {sub.publisher_name}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-text-tertiary mt-0.5">
+                            Class {selectedClass} · {subModules.length}{" "}
+                            {subModules.length === 1 ? "Chapter / PDF" : "Chapters / PDFs"} uploaded
+                          </p>
+                        </div>
                       </div>
-                      <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
 
-                      <div className="mt-3">
-                        <ModuleStatusBadge
-                          status={status}
-                          title={job?.message ?? undefined}
-                        />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/modules/upload?class=${selectedClass}&subject=${encodeURIComponent(
+                              sub.subject
+                            )}`
+                          )
+                        }
+                        className="text-xs self-start sm:self-auto"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1 text-brand" />
+                        Upload PDF for {sub.subject}
+                      </Button>
+                    </div>
+
+                    {/* Modules Under This Subject */}
+                    {subModules.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                        {subModules.map((mod) => {
+                          const status = statusOf(mod);
+                          const job = jobFor(mod.id);
+                          const ocrPdfUrl = job?.ocrPdfUrl ?? mod.ocr_pdf_url ?? null;
+
+                          return (
+                            <div
+                              key={mod.id}
+                              className="rounded-[var(--radius-md)] border border-border-primary bg-surface/60 hover:border-brand p-4 transition-all flex flex-col justify-between gap-3"
+                            >
+                              <div>
+                                <div className="flex items-center justify-between gap-2 mb-1.5">
+                                  <span className="text-[10px] font-bold text-brand uppercase tracking-wide">
+                                    Chapter / Material
+                                  </span>
+                                  <button
+                                    onClick={() => setModuleToDelete(mod)}
+                                    className="text-text-tertiary hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-500/10 cursor-pointer"
+                                    title={`Delete "${mod.title}"`}
+                                    aria-label={`Delete ${mod.title}`}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                                <h4 className="text-xs font-bold text-text-primary line-clamp-2">
+                                  {mod.title}
+                                </h4>
+
+                                <div className="mt-2.5">
+                                  <ModuleStatusBadge
+                                    status={status}
+                                    title={job?.message ?? undefined}
+                                  />
+                                </div>
+
+                                {status === "failed" && (
+                                  <p className="text-[10px] text-text-secondary mt-1.5 leading-relaxed">
+                                    Text could not be extracted. Re-upload to run extraction again.
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="pt-2.5 border-t border-border-primary/50 flex items-center justify-between gap-2 text-xs">
+                                {mod.file_url ? (
+                                  <a
+                                    href={formatPdfUrl(mod.file_url)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline"
+                                  >
+                                    <FileText className="w-3 h-3" />
+                                    View PDF
+                                  </a>
+                                ) : (
+                                  <span className="text-[11px] text-text-tertiary italic">No File</span>
+                                )}
+
+                                {status === "done" && ocrPdfUrl && (
+                                  <a
+                                    href={formatPdfUrl(ocrPdfUrl)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline"
+                                  >
+                                    <Layers className="w-3 h-3" />
+                                    Extracted Text
+                                  </a>
+                                )}
+
+                                {status === "failed" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      router.push(
+                                        `/dashboard/modules/upload?class=${mod.class_number}&replace=${mod.id}`
+                                      )
+                                    }
+                                    className="text-[10px] py-1 px-2"
+                                  >
+                                    <RefreshCw className="w-3 h-3 mr-1" />
+                                    Retry
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-
-                      {status === "failed" && (
-                        <p className="text-[11px] text-text-secondary mt-2 leading-relaxed">
-                          Text could not be extracted. Re-upload the pages to run
-                          extraction again.
+                    ) : (
+                      <div
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/modules/upload?class=${selectedClass}&subject=${encodeURIComponent(
+                              sub.subject
+                            )}`
+                          )
+                        }
+                        className="rounded-[var(--radius-md)] border border-dashed border-border-primary/80 bg-surface/30 p-6 text-center hover:bg-surface-hover/50 hover:border-brand transition-colors cursor-pointer space-y-2 group"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-surface border border-border-primary flex items-center justify-center mx-auto text-text-tertiary group-hover:text-brand group-hover:border-brand transition-colors">
+                          <Upload className="w-4 h-4" />
+                        </div>
+                        <p className="text-xs font-semibold text-text-secondary group-hover:text-text-primary">
+                          No PDF chapters uploaded yet for {sub.subject}
                         </p>
-                      )}
-                    </div>
-
-                    <div className="pt-3 border-t border-border-primary/50 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        {mod.file_url ? (
-                          <a
-                            href={formatPdfUrl(mod.file_url)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            View Module Document
-                          </a>
-                        ) : (
-                          <span className="text-xs text-text-tertiary italic">NCERT Module (No File)</span>
-                        )}
-
-                        <button
-                          onClick={() => setModuleToDelete(mod)}
-                          className="text-text-tertiary hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-500/10 cursor-pointer"
-                          title={`Delete "${mod.title}"`}
-                          aria-label={`Delete ${mod.title}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <p className="text-[11px] text-text-tertiary max-w-xs mx-auto">
+                          Click to upload textbook chapters or study notes for Class {selectedClass} students.
+                        </p>
                       </div>
-
-                      {status === "done" && ocrPdfUrl && (
-                        <a
-                          href={formatPdfUrl(ocrPdfUrl)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
-                        >
-                          <Layers className="w-3.5 h-3.5" />
-                          View Extracted Text
-                        </a>
-                      )}
-
-                      {status === "failed" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            router.push(
-                              `/dashboard/modules/upload?class=${mod.class_number}&replace=${mod.id}`
-                            )
-                          }
-                          className="w-full text-xs py-1.5"
-                        >
-                          <RefreshCw className="w-3.5 h-3.5 mr-1" />
-                          Retry Extraction
-                        </Button>
-                      )}
-                    </div>
+                    )}
                   </div>
                 );
               })}
+
+              {/* Unassigned / General Modules Section if any */}
+              {unassignedModules.length > 0 && (
+                <div className="glass rounded-[var(--radius-lg)] border border-border-primary p-5 space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-border-primary/60">
+                    <div>
+                      <h3 className="text-sm font-bold text-text-primary">
+                        Additional / General Modules
+                      </h3>
+                      <p className="text-[11px] text-text-tertiary mt-0.5">
+                        {unassignedModules.length} module(s) not mapped to specific registered subjects
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {unassignedModules.map((mod) => {
+                      const status = statusOf(mod);
+                      const job = jobFor(mod.id);
+                      const ocrPdfUrl = job?.ocrPdfUrl ?? mod.ocr_pdf_url ?? null;
+
+                      return (
+                        <div
+                          key={mod.id}
+                          className="rounded-[var(--radius-md)] border border-border-primary bg-surface/60 p-4 flex flex-col justify-between gap-3"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <span className="text-[10px] font-bold text-brand uppercase tracking-wide">
+                                {mod.subject || "General"}
+                              </span>
+                              <button
+                                onClick={() => setModuleToDelete(mod)}
+                                className="text-text-tertiary hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-500/10 cursor-pointer"
+                                title={`Delete "${mod.title}"`}
+                                aria-label={`Delete ${mod.title}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <h4 className="text-xs font-bold text-text-primary line-clamp-2">
+                              {mod.title}
+                            </h4>
+
+                            <div className="mt-2.5">
+                              <ModuleStatusBadge
+                                status={status}
+                                title={job?.message ?? undefined}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="pt-2.5 border-t border-border-primary/50 flex items-center justify-between text-xs">
+                            {mod.file_url ? (
+                              <a
+                                href={formatPdfUrl(mod.file_url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline"
+                              >
+                                <FileText className="w-3 h-3" />
+                                View PDF
+                              </a>
+                            ) : (
+                              <span className="text-[11px] text-text-tertiary italic">No File</span>
+                            )}
+
+                            {status === "done" && ocrPdfUrl && (
+                              <a
+                                href={formatPdfUrl(ocrPdfUrl)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline"
+                              >
+                                <Layers className="w-3 h-3" />
+                                Extracted Text
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed space-y-3">
               <BookOpen className="w-10 h-10 text-text-tertiary mx-auto opacity-50" />
               <h3 className="text-sm font-semibold text-text-primary">
-                No Modules Added for Class {selectedClass}
+                No Subjects Registered for Class {selectedClass}
               </h3>
               <p className="text-xs text-text-secondary max-w-sm mx-auto">
-                Upload your own book or worksheet as a PDF, or attach NCERT books from the NCERT Library, to make content available for Class {selectedClass} students & AI quizzes.
+                Upload your curriculum books or worksheets as PDFs to make content available for Class {selectedClass} students &amp; AI quizzes.
               </p>
               <div className="flex justify-center pt-2">
                 <Button
@@ -991,11 +1173,6 @@ function SchoolDashboardView({
             </div>
           )}
         </div>
-      )}
-
-      {/* TAB: NCERT BOOKS MANAGEMENT */}
-      {activeTab === "ncert" && (
-        <NCERTBookManagementPanel onModuleAttached={fetchModules} />
       )}
 
       {/* TAB: ADMINISTRATOR REQUESTS (school verification — owner approval) */}
@@ -1024,6 +1201,7 @@ function SchoolDashboardView({
 }
 
 // ── Parent Dashboard View ────────────────────────────────────────────────────
+
 
 function ParentDashboardView({
   parent,

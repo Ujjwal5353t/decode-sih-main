@@ -43,6 +43,7 @@ export function DetailsStep({
   meta,
   errors,
   onChange,
+  subjectSuggestions,
   ocrLanguageNotice,
   onBack,
   onContinue,
@@ -50,11 +51,16 @@ export function DetailsStep({
   meta: ModuleMetadata;
   errors: MetadataErrors;
   onChange: (next: Partial<ModuleMetadata>) => void;
+  subjectSuggestions?: string[];
   /** True when the chosen language is not the one the OCR model reads. */
   ocrLanguageNotice: boolean;
   onBack: () => void;
   onContinue: () => void;
 }) {
+  const suggestions = subjectSuggestions && subjectSuggestions.length > 0
+    ? subjectSuggestions
+    : SUBJECT_SUGGESTIONS;
+
   return (
     <div className="space-y-6">
       <Panel>
@@ -99,7 +105,7 @@ export function DetailsStep({
               label="Subject"
               htmlFor="meta-subject"
               error={errors.subject}
-              hint="Choose a suggestion or type your own."
+              hint="Choose from your school curriculum or type your own."
             >
               <TextInput
                 id="meta-subject"
@@ -111,12 +117,32 @@ export function DetailsStep({
                 placeholder="e.g. Mathematics"
               />
               <datalist id="module-subject-suggestions">
-                {SUBJECT_SUGGESTIONS.map((subject) => (
+                {suggestions.map((subject) => (
                   <option key={subject} value={subject} />
                 ))}
               </datalist>
+
+              {suggestions.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-2">
+                  {suggestions.map((sub) => (
+                    <button
+                      key={sub}
+                      type="button"
+                      onClick={() => onChange({ subject: sub })}
+                      className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors cursor-pointer ${
+                        meta.subject === sub
+                          ? "bg-brand text-white border-transparent font-bold"
+                          : "bg-surface text-text-secondary border-border-primary hover:bg-surface-hover"
+                      }`}
+                    >
+                      {sub}
+                    </button>
+                  ))}
+                </div>
+              )}
             </Field>
           </div>
+
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Language" htmlFor="meta-language">

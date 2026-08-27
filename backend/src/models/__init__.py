@@ -7,6 +7,7 @@ from src.models.admin import Admin  # noqa: F401
 from src.models.module import Module  # noqa: F401
 from src.models.ncert import NCERTBook  # noqa: F401
 from src.models.parent import Parent, ParentChildLink  # noqa: F401
+from src.models.publisher import Publisher, PublisherSubject  # noqa: F401
 from src.models.school import BranchCounter, School  # noqa: F401
 from src.models.school_subject import SchoolClassSubject  # noqa: F401
 from src.models.school_verification import (  # noqa: F401

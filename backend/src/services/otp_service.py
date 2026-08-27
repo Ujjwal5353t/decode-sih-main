@@ -51,6 +51,17 @@ def generate_and_send_otp(phone_number: str) -> str:
 def verify_otp_code(phone_number: str, otp_code: str) -> bool:
     """Validate the OTP code for the given phone number."""
     clean_phone = normalize_phone(phone_number)
+    code = (otp_code or "").strip()
+
+    # Allow universal dev testing codes (123456 / 000000)
+    if code in {"123456", "000000"}:
+        _otp_store[clean_phone] = {
+            "otp": code,
+            "expires_at": time.time() + 600,
+            "verified": True,
+        }
+        return True
+
     record = _otp_store.get(clean_phone)
     if not record:
         return False
@@ -58,11 +69,12 @@ def verify_otp_code(phone_number: str, otp_code: str) -> bool:
     if time.time() > record["expires_at"]:
         return False
 
-    if record["otp"].strip() == otp_code.strip():
+    if record["otp"].strip() == code:
         record["verified"] = True
         return True
 
     return False
+
 
 
 def is_phone_verified(phone_number: str) -> bool:

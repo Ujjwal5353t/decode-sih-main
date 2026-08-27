@@ -25,16 +25,19 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_session
 from src.core.dependencies import get_current_school
 from src.models.module import Module, OcrStatus
 from src.models.school import School
+from src.models.school_subject import SchoolClassSubject
 from src.schemas.module import ModuleOut, NCERTModuleAddRequest, UpdateModuleTitleRequest
 from src.schemas.school import SchoolProfile
 from src.schemas.school_subject import (
     ClassSubjectOptions,
+    SchoolSubjectDetail,
     SubjectSetupOut,
     SubjectSetupRequest,
 )
@@ -66,6 +69,24 @@ async def get_school_profile(school: School = Depends(get_current_school)):
 )
 async def list_classes(_: School = Depends(get_current_school)):
     return list(school_subject_service.SUPPORTED_CLASSES)
+
+
+@router.get(
+    "/subjects",
+    response_model=list[SchoolSubjectDetail],
+    summary="Get all configured class-wise subjects and publishers for this school",
+)
+async def get_school_subjects(
+    class_number: Optional[int] = None,
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    stmt = select(SchoolClassSubject).where(SchoolClassSubject.school_id == school.id)
+    if class_number is not None:
+        stmt = stmt.where(SchoolClassSubject.class_number == class_number)
+    stmt = stmt.order_by(SchoolClassSubject.class_number, SchoolClassSubject.subject)
+    res = await session.execute(stmt)
+    return res.scalars().all()
 
 
 # ── First-run setup: which subjects this school teaches, per class ────────────

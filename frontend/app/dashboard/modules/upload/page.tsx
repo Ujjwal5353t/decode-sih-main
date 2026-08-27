@@ -43,6 +43,7 @@ function ModuleUploadContent() {
 
   const school = user as SchoolProfile;
   const requestedClass = Number(searchParams.get("class"));
+  const requestedSubject = searchParams.get("subject") || undefined;
   const initialClass = CLASS_OPTIONS.includes(
     requestedClass as (typeof CLASS_OPTIONS)[number]
   )
@@ -112,6 +113,7 @@ function ModuleUploadContent() {
 
         <ModuleUploadWizard
           initialClass={initialClass}
+          initialSubject={requestedSubject}
           branchName={school.branch_name}
           replaceModuleId={searchParams.get("replace") ?? undefined}
           onExit={() => router.push("/dashboard")}
@@ -119,6 +121,7 @@ function ModuleUploadContent() {
       </main>
     </div>
   );
+
 }
 
 export default function ModuleUploadPage() {

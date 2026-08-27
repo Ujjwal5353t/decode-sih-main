@@ -2,16 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  BookOpen,
   Building2,
   Check,
   ClipboardCheck,
   Clock,
   ExternalLink,
+  Library,
   Loader2,
   MapPin,
   ShieldCheck,
   X,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/Button";
 import {
   approveSchoolRequest,
@@ -330,6 +333,48 @@ function RequestCard({
           </p>
         )}
       </div>
+
+      {/* Class-wise Curriculum & Publishers */}
+      {request.class_subjects && request.class_subjects.length > 0 && (
+        <div className="rounded-[var(--radius-md)] border border-border-primary bg-surface/50 p-4 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-text-primary flex items-center gap-1.5 font-[family-name:var(--font-display)]">
+              <BookOpen className="w-3.5 h-3.5 text-brand" />
+              Class-wise Subjects & Textbook Publishers
+            </p>
+            <span className="text-[10px] uppercase font-bold text-text-tertiary">
+              {request.class_subjects.length} class setup{request.class_subjects.length === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-1">
+            {request.class_subjects.map((cs, idx) => (
+              <div
+                key={idx}
+                className="p-2.5 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs space-y-1"
+              >
+                <div className="flex items-center justify-between gap-1.5">
+                  <span className="font-bold text-brand">Class {cs.class_number}</span>
+                  <span className="text-[10px] font-semibold text-text-tertiary truncate">
+                    {cs.publisher_name}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {cs.subjects.map((sub, sIdx) => (
+                    <span
+                      key={sIdx}
+                      className="inline-block px-1.5 py-0.5 rounded text-[10px] bg-surface-hover text-text-secondary border border-border-primary/60"
+                    >
+                      {sub}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
 
       {isPending ? (
         <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-border-primary/50">

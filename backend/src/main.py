@@ -22,7 +22,8 @@ from src.core.config import settings
 from src.core.database import AsyncSessionFactory, init_db
 
 # ── Critical: import all models so SQLModel.metadata is fully populated ────────
-import src.models  # noqa: F401  (side-effect import)
+import src.models  # noqa: F401  (side-effect import for all tables including publishers)
+
 
 
 @asynccontextmanager

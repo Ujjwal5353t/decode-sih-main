@@ -194,16 +194,6 @@ ROLE_PERMISSIONS: Dict[str, RolePermissionsResponse] = {
                 ],
             ),
             DashboardPermissionItem(
-                id="ncert",
-                label="NCERT Library Catalog",
-                description="Add pre-loaded NCERT textbooks directly into your school branch curriculum",
-                icon="BookOpen",
-                category="Curriculum",
-                actions=[
-                    PermissionAction(key="link_ncert_books", label="Link NCERT Books", description="Attach NCERT textbooks into school modules"),
-                ],
-            ),
-            DashboardPermissionItem(
                 id="admin-requests",
                 label="Administrator Requests",
                 description="Approve or reject people requesting administrator access to your school",

@@ -17,6 +17,7 @@ Phone verification reuses the existing OTP endpoints (POST /auth/otp/send,
 POST /auth/otp/verify) — no second OTP system is introduced here.
 """
 
+import json
 import uuid
 from typing import Annotated, Optional
 
@@ -39,13 +40,16 @@ from src.schemas.school_verification import (
     ClaimDecisionRequest,
     ClaimStatusOut,
     ClaimTokenResponse,
+    ClassSubjectPublisherItem,
     CreateClaimRequest,
     EmailVerificationResponse,
     OwnerClaimListItem,
+    PublisherWithSubjectsOut,
     SchoolRecordOut,
     SendEmailCodeRequest,
     VerifyEmailCodeRequest,
 )
+
 from src.services import school_verification_service as svc
 from src.services.email_verification_service import (
     generate_and_send_email_code,
@@ -133,12 +137,36 @@ async def verify_email(data: VerifyEmailCodeRequest):
     )
 
 
+# ── Publishers ────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/publishers",
+    response_model=list[PublisherWithSubjectsOut],
+    summary="List all publishers with their available subjects",
+)
+async def list_publishers(
+    session: AsyncSession = Depends(get_session),
+):
+    return await svc.get_all_publishers_with_subjects(session)
+
+
 # ── Serialisation helper ──────────────────────────────────────────────────────
 
 async def _claim_out(
     claim: SchoolAdminClaim, session: AsyncSession
 ) -> ClaimStatusOut:
     record = await session.get(SchoolDirectory, claim.directory_id)
+
+    class_subjects = None
+    if claim.class_subjects_json:
+        try:
+            class_subjects = [
+                ClassSubjectPublisherItem(**item)
+                for item in json.loads(claim.class_subjects_json)
+            ]
+        except Exception:
+            class_subjects = None
+
     return ClaimStatusOut(
         id=claim.id,
         udise_code=claim.udise_code,
@@ -156,6 +184,7 @@ async def _claim_out(
         authority_notes=claim.authority_notes,
         decision_reason=claim.decision_reason,
         evidence_url=claim.evidence_url,
+        class_subjects=class_subjects,
         created_at=claim.created_at,
         # The single source of truth for "may this person use the dashboard".
         admin_access_granted=(
@@ -184,7 +213,9 @@ async def create_claim(
         official_email=str(data.official_email),
         phone_number=data.phone_number,
         password=data.password,
+        class_subjects=data.class_subjects,
     )
+
 
     if owner_school:
         message = (

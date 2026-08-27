@@ -50,6 +50,29 @@ class EmailVerificationResponse(BaseModel):
     verified: Optional[bool] = None
 
 
+# ── Publishers & Class Subjects ─────────────────────────────────────────────
+
+class PublisherOut(BaseModel):
+    id: uuid.UUID
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
+class PublisherWithSubjectsOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    subjects: list[str]
+
+    model_config = {"from_attributes": True}
+
+
+class ClassSubjectPublisherItem(BaseModel):
+    class_number: int
+    publisher_name: str
+    subjects: list[str]
+
+
 # ── Claims ────────────────────────────────────────────────────────────────────
 
 class CreateClaimRequest(BaseModel):
@@ -59,6 +82,7 @@ class CreateClaimRequest(BaseModel):
     official_email: EmailStr
     phone_number: str
     password: str
+    class_subjects: Optional[list[ClassSubjectPublisherItem]] = None
 
     @field_validator("full_name")
     @classmethod
@@ -98,10 +122,12 @@ class ClaimStatusOut(BaseModel):
     authority_notes: Optional[str] = None
     decision_reason: Optional[str] = None
     evidence_url: Optional[str] = None
+    class_subjects: Optional[list[ClassSubjectPublisherItem]] = None
     created_at: datetime
 
     # Only ever true once the claim is approved AND an account exists.
     admin_access_granted: bool
+
 
 
 class ClaimCreatedResponse(BaseModel):
@@ -174,5 +200,7 @@ class SchoolRequestListItem(BaseModel):
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[datetime] = None
     created_at: datetime
+    class_subjects: Optional[list[ClassSubjectPublisherItem]] = None
 
     admin_access_granted: bool
+
