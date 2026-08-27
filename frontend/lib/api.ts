@@ -997,3 +997,267 @@ export async function deleteSchoolModule(
     method: "DELETE",
   });
 }
+
+// ── School Registration & Verification ────────────────────────────────────────
+// Backend: src/api/routes/school_verification.py
+// Phone verification reuses the existing sendOTP/verifyOTP helpers above —
+// there is no second OTP client here.
+
+export type ClaimStatusValue = "pending" | "approved" | "rejected";
+export type AuthorityStatusValue =
+  | "unverified"
+  | "verified"
+  | "manual_review"
+  | "failed";
+export type ClaimRouteValue = "first_admin" | "owner_approval";
+
+export interface SchoolRecordOut {
+  udise_code: string;
+  school_name: string;
+  state: string;
+  district: string;
+  management: string;
+  board: string | null;
+}
+
+export interface EmailVerificationResponse {
+  status: string;
+  message: string;
+  email?: string | null;
+  verified?: boolean | null;
+}
+
+export interface ClaimStatusOut {
+  id: string;
+  udise_code: string;
+  school_name: string;
+  full_name: string;
+  designation: string;
+  official_email: string;
+  phone_number: string;
+  school_identity_verified: boolean;
+  phone_verified: boolean;
+  email_verified: boolean;
+  authority_status: AuthorityStatusValue;
+  route: ClaimRouteValue;
+  status: ClaimStatusValue;
+  authority_notes: string | null;
+  decision_reason: string | null;
+  evidence_url: string | null;
+  created_at: string;
+  admin_access_granted: boolean;
+}
+
+export interface ClaimCreatedResponse {
+  claim: ClaimStatusOut;
+  message: string;
+}
+
+export interface OwnerClaimListItem {
+  id: string;
+  full_name: string;
+  designation: string;
+  official_email: string;
+  phone_number: string;
+  school_name: string;
+  status: ClaimStatusValue;
+  created_at: string;
+}
+
+/** Official school record by UDISE code. */
+export async function lookupSchoolByUdise(
+  udise_code: string
+): Promise<SchoolRecordOut> {
+  return fetchApi<SchoolRecordOut>(
+    `/school-verification/lookup?udise_code=${encodeURIComponent(udise_code)}`
+  );
+}
+
+/** Official school directory search by name / state / district. */
+export async function searchSchoolDirectory(params: {
+  name?: string;
+  state?: string;
+  district?: string;
+}): Promise<SchoolRecordOut[]> {
+  const query = new URLSearchParams();
+  if (params.name?.trim()) query.append("name", params.name.trim());
+  if (params.state?.trim()) query.append("state", params.state.trim());
+  if (params.district?.trim()) query.append("district", params.district.trim());
+  return fetchApi<SchoolRecordOut[]>(
+    `/school-verification/search?${query.toString()}`
+  );
+}
+
+export async function sendSchoolEmailCode(
+  email: string
+): Promise<EmailVerificationResponse> {
+  return fetchApi<EmailVerificationResponse>("/school-verification/email/send", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function verifySchoolEmailCode(
+  email: string,
+  code: string
+): Promise<EmailVerificationResponse> {
+  return fetchApi<EmailVerificationResponse>("/school-verification/email/verify", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
+}
+
+export async function createSchoolClaim(payload: {
+  udise_code: string;
+  full_name: string;
+  designation: string;
+  official_email: string;
+  phone_number: string;
+  password: string;
+}): Promise<ClaimCreatedResponse> {
+  return fetchApi<ClaimCreatedResponse>("/school-verification/claims", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getSchoolClaim(claim_id: string): Promise<ClaimStatusOut> {
+  return fetchApi<ClaimStatusOut>(`/school-verification/claims/${claim_id}`);
+}
+
+/** Attach a supporting authority document. Never approves the claim by itself. */
+export async function uploadClaimEvidence(
+  claim_id: string,
+  file: File
+): Promise<ClaimStatusOut> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return uploadFormData<ClaimStatusOut>(
+    `/school-verification/claims/${claim_id}/evidence`,
+    formData
+  );
+}
+
+/**
+ * Exchange an approved claim for a School Admin session.
+ * Fails with 403 while the claim is pending or rejected.
+ */
+export async function activateSchoolClaim(
+  claim_id: string
+): Promise<TokenResponse> {
+  const res = await fetchApi<TokenResponse>(
+    `/school-verification/claims/${claim_id}/activate`,
+    { method: "POST", body: JSON.stringify({}) }
+  );
+  setStoredAuth(res.access_token, "school");
+  return res;
+}
+
+// ── Verified owner: approve / reject administrator requests ───────────────────
+
+export async function getOwnerClaimRequests(): Promise<OwnerClaimListItem[]> {
+  return fetchApi<OwnerClaimListItem[]>("/school-verification/owner/requests");
+}
+
+export async function approveOwnerClaim(
+  claim_id: string,
+  reason?: string
+): Promise<ClaimStatusOut> {
+  return fetchApi<ClaimStatusOut>(
+    `/school-verification/owner/requests/${claim_id}/approve`,
+    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) }
+  );
+}
+
+export async function rejectOwnerClaim(
+  claim_id: string,
+  reason?: string
+): Promise<ClaimStatusOut> {
+  return fetchApi<ClaimStatusOut>(
+    `/school-verification/owner/requests/${claim_id}/reject`,
+    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) }
+  );
+}
+
+// ── Super Admin: school registration requests ─────────────────────────────────
+
+export interface SchoolRequestListItem {
+  id: string;
+  school_name: string;
+  udise_code: string;
+  state: string | null;
+  district: string | null;
+  board: string | null;
+  management: string | null;
+  full_name: string;
+  designation: string;
+  official_email: string;
+  phone_number: string;
+  phone_verified: boolean;
+  email_verified: boolean;
+  authority_status: AuthorityStatusValue;
+  authority_notes: string | null;
+  evidence_url: string | null;
+  status: ClaimStatusValue;
+  decision_reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  admin_access_granted: boolean;
+}
+
+export async function getSchoolRegistrationRequests(
+  status?: ClaimStatusValue
+): Promise<SchoolRequestListItem[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return fetchApi<SchoolRequestListItem[]>(`/admin/school-requests${query}`);
+}
+
+export async function approveSchoolRequest(
+  claim_id: string,
+  reason?: string
+): Promise<SchoolRequestListItem> {
+  return fetchApi<SchoolRequestListItem>(
+    `/admin/school-requests/${claim_id}/approve`,
+    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) }
+  );
+}
+
+export async function rejectSchoolRequest(
+  claim_id: string,
+  reason?: string
+): Promise<SchoolRequestListItem> {
+  return fetchApi<SchoolRequestListItem>(
+    `/admin/school-requests/${claim_id}/reject`,
+    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) }
+  );
+}
+
+// ── School Admin: first-run class/subject setup ───────────────────────────────
+
+export interface ClassSubjectOptions {
+  class_number: number;
+  class_label: string;
+  subject_count: number;
+  subjects: string[];
+  selected: string[];
+}
+
+export interface SubjectSetupOut {
+  completed: boolean;
+  configured_at: string | null;
+  classes: ClassSubjectOptions[];
+}
+
+export async function getSchoolSubjectSetup(): Promise<SubjectSetupOut> {
+  return fetchApi<SubjectSetupOut>("/school/subject-setup");
+}
+
+export async function saveSchoolSubjectSetup(
+  classes: { class_number: number; subjects: string[] }[]
+): Promise<SubjectSetupOut> {
+  return fetchApi<SubjectSetupOut>("/school/subject-setup", {
+    method: "PUT",
+    body: JSON.stringify({ classes }),
+  });
+}

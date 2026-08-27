@@ -42,6 +42,9 @@ import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { DashboardSidebar } from "@/components/dashboard/Sidebar";
 import { DeleteModuleDialog } from "@/components/school/DeleteModuleDialog";
+import { AdminRequestsPanel } from "@/components/school/registration/AdminRequestsPanel";
+import { SchoolRequestsPanel } from "@/components/admin/SchoolRequestsPanel";
+import { SubjectSetupGate } from "@/components/school/SubjectSetupGate";
 import {
   ModuleStatusBadge,
   type ModuleDisplayStatus,
@@ -239,10 +242,12 @@ export default function DashboardPage() {
             />
           )}
           {role === "school" && (
-            <SchoolDashboardView
-              school={user as SchoolProfile}
-              activeTab={activeTab}
-            />
+            <SubjectSetupGate>
+              <SchoolDashboardView
+                school={user as SchoolProfile}
+                activeTab={activeTab}
+              />
+            </SubjectSetupGate>
           )}
           {role === "parent" && (
             <ParentDashboardView
@@ -993,6 +998,9 @@ function SchoolDashboardView({
         <NCERTBookManagementPanel onModuleAttached={fetchModules} />
       )}
 
+      {/* TAB: ADMINISTRATOR REQUESTS (school verification — owner approval) */}
+      {activeTab === "admin-requests" && <AdminRequestsPanel />}
+
       {/* TAB: TEACHER MANAGEMENT */}
       {activeTab === "teachers" && <SchoolTeacherManagement />}
 
@@ -1380,6 +1388,9 @@ function AdminDashboardView({
 
       {/* TAB: NCERT MASTER CATALOGUE */}
       {activeTab === "ncert_master" && <NCERTBookManagementPanel />}
+
+      {/* TAB: REGISTRATIONS → SCHOOL REQUESTS */}
+      {activeTab === "school-requests" && <SchoolRequestsPanel />}
 
       {/* TAB: SCHOOLS / INSTITUTIONS */}
       {activeTab === "schools" && (

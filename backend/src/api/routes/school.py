@@ -3,6 +3,8 @@ School dashboard routes (protected — school role required).
 
 GET  /school/me                                  — profile
 GET  /school/classes                             — list available classes (1–5)
+GET  /school/subject-setup                       — class-wise subject options + current selection
+PUT  /school/subject-setup                       — save the subjects this school teaches
 GET  /school/classes/{class_number}/modules      — modules for a class
 POST /school/classes/{class_number}/modules/pdf  — upload PDF module
 POST /school/classes/{class_number}/modules/images — upload image(s) → PDF module
@@ -31,8 +33,13 @@ from src.models.module import Module, OcrStatus
 from src.models.school import School
 from src.schemas.module import ModuleOut, NCERTModuleAddRequest, UpdateModuleTitleRequest
 from src.schemas.school import SchoolProfile
+from src.schemas.school_subject import (
+    ClassSubjectOptions,
+    SubjectSetupOut,
+    SubjectSetupRequest,
+)
 from src.schemas.teacher import AssignClassRequest, TeacherClassOut, TeacherListItem
-from src.services import module_service, teacher_service
+from src.services import module_service, school_subject_service, teacher_service
 
 router = APIRouter(prefix="/school", tags=["School Dashboard"])
 
@@ -58,7 +65,56 @@ async def get_school_profile(school: School = Depends(get_current_school)):
     summary="List available classes (always 1–5)",
 )
 async def list_classes(_: School = Depends(get_current_school)):
-    return list(range(1, 6))
+    return list(school_subject_service.SUPPORTED_CLASSES)
+
+
+# ── First-run setup: which subjects this school teaches, per class ────────────
+
+@router.get(
+    "/subject-setup",
+    response_model=SubjectSetupOut,
+    summary="Class-wise subject options and this school's current selection",
+)
+async def get_subject_setup(
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    catalog = await school_subject_service.get_catalog(session)
+    selected = await school_subject_service.get_selection(school, session)
+
+    return SubjectSetupOut(
+        completed=school_subject_service.is_complete(school),
+        configured_at=school.subjects_configured_at,
+        classes=[
+            ClassSubjectOptions(
+                class_number=class_number,
+                class_label=school_subject_service.class_label(class_number),
+                subject_count=len(subjects),
+                subjects=subjects,
+                selected=selected.get(class_number, []),
+            )
+            for class_number, subjects in catalog.items()
+        ],
+    )
+
+
+@router.put(
+    "/subject-setup",
+    response_model=SubjectSetupOut,
+    summary="Save the subjects this school teaches for each class",
+)
+async def save_subject_setup(
+    data: SubjectSetupRequest,
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    await school_subject_service.save_selection(
+        school,
+        [(entry.class_number, entry.subjects) for entry in data.classes],
+        session,
+    )
+    await session.flush()
+    return await get_subject_setup(school=school, session=session)
 
 
 @router.get(

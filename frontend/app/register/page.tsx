@@ -364,6 +364,12 @@ export default function RegisterPage() {
                     key={r.id}
                     type="button"
                     onClick={() => {
+                      // School accounts go through verification before they can
+                      // be administered — see app/register/school/page.tsx.
+                      if (r.id === "school") {
+                        router.push("/register/school");
+                        return;
+                      }
                       setSelectedRole(r.id);
                       clearError();
                       setLocalError(null);

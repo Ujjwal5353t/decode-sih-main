@@ -296,13 +296,17 @@ async def school_register(
     data: SchoolRegisterRequest,
     session: AsyncSession = Depends(get_session),
 ):
-    school = await school_service.register_school(data, session)
-    token = create_access_token(
-        subject=str(school.id),
-        role="school",
-        extra_claims={"branch": school.branch_name},
+    # Self-service school signup no longer confers School Admin access.
+    # A school account is only ever created by an approved administrator claim
+    # (see services/school_verification_service.activate_claim), so this
+    # endpoint deliberately creates nothing and issues no token.
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=(
+            "School accounts must be verified before they can be administered. "
+            "Please complete school verification to claim your school."
+        ),
     )
-    return TokenResponse(access_token=token, role="school")
 
 
 @router.post(
