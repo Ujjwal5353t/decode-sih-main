@@ -15,6 +15,7 @@ import {
   Brain,
   Award,
   ShieldCheck,
+  ClipboardCheck,
   Layers,
   LogOut,
   X,
@@ -40,6 +41,7 @@ const ICON_MAP: Record<string, any> = {
   Brain,
   Award,
   ShieldCheck,
+  ClipboardCheck,
   Layers,
   Sliders,
 };

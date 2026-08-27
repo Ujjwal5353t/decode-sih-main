@@ -54,6 +54,30 @@ def _maybe_refresh(payload: dict, response: Response) -> None:
         response.headers["X-Access-Token"] = new_token
 
 
+def _require_verified_school(school) -> None:
+    """
+    School Admin access is gated on an approved administrator claim.
+
+    Accounts that predate the verification flow are migrated to 'verified', so
+    this only blocks schools still awaiting or refused verification.
+    """
+    verification_status = getattr(school, "verification_status", "verified")
+    if verification_status == "verified":
+        return
+    if verification_status == "rejected":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="School verification was rejected. Administrator access is not available.",
+        )
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=(
+            "Your authority to administer this school is still being verified. "
+            "School management features will become available after approval."
+        ),
+    )
+
+
 # ── School ─────────────────────────────────────────────────────────────────────
 
 async def get_current_school(
@@ -71,6 +95,7 @@ async def get_current_school(
     school = await session.get(School, school_id)
     if not school:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="School not found.")
+    _require_verified_school(school)
     return school
 
 
@@ -176,6 +201,8 @@ async def get_current_school_or_admin(
     entity_id = uuid.UUID(payload["sub"])
     if role == "school":
         entity = await session.get(School, entity_id)
+        if entity:
+            _require_verified_school(entity)
     else:
         entity = await session.get(Admin, entity_id)
 

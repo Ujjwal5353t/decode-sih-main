@@ -373,10 +373,99 @@ async def seed_demo_accounts(session: AsyncSession) -> None:
         print(f"[seed] Demo Module for Class 4 ({b_name}) created.")
 
 
+# ── School directory (official records for school verification) ───────────────
+
+SCHOOL_DIRECTORY_SEED = [
+    {
+        "udise_code": "07040100201",
+        "school_name": "ABC Public School",
+        "state": "Delhi",
+        "district": "South Delhi",
+        "management": "Private Unaided",
+        "board": "CBSE",
+        "official_email": "principal@abcpublicschool.edu.in",
+        "official_phone": "+919810011001",
+        "head_name": "Rajesh Menon",
+    },
+    {
+        "udise_code": "07040100305",
+        "school_name": "LPS Karkarduma",
+        "state": "Delhi",
+        "district": "East Delhi",
+        "management": "Private Unaided",
+        "board": "CBSE",
+        "official_email": "school@lps.edu",
+        "official_phone": "+919810022002",
+        "head_name": "Anita Sharma",
+    },
+    {
+        "udise_code": "27260500712",
+        "school_name": "Shivaji Vidyalaya",
+        "state": "Maharashtra",
+        "district": "Pune",
+        "management": "Government Aided",
+        "board": "State Board",
+        "official_email": "head@shivajividyalaya.org",
+        "official_phone": "+919820033003",
+        "head_name": "Sunil Deshpande",
+    },
+    {
+        "udise_code": "29280600418",
+        "school_name": "Green Valley International School",
+        "state": "Karnataka",
+        "district": "Bengaluru Urban",
+        "management": "Private Unaided",
+        "board": "ICSE",
+        "official_email": "office@greenvalleyintl.edu.in",
+        "official_phone": "+919845044004",
+        "head_name": "Meera Iyer",
+    },
+    {
+        "udise_code": "33300700915",
+        "school_name": "Government Higher Secondary School Adyar",
+        "state": "Tamil Nadu",
+        "district": "Chennai",
+        "management": "Government",
+        "board": "State Board",
+        "official_email": "ghss.adyar@tn.gov.in",
+        "official_phone": "+919840055005",
+        "head_name": "K. Rajalakshmi",
+    },
+]
+
+
+async def seed_school_directory(session: AsyncSession) -> None:
+    """
+    Seed official school records used by the school verification flow.
+
+    This is sample directory data standing in for an official UDISE feed —
+    src/services/school_verification_service.py is the integration point where
+    a real directory would be plugged in.
+    """
+    from src.models.school_verification import SchoolDirectory
+
+    created = 0
+    for entry in SCHOOL_DIRECTORY_SEED:
+        existing = await session.execute(
+            select(SchoolDirectory).where(
+                SchoolDirectory.udise_code == entry["udise_code"]
+            )
+        )
+        if existing.scalar_one_or_none():
+            continue
+        session.add(SchoolDirectory(**entry))
+        created += 1
+
+    if created:
+        await session.commit()
+    print(f"[seed] School directory ready ({created} new official record(s)).")
+
+
 async def run_all_seeds(session: AsyncSession) -> None:
     """Entry point — called from main.py lifespan or CLI."""
     await seed_admin(session)
     await seed_self_school(session)
+    await seed_school_directory(session)
     await seed_ncert_books(session)
     await seed_demo_accounts(session)
 

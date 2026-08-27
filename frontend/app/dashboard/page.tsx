@@ -36,10 +36,23 @@ import {
   Phone,
   User,
   Menu,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { DashboardSidebar } from "@/components/dashboard/Sidebar";
+import { DeleteModuleDialog } from "@/components/school/DeleteModuleDialog";
+import { AdminRequestsPanel } from "@/components/school/registration/AdminRequestsPanel";
+import { SchoolRequestsPanel } from "@/components/admin/SchoolRequestsPanel";
+import { SubjectSetupGate } from "@/components/school/SubjectSetupGate";
+import {
+  ModuleStatusBadge,
+  type ModuleDisplayStatus,
+} from "@/components/school/ModuleStatusBadge";
+import {
+  isProcessing,
+  useModuleProcessing,
+} from "@/components/school/ModuleProcessingProvider";
 import { useAuth } from "@/hooks/useAuth";
 import {
   StudentProfile,
@@ -229,10 +242,12 @@ export default function DashboardPage() {
             />
           )}
           {role === "school" && (
-            <SchoolDashboardView
-              school={user as SchoolProfile}
-              activeTab={activeTab}
-            />
+            <SubjectSetupGate>
+              <SchoolDashboardView
+                school={user as SchoolProfile}
+                activeTab={activeTab}
+              />
+            </SubjectSetupGate>
           )}
           {role === "parent" && (
             <ParentDashboardView
@@ -723,9 +738,12 @@ function SchoolDashboardView({
   school: SchoolProfile;
   activeTab?: string;
 }) {
+  const router = useRouter();
+  const { jobFor, unwatch, completionNonce } = useModuleProcessing();
   const [selectedClass, setSelectedClass] = useState<number>(1);
   const [modules, setModules] = useState<ModuleOut[]>([]);
   const [loadingModules, setLoadingModules] = useState<boolean>(false);
+  const [moduleToDelete, setModuleToDelete] = useState<ModuleOut | null>(null);
 
   const fetchModules = () => {
     setLoadingModules(true);
@@ -735,11 +753,17 @@ function SchoolDashboardView({
       .finally(() => setLoadingModules(false));
   };
 
+  // `completionNonce` changes when a background extraction reaches a result, so
+  // the list re-reads the module records without polling on its own.
   useEffect(() => {
     if (activeTab === "modules" || activeTab === "overview") {
       fetchModules();
     }
-  }, [selectedClass, activeTab]);
+  }, [selectedClass, activeTab, completionNonce]);
+
+  /** Live job status wins over the record fetched with the list. */
+  const statusOf = (mod: ModuleOut): ModuleDisplayStatus =>
+    jobFor(mod.id)?.status ?? mod.ocr_status ?? "na";
 
   return (
     <div className="space-y-6">
@@ -807,6 +831,19 @@ function SchoolDashboardView({
               </p>
             </div>
 
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() =>
+                  router.push(`/dashboard/modules/upload?class=${selectedClass}`)
+                }
+                className="text-xs"
+              >
+                <Upload className="w-3.5 h-3.5 mr-1" />
+                Upload Module
+              </Button>
+
             {/* Class Tabs */}
             <div className="flex items-center gap-1 bg-surface-hover p-1 rounded-[var(--radius-md)] border border-border-primary">
               {[1, 2, 3, 4, 5].map((cls) => (
@@ -822,6 +859,7 @@ function SchoolDashboardView({
                   Class {cls}
                 </button>
               ))}
+              </div>
             </div>
           </div>
 
@@ -832,36 +870,101 @@ function SchoolDashboardView({
             </div>
           ) : modules.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {modules.map((mod) => (
-                <div
-                  key={mod.id}
-                  className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                        {mod.subject}
-                      </span>
-                      <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
-                    </div>
-                    <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
-                  </div>
+              {modules.map((mod) => {
+                const status = statusOf(mod);
+                const job = jobFor(mod.id);
+                const ocrPdfUrl = job?.ocrPdfUrl ?? mod.ocr_pdf_url ?? null;
 
-                  {mod.file_url ? (
-                    <a
-                      href={formatPdfUrl(mod.file_url)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      View Module Document
-                    </a>
-                  ) : (
-                    <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module (No File)</span>
-                  )}
-                </div>
-              ))}
+                return (
+                  <div
+                    key={mod.id}
+                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between gap-4"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        {mod.subject ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
+                            {mod.subject}
+                          </span>
+                        ) : (
+                          <span />
+                        )}
+                        <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
+                      </div>
+                      <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
+
+                      <div className="mt-3">
+                        <ModuleStatusBadge
+                          status={status}
+                          title={job?.message ?? undefined}
+                        />
+                      </div>
+
+                      {status === "failed" && (
+                        <p className="text-[11px] text-text-secondary mt-2 leading-relaxed">
+                          Text could not be extracted. Re-upload the pages to run
+                          extraction again.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="pt-3 border-t border-border-primary/50 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        {mod.file_url ? (
+                          <a
+                            href={formatPdfUrl(mod.file_url)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            View Module Document
+                          </a>
+                        ) : (
+                          <span className="text-xs text-text-tertiary italic">NCERT Module (No File)</span>
+                        )}
+
+                        <button
+                          onClick={() => setModuleToDelete(mod)}
+                          className="text-text-tertiary hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-500/10 cursor-pointer"
+                          title={`Delete "${mod.title}"`}
+                          aria-label={`Delete ${mod.title}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {status === "done" && ocrPdfUrl && (
+                        <a
+                          href={formatPdfUrl(ocrPdfUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
+                        >
+                          <Layers className="w-3.5 h-3.5" />
+                          View Extracted Text
+                        </a>
+                      )}
+
+                      {status === "failed" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            router.push(
+                              `/dashboard/modules/upload?class=${mod.class_number}&replace=${mod.id}`
+                            )
+                          }
+                          className="w-full text-xs py-1.5"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                          Retry Extraction
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed space-y-3">
@@ -870,8 +973,21 @@ function SchoolDashboardView({
                 No Modules Added for Class {selectedClass}
               </h3>
               <p className="text-xs text-text-secondary max-w-sm mx-auto">
-                Attach NCERT books with uploaded PDF files from the NCERT Library tab to make content available for Class {selectedClass} students & AI quizzes.
+                Upload your own book or worksheet as a PDF, or attach NCERT books from the NCERT Library, to make content available for Class {selectedClass} students & AI quizzes.
               </p>
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() =>
+                    router.push(`/dashboard/modules/upload?class=${selectedClass}`)
+                  }
+                  className="text-xs"
+                >
+                  <Upload className="w-3.5 h-3.5 mr-1" />
+                  Upload Module
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -882,8 +998,27 @@ function SchoolDashboardView({
         <NCERTBookManagementPanel onModuleAttached={fetchModules} />
       )}
 
+      {/* TAB: ADMINISTRATOR REQUESTS (school verification — owner approval) */}
+      {activeTab === "admin-requests" && <AdminRequestsPanel />}
+
       {/* TAB: TEACHER MANAGEMENT */}
       {activeTab === "teachers" && <SchoolTeacherManagement />}
+
+      {/* DELETE MODULE CONFIRMATION */}
+      {moduleToDelete && (
+        <DeleteModuleDialog
+          module={moduleToDelete}
+          classNumber={moduleToDelete.class_number}
+          isProcessing={isProcessing(statusOf(moduleToDelete))}
+          onClose={() => setModuleToDelete(null)}
+          onDeleted={(moduleId) => {
+            unwatch(moduleId);
+            setModuleToDelete(null);
+            setModules((prev) => prev.filter((m) => m.id !== moduleId));
+            fetchModules();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1253,6 +1388,9 @@ function AdminDashboardView({
 
       {/* TAB: NCERT MASTER CATALOGUE */}
       {activeTab === "ncert_master" && <NCERTBookManagementPanel />}
+
+      {/* TAB: REGISTRATIONS → SCHOOL REQUESTS */}
+      {activeTab === "school-requests" && <SchoolRequestsPanel />}
 
       {/* TAB: SCHOOLS / INSTITUTIONS */}
       {activeTab === "schools" && (

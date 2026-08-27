@@ -80,6 +80,53 @@ async def init_db() -> None:
         await conn.execute(
             text("ALTER TABLE modules ADD COLUMN IF NOT EXISTS ocr_pdf_public_id TEXT;")
         )
+        # Migration: school verification columns.
+        # DEFAULT 'verified' so every school account that existed before the
+        # verification flow keeps its current access unchanged.
+        await conn.execute(
+            text("ALTER TABLE schools ADD COLUMN IF NOT EXISTS verification_status VARCHAR(20) DEFAULT 'verified';")
+        )
+        await conn.execute(
+            text("UPDATE schools SET verification_status = 'verified' WHERE verification_status IS NULL;")
+        )
+        await conn.execute(
+            text("ALTER TABLE schools ADD COLUMN IF NOT EXISTS udise_code VARCHAR(20);")
+        )
+        await conn.execute(
+            text("ALTER TABLE schools ADD COLUMN IF NOT EXISTS district VARCHAR(120);")
+        )
+        await conn.execute(
+            text("ALTER TABLE schools ADD COLUMN IF NOT EXISTS board VARCHAR(60);")
+        )
+        await conn.execute(
+            text("ALTER TABLE schools ADD COLUMN IF NOT EXISTS management VARCHAR(120);")
+        )
+        await conn.execute(
+            text("ALTER TABLE schools ADD COLUMN IF NOT EXISTS owner_claim_id UUID;")
+        )
+        # Migration: first-run class/subject setup marker.
+        # NULL means "setup still due". School accounts that predate this column
+        # are stamped as already configured in the same step that adds it, so
+        # existing admins keep landing straight on their dashboard. Guarded by a
+        # column-existence check so the backfill can only ever run once.
+        await conn.execute(
+            text(
+                """
+                DO $do$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'schools'
+                          AND column_name = 'subjects_configured_at'
+                    ) THEN
+                        ALTER TABLE schools ADD COLUMN subjects_configured_at TIMESTAMP;
+                        UPDATE schools SET subjects_configured_at = NOW();
+                    END IF;
+                END
+                $do$;
+                """
+            )
+        )
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
