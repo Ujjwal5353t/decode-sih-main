@@ -55,6 +55,7 @@ import {
   useModuleProcessing,
 } from "@/components/school/ModuleProcessingProvider";
 import { useAuth } from "@/hooks/useAuth";
+import { Mascot, MascotMood } from "@/components/quiz/Mascot";
 import {
   StudentProfile,
   SchoolProfile,
@@ -365,6 +366,19 @@ function StudentDashboardView({
   const isSelfEnrolled = student.enrollment_type === "self" || student.branch_name === "SELF";
   const needsSetup = isSelfEnrolled ? student.class_number === null : (student.class_number === null || student.section === null);
 
+  // A persistent companion mood, derived straight from state already in
+  // scope — no separate state of its own, no backend involvement. "idle"
+  // (now a genuinely lively animation — blink, sway, an occasional
+  // sparkle, tap-for-a-cheer) is the resting state; "encourage" is a
+  // reaction to a specific wrong answer elsewhere in the app, not
+  // something to show constantly just because the quiz isn't done yet —
+  // that would read as a nagging/puzzled face rather than a companion.
+  // "happy" is reserved as a steady positive state once the diagnostic is
+  // actually complete.
+  const mascotMood: MascotMood = !needsSetup && !loadingQuizStatus && quizStatus?.completed
+    ? "happy"
+    : "idle";
+
 
   // The diagnostic quiz is mandatory — modules/curriculum stay locked until
   // it's completed, so this must resolve before deciding what to render.
@@ -415,6 +429,12 @@ function StudentDashboardView({
 
   return (
     <div className="space-y-6">
+      {/* Persistent companion — stays mounted across every tab, mood
+          derived from state already in scope above (no backend call). */}
+      <div className="fixed bottom-5 right-5 z-30 hidden sm:block">
+        <Mascot mood={mascotMood} size={72} />
+      </div>
+
       {/* TAB: OVERVIEW */}
       {activeTab === "overview" && (
         <div className="space-y-6">
