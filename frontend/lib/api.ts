@@ -683,9 +683,11 @@ export interface TeacherProfile {
 
 export interface TeacherClassOut {
   id: string;
+  teacher_id?: string;
   class_number: number;
   section: string;
-  label: string;  // e.g. "4A"
+  subject: string;
+  label: string;  // e.g. "4A • Mathematics"
   assigned_at: string;
 }
 
@@ -695,6 +697,7 @@ export interface AssignmentOut {
   branch_name: string;
   class_number: number;
   section: string;
+  subject?: string | null;
   title: string;
   description: string | null;
   assignment_type: "pdf_upload" | "ai_quiz";
@@ -826,6 +829,7 @@ export async function createAiQuizAssignment(
   section: string,
   payload: {
     title: string;
+    subject?: string | null;
     description?: string | null;
     module_ids: string[];
     deadline_days?: number | null;
@@ -919,23 +923,34 @@ export async function getSchoolTeachers(): Promise<TeacherListItem[]> {
 export async function assignClassToTeacher(
   teacher_id: string,
   class_number: number,
-  section: string
+  section: string,
+  subject: string
 ): Promise<TeacherClassOut> {
   return fetchApi<TeacherClassOut>(`/school/teachers/${teacher_id}/assign-class`, {
     method: "POST",
-    body: JSON.stringify({ class_number, section }),
+    body: JSON.stringify({ class_number, section, subject }),
   });
 }
 
 export async function deassignClassFromTeacher(
   teacher_id: string,
-  class_number: number,
-  section: string
+  class_number?: number,
+  section?: string,
+  subject?: string,
+  assignment_id?: string
 ): Promise<void> {
-  await fetchApi<{}>(
-    `/school/teachers/${teacher_id}/assign-class/${class_number}/${section}`,
-    { method: "DELETE" }
-  );
+  if (assignment_id) {
+    await fetchApi<{}>(
+      `/school/teachers/${teacher_id}/assignments/${assignment_id}`,
+      { method: "DELETE" }
+    );
+  } else {
+    const q = subject ? `?subject=${encodeURIComponent(subject)}` : "";
+    await fetchApi<{}>(
+      `/school/teachers/${teacher_id}/assign-class/${class_number}/${section}${q}`,
+      { method: "DELETE" }
+    );
+  }
 }
 
 // ── School Module Upload & OCR ────────────────────────────────────────────────

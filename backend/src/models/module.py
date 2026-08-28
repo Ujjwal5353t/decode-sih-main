@@ -39,7 +39,6 @@ class Module(SQLModel, table=True):
 
     branch_name: str = Field(foreign_key="schools.branch_name", index=True, max_length=120)
     class_number: int = Field(ge=1, le=5)
-    subject: str = Field(default="General", max_length=100, index=True)
     title: str = Field(max_length=300)
     source_type: SourceType
 

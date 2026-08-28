@@ -191,11 +191,16 @@ async def init_db() -> None:
         # Migration: curated illustration library asset keys (real pictures,
         # pre-seeded offline) — preferred over image_emoji/option_emojis
         # when the question's picture is in the vocabulary.
+        # Migration: add subject column to teacher_class_assignments
         await conn.execute(
-            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS image_asset_key VARCHAR(60);")
+            text("ALTER TABLE teacher_class_assignments ADD COLUMN IF NOT EXISTS subject VARCHAR(100);")
         )
         await conn.execute(
-            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS option_asset_keys JSONB;")
+            text("DELETE FROM teacher_class_assignments WHERE subject IS NULL OR subject = '';")
+        )
+        # Migration: add subject column to assignments
+        await conn.execute(
+            text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS subject VARCHAR(100);")
         )
 
 

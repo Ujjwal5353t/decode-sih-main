@@ -56,7 +56,7 @@ async def get_teacher_profile(teacher: Teacher = Depends(get_current_teacher)):
 @router.get(
     "/classes",
     response_model=list[TeacherClassOut],
-    summary="List classes assigned to this teacher",
+    summary="List classes and subjects assigned to this teacher",
 )
 async def get_teacher_classes(
     teacher: Teacher = Depends(get_current_teacher),
@@ -66,9 +66,11 @@ async def get_teacher_classes(
     return [
         TeacherClassOut(
             id=a.id,
+            teacher_id=a.teacher_id,
             class_number=a.class_number,
             section=a.section,
-            label=f"{a.class_number}{a.section}",
+            subject=a.subject,
+            label=f"{a.class_number}{a.section} • {a.subject}",
             assigned_at=a.assigned_at,
         )
         for a in assignments
@@ -201,16 +203,18 @@ async def create_pdf_assignment(
     section: str,
     title: Annotated[str, Form()],
     file: Annotated[UploadFile, File(description="PDF file (max 5 MB)")],
+    subject: Annotated[Optional[str], Form()] = None,
     description: Annotated[Optional[str], Form()] = None,
     deadline_days: Annotated[Optional[int], Form()] = None,
     teacher: Teacher = Depends(get_current_teacher),
     session: AsyncSession = Depends(get_session),
 ):
-    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session)
+    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session, subject=subject)
 
     from src.schemas.teacher import AssignmentCreatePdfRequest
     data = AssignmentCreatePdfRequest(
         title=title,
+        subject=subject,
         description=description,
         deadline_days=deadline_days,
     )
@@ -233,7 +237,7 @@ async def create_quiz_assignment(
     teacher: Teacher = Depends(get_current_teacher),
     session: AsyncSession = Depends(get_session),
 ):
-    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session)
+    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session, subject=data.subject)
     asgn = await teacher_service.create_quiz_assignment(teacher, class_number, section, data, session)
     return AssignmentOut.model_validate(asgn)
 
