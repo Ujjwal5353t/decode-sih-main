@@ -16,6 +16,7 @@ class ModuleOut(BaseModel):
     source_type: SourceType
     file_url: str
     ncert_book_id: Optional[uuid.UUID]
+    subject: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     # OCR fields — only meaningful for image_upload modules

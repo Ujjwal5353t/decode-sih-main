@@ -20,7 +20,7 @@ from src.models.student import Student
 from src.schemas.module import ModuleOut
 from src.schemas.student import StudentProfile
 from src.schemas.teacher import AssignmentOut, FeedbackOut, SubmissionOut
-from src.services import module_service, teacher_service
+from src.services import module_service, quiz_service, teacher_service
 
 router = APIRouter(prefix="/student", tags=["Student Dashboard"])
 
@@ -45,6 +45,13 @@ async def get_student_modules(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Please complete your class setup first via POST /auth/student/setup-class.",
+        )
+
+    if not await quiz_service.has_completed_diagnostic(student.id, session):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please complete your diagnostic assessment first via the Gap "
+                   "Identification Quiz (POST /quiz/start) before accessing modules.",
         )
 
     return await module_service.get_class_modules(

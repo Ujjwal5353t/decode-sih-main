@@ -39,24 +39,6 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
 
-        # Ensure publishers & publisher_subjects tables exist
-        await conn.execute(
-            text("CREATE TABLE IF NOT EXISTS publishers (id UUID PRIMARY KEY, name VARCHAR(150) NOT NULL UNIQUE, created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW());")
-        )
-        await conn.execute(
-            text("CREATE INDEX IF NOT EXISTS ix_publishers_name ON publishers (name);")
-        )
-        await conn.execute(
-            text("CREATE TABLE IF NOT EXISTS publisher_subjects (id UUID PRIMARY KEY, publisher_id UUID NOT NULL REFERENCES publishers(id) ON DELETE CASCADE, subject_name VARCHAR(150) NOT NULL, created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW());")
-        )
-        await conn.execute(
-            text("CREATE INDEX IF NOT EXISTS ix_publisher_subjects_publisher_id ON publisher_subjects (publisher_id);")
-        )
-        await conn.execute(
-            text("CREATE INDEX IF NOT EXISTS ix_publisher_subjects_subject_name ON publisher_subjects (subject_name);")
-        )
-
-
         # Migration: ensure enrollment_type column exists on students table
         await conn.execute(
             text("ALTER TABLE students ADD COLUMN IF NOT EXISTS enrollment_type VARCHAR(20) DEFAULT 'school';")
@@ -146,14 +128,49 @@ async def init_db() -> None:
                 """
             )
         )
-        # Migration: class-wise subjects & publishers for claims & school class subjects
+        # Migration: add scoring columns to quiz_attempts (added after the table
+        # first shipped without them)
         await conn.execute(
-            text("ALTER TABLE school_admin_claims ADD COLUMN IF NOT EXISTS class_subjects_json TEXT;")
+            text("ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS overall_score DOUBLE PRECISION;")
         )
         await conn.execute(
-            text("ALTER TABLE school_class_subjects ADD COLUMN IF NOT EXISTS publisher_name VARCHAR(150);")
+            text("ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS subject_scores JSONB DEFAULT '{}'::jsonb;")
         )
-
+        # Migration: school-module-grounded quiz questions
+        await conn.execute(
+            text("ALTER TABLE modules ADD COLUMN IF NOT EXISTS subject VARCHAR(100);")
+        )
+        await conn.execute(
+            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id);")
+        )
+        await conn.execute(
+            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS branch_name VARCHAR(120);")
+        )
+        # Migration: image-emoji stand-in for questions that identify
+        # something visually (no image-hosting pipeline exists)
+        await conn.execute(
+            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS image_emoji VARCHAR(8);")
+        )
+        # Migration: background-generated AI result summary
+        await conn.execute(
+            text("ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS ai_summary TEXT;")
+        )
+        await conn.execute(
+            text("ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS ai_summary_status VARCHAR(20) DEFAULT 'pending';")
+        )
+        # Migration: per-option emoji, for image-forward answer choices
+        await conn.execute(
+            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS option_emojis JSONB;")
+        )
+        # Migration: curated illustration library asset keys (real pictures,
+        # pre-seeded offline) — preferred over image_emoji/option_emojis
+        # when the question's picture is in the vocabulary.
+        await conn.execute(
+            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS image_asset_key VARCHAR(60);")
+        )
+        await conn.execute(
+            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS option_asset_keys JSONB;")
+        )
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

@@ -146,6 +146,99 @@ export async function getRolePermissions(role?: Role): Promise<RolePermissionsRe
   return fetchApi<RolePermissionsResponse>(`/auth/permissions${q}`);
 }
 
+// ── Diagnostic Quiz Types ──────────────────────────────────────────────────────
+
+export type TopicType = "concept" | "skill";
+export type QuizAttemptStatus = "in_progress" | "completed" | "abandoned";
+
+export interface QuestionOut {
+  id: string;
+  subject: string;
+  class_number: number;
+  topic_name: string;
+  topic_type: TopicType;
+  question_text: string;
+  options: string[];
+  image_emoji: string | null;
+  option_emojis: string[] | null;
+  image_asset_key: string | null;
+  option_asset_keys: string[] | null;
+}
+
+export interface StartQuizResponse {
+  attempt_id: string;
+  question: QuestionOut | null;
+}
+
+export interface AnswerResponse {
+  finished: boolean;
+  next_question: QuestionOut | null;
+  was_correct: boolean;
+}
+
+export interface GapItemOut {
+  subject: string;
+  topic_code: string;
+  topic_name: string;
+  originating_class: number;
+  student_current_class: number;
+}
+
+export interface SubjectScoreOut {
+  score: number;
+  topics_tested: number;
+  gaps_found: number;
+  average_classes_behind: number;
+}
+
+export type AiSummaryStatus = "pending" | "ready" | "failed";
+
+export interface GapReportOut {
+  attempt_id: string;
+  subjects_covered: string[];
+  gaps: GapItemOut[];
+  completed_at: string | null;
+  overall_score: number | null;
+  subject_scores: Record<string, SubjectScoreOut | null>;
+  student_class: number;
+  ai_summary: string | null;
+  ai_summary_status: AiSummaryStatus;
+}
+
+export interface StudentQuizSummaryOut {
+  student_unique_number: string;
+  student_email: string;
+  completed: boolean;
+  overall_score: number | null;
+  gaps_found: number;
+  ai_summary: string | null;
+  ai_summary_status: AiSummaryStatus;
+  completed_at: string | null;
+}
+
+export interface CurrentGapOut {
+  subject: string;
+  topic_code: string;
+  topic_name: string;
+  originating_class: number;
+  updated_at: string;
+}
+
+export interface QuizAttemptSummaryOut {
+  id: string;
+  status: QuizAttemptStatus;
+  subjects: string[];
+  started_at: string;
+  completed_at: string | null;
+  overall_score: number | null;
+}
+
+export interface QuizStatusOut {
+  completed: boolean;
+  attempt_id: string | null;
+  in_progress_attempt_id: string | null;
+}
+
 // Token Helpers
 export function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -415,6 +508,12 @@ export async function getSchoolClassModules(
   return fetchApi<ModuleOut[]>(`/school/classes/${class_number}/modules`);
 }
 
+export async function getSchoolClassQuizSummaries(
+  class_number: number
+): Promise<StudentQuizSummaryOut[]> {
+  return fetchApi<StudentQuizSummaryOut[]>(`/school/classes/${class_number}/quiz-summaries`);
+}
+
 export async function getParentChildren(): Promise<ChildLinkOut[]> {
   return fetchApi<ChildLinkOut[]>("/parent/children");
 }
@@ -434,6 +533,21 @@ export async function getChildProfile(
   return fetchApi<StudentProfile>(
     `/parent/children/${student_unique_number}/profile`
   );
+}
+
+// Returns null (not thrown) if the child hasn't completed the diagnostic yet,
+// since that's an expected state a parent dashboard needs to render around.
+export async function getChildQuizResult(
+  student_unique_number: string
+): Promise<GapReportOut | null> {
+  try {
+    return await fetchApi<GapReportOut>(
+      `/parent/children/${student_unique_number}/quiz-result`
+    );
+  } catch (err: any) {
+    if (err?.message?.includes("has not completed their diagnostic")) return null;
+    throw err;
+  }
 }
 
 export async function searchSchools(query?: string): Promise<SchoolSearchResult[]> {
@@ -1303,3 +1417,39 @@ export async function saveSchoolSubjectSetup(
   });
 }
 
+// ── Diagnostic Quiz Endpoints ──────────────────────────────────────────────────
+
+export async function startQuiz(payload?: {
+  subjects?: string[];
+}): Promise<StartQuizResponse> {
+  return fetchApi<StartQuizResponse>("/quiz/start", {
+    method: "POST",
+    body: JSON.stringify(payload || {}),
+  });
+}
+
+export async function answerQuiz(
+  attemptId: string,
+  payload: { question_id: string; selected_option_index: number }
+): Promise<AnswerResponse> {
+  return fetchApi<AnswerResponse>(`/quiz/${attemptId}/answer`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getQuizResult(attemptId: string): Promise<GapReportOut> {
+  return fetchApi<GapReportOut>(`/quiz/${attemptId}/result`);
+}
+
+export async function getQuizAttempts(): Promise<QuizAttemptSummaryOut[]> {
+  return fetchApi<QuizAttemptSummaryOut[]>("/quiz/attempts");
+}
+
+export async function getCurrentGaps(): Promise<CurrentGapOut[]> {
+  return fetchApi<CurrentGapOut[]>("/quiz/gaps");
+}
+
+export async function getQuizStatus(): Promise<QuizStatusOut> {
+  return fetchApi<QuizStatusOut>("/quiz/status");
+}

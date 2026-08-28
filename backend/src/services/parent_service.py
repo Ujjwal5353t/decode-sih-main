@@ -254,3 +254,29 @@ async def get_parent_children(
             )
         )
     return children
+
+
+async def get_owned_student(
+    parent: Parent, student_unique_number: str, session: AsyncSession
+) -> Student:
+    """Resolve a student by unique_number, enforcing that it's linked to
+    this parent account. Shared by any parent-facing per-child endpoint."""
+    link_result = await session.execute(
+        select(ParentChildLink).where(
+            ParentChildLink.parent_id == parent.id,
+            ParentChildLink.student_unique_number == student_unique_number,
+        )
+    )
+    if not link_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This student is not linked to your account.",
+        )
+
+    student_result = await session.execute(
+        select(Student).where(Student.unique_number == student_unique_number)
+    )
+    student = student_result.scalar_one_or_none()
+    if not student:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found.")
+    return student

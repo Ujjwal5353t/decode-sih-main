@@ -6,6 +6,7 @@ GET  /school/classes                             — list available classes (1�
 GET  /school/subject-setup                       — class-wise subject options + current selection
 PUT  /school/subject-setup                       — save the subjects this school teaches
 GET  /school/classes/{class_number}/modules      — modules for a class
+GET  /school/classes/{class_number}/quiz-summaries — students' diagnostic quiz results
 POST /school/classes/{class_number}/modules/pdf  — upload PDF module
 POST /school/classes/{class_number}/modules/images — upload image(s) → PDF module
 POST /school/classes/{class_number}/modules/ncert  — add pre-loaded NCERT book
@@ -34,6 +35,7 @@ from src.models.module import Module, OcrStatus
 from src.models.school import School
 from src.models.school_subject import SchoolClassSubject
 from src.schemas.module import ModuleOut, NCERTModuleAddRequest, UpdateModuleTitleRequest
+from src.schemas.quiz import StudentQuizSummaryOut
 from src.schemas.school import SchoolProfile
 from src.schemas.school_subject import (
     ClassSubjectOptions,
@@ -42,7 +44,7 @@ from src.schemas.school_subject import (
     SubjectSetupRequest,
 )
 from src.schemas.teacher import AssignClassRequest, TeacherClassOut, TeacherListItem
-from src.services import module_service, school_subject_service, teacher_service
+from src.services import module_service, quiz_service, school_subject_service, teacher_service
 
 router = APIRouter(prefix="/school", tags=["School Dashboard"])
 
@@ -151,6 +153,22 @@ async def get_class_modules(
     return await module_service.get_class_modules(school.branch_name, class_number, session)
 
 
+@router.get(
+    "/classes/{class_number}/quiz-summaries",
+    response_model=list[StudentQuizSummaryOut],
+    summary="Get every student's diagnostic quiz result for a class (class teacher view)",
+)
+async def get_class_quiz_summaries(
+    class_number: int,
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    summaries = await quiz_service.get_class_quiz_summaries(
+        school.branch_name, class_number, session
+    )
+    return [StudentQuizSummaryOut(**s) for s in summaries]
+
+
 @router.post(
     "/classes/{class_number}/modules/pdf",
     response_model=ModuleOut,
@@ -161,13 +179,16 @@ async def upload_pdf_module(
     class_number: int,
     title: Annotated[str, Form()],
     file: Annotated[UploadFile, File(description="PDF file (max 50 MB)")],
-    subject: Annotated[Optional[str], Form()] = "General",
+    subject: Annotated[
+        Optional[str],
+        Form(description="Mathematics | English | Hindi | EVS — enables this module as a "
+                          "diagnostic-quiz question source for this school"),
+    ] = None,
     school: School = Depends(get_current_school),
     session: AsyncSession = Depends(get_session),
 ):
-    eff_subject = subject or "General"
     module = await module_service.add_pdf_module(
-        school.branch_name, class_number, title, file, session, subject=eff_subject
+        school.branch_name, class_number, title, file, session, subject=subject
     )
     return ModuleOut.model_validate(module)
 
@@ -182,13 +203,16 @@ async def upload_images_module(
     class_number: int,
     title: Annotated[str, Form()],
     files: Annotated[list[UploadFile], File(description="JPEG/PNG images (max 50 MB each)")],
-    subject: Annotated[Optional[str], Form()] = "General",
+    subject: Annotated[
+        Optional[str],
+        Form(description="Mathematics | English | Hindi | EVS — enables this module as a "
+                          "diagnostic-quiz question source for this school"),
+    ] = None,
     school: School = Depends(get_current_school),
     session: AsyncSession = Depends(get_session),
 ):
-    eff_subject = subject or "General"
     module = await module_service.add_images_module(
-        school.branch_name, class_number, title, files, session, subject=eff_subject
+        school.branch_name, class_number, title, files, session, subject=subject
     )
     return ModuleOut.model_validate(module)
 

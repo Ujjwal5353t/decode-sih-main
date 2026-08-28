@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from datetime import datetime, timezone
-from typing import Sequence
+from typing import Optional, Sequence
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,11 +11,29 @@ from src.ai.ocr_service import run_ocr_background
 from src.models.module import Module, OcrStatus, SourceType
 from src.models.ncert import NCERTBook
 from src.schemas.module import NCERTModuleAddRequest
+from src.services.quiz_service import ALL_SUBJECTS
 from src.utils.file_utils import (
     delete_cloudinary_asset,
     upload_images_as_pdf,
     upload_pdf,
 )
+
+
+def _normalize_subject(subject: Optional[str]) -> Optional[str]:
+    """Validate against the diagnostic quiz's known subject set. Returns None
+    (rather than raising) for blank input, since subject is optional at
+    upload time — a module without a recognized subject just isn't picked
+    up as a source for quiz question generation."""
+    if not subject or not subject.strip():
+        return None
+    normalized = subject.strip()
+    matches = [s for s in ALL_SUBJECTS if s.lower() == normalized.lower()]
+    if not matches:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown subject '{subject}'. Must be one of: {', '.join(ALL_SUBJECTS)}.",
+        )
+    return matches[0]
 
 
 async def get_class_modules(
@@ -36,17 +54,17 @@ async def add_pdf_module(
     title: str,
     file: UploadFile,
     session: AsyncSession,
-    subject: str = "General",
+    subject: Optional[str] = None,
 ) -> Module:
     upload = await upload_pdf(file, folder=f"decode-sih/{branch_name}/class-{class_number}")
     module = Module(
         branch_name=branch_name,
         class_number=class_number,
-        subject=subject,
         title=title,
         source_type=SourceType.PDF_UPLOAD,
         file_url=upload["url"],
         cloudinary_public_id=upload["public_id"],
+        subject=_normalize_subject(subject),
         # PDF uploads have no raw images — OCR is not applicable
         ocr_status=OcrStatus.NA,
     )
@@ -75,7 +93,7 @@ async def add_images_module(
     title: str,
     files: Sequence[UploadFile],
     session: AsyncSession,
-    subject: str = "General",
+    subject: Optional[str] = None,
 ) -> Module:
     upload = await upload_images_as_pdf(
         files, folder=f"decode-sih/{branch_name}/class-{class_number}"
@@ -83,11 +101,11 @@ async def add_images_module(
     module = Module(
         branch_name=branch_name,
         class_number=class_number,
-        subject=subject,
         title=title,
         source_type=SourceType.IMAGE_UPLOAD,
         file_url=upload["url"],
         cloudinary_public_id=upload["public_id"],
+        subject=_normalize_subject(subject),
         # OCR starts immediately in background; status begins as "pending"
         ocr_status=OcrStatus.PENDING,
     )
@@ -131,11 +149,15 @@ async def add_ncert_module(
     module = Module(
         branch_name=branch_name,
         class_number=class_number,
-        subject=ncert_book.subject,
         title=data.title or ncert_book.title,
         source_type=SourceType.NCERT,
         file_url=ncert_book.file_url or "",
         ncert_book_id=ncert_book.id,
+        # Auto-filled from the book — an NCERT-sourced module's content is
+        # already fully covered by the generic curriculum question bank, so
+        # it never needs its own module-grounded generation, but subject is
+        # still recorded for consistency/display.
+        subject=ncert_book.subject,
         # NCERT books already have structured text — OCR not applicable
         ocr_status=OcrStatus.NA,
     )

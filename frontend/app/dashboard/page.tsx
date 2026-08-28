@@ -37,6 +37,7 @@ import {
   User,
   Menu,
   RefreshCw,
+  Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -70,6 +71,9 @@ import {
   ChildLinkOut,
   RolePermissionsResponse,
   getRolePermissions,
+  GapReportOut,
+  QuizStatusOut,
+  StudentQuizSummaryOut,
   getStudentModules,
   getNCERTBooksForClass,
   getAllNCERTBooks,
@@ -80,6 +84,7 @@ import {
   detachNCERTBookFile,
   addNCERTModuleToSchool,
   getSchoolClassModules,
+  getSchoolClassQuizSummaries,
   getParentChildren,
   addParentChild,
   getTeacherClasses,
@@ -102,6 +107,8 @@ import {
   SchoolSubjectDetail,
   assignClassToTeacher,
   deassignClassFromTeacher,
+  getQuizStatus,
+  getChildQuizResult,
 } from "@/lib/api";
 
 
@@ -294,26 +301,39 @@ function StudentDashboardView({
   const [ncertBooks, setNcertBooks] = useState<NCERTBookOut[]>([]);
   const [loadingModules, setLoadingModules] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [quizStatus, setQuizStatus] = useState<QuizStatusOut | null>(null);
+  const [loadingQuizStatus, setLoadingQuizStatus] = useState<boolean>(true);
 
   const isSelfEnrolled = student.enrollment_type === "self" || student.branch_name === "SELF";
   const needsSetup = isSelfEnrolled ? student.class_number === null : (student.class_number === null || student.section === null);
 
+
+  // The diagnostic quiz is mandatory — modules/curriculum stay locked until
+  // it's completed, so this must resolve before deciding what to render.
   useEffect(() => {
-    if (!needsSetup) {
-      setLoadingModules(true);
-      if (isSelfEnrolled) {
-        getNCERTBooksForClass(student.class_number || 1)
-          .then((res) => setNcertBooks(res))
-          .catch((err) => console.log("NCERT books fetch note:", err.message))
-          .finally(() => setLoadingModules(false));
-      } else {
-        getStudentModules()
-          .then((res) => setModules(res))
-          .catch((err) => console.log("School modules fetch note:", err.message))
-          .finally(() => setLoadingModules(false));
-      }
+    if (needsSetup) return;
+    setLoadingQuizStatus(true);
+    getQuizStatus()
+      .then((res) => setQuizStatus(res))
+      .catch((err) => console.log("Quiz status fetch note:", err.message))
+      .finally(() => setLoadingQuizStatus(false));
+  }, [needsSetup]);
+
+  useEffect(() => {
+    if (needsSetup || !quizStatus?.completed) return;
+    setLoadingModules(true);
+    if (isSelfEnrolled) {
+      getNCERTBooksForClass(student.class_number || 1)
+        .then((res) => setNcertBooks(res))
+        .catch((err) => console.log("NCERT books fetch note:", err.message))
+        .finally(() => setLoadingModules(false));
+    } else {
+      getStudentModules()
+        .then((res) => setModules(res))
+        .catch((err) => console.log("School modules fetch note:", err.message))
+        .finally(() => setLoadingModules(false));
     }
-  }, [needsSetup, student.class_number, isSelfEnrolled]);
+  }, [needsSetup, quizStatus?.completed, student.class_number, isSelfEnrolled]);
 
   const handleSetupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -484,6 +504,56 @@ function StudentDashboardView({
       {/* TAB: MODULES */}
       {activeTab === "modules" && (
         <div>
+          {/* Diagnostic Quiz — mandatory gate: modules stay locked until this is done */}
+          {!needsSetup && loadingQuizStatus && (
+            <div className="py-8 flex justify-center">
+              <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+
+          {!needsSetup && !loadingQuizStatus && quizStatus && !quizStatus.completed && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass rounded-[var(--radius-lg)] p-6 border border-brand/40 bg-brand/5"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-[var(--radius-sm)] bg-brand text-white flex items-center justify-center shrink-0">
+                  <Target className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-base font-bold text-text-primary">
+                    Complete Your Diagnostic Assessment to Unlock Learning Modules
+                  </h2>
+                  <p className="text-xs text-text-secondary mt-1 max-w-lg">
+                    Before you can access your {isSelfEnrolled ? "NCERT curriculum" : "learning modules"}, take a
+                    short adaptive quiz that finds any weak topics from previous classes. This is a
+                    one-time assessment — you won't be asked to retake it.
+                  </p>
+                  <Link href="/dashboard/diagnostic-quiz" className="inline-block mt-4">
+                    <Button variant="primary" size="sm">
+                      {quizStatus.in_progress_attempt_id ? "Continue Quiz" : "Start Quiz"}
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {!needsSetup && quizStatus?.completed && (
+            <div className="glass rounded-[var(--radius-md)] p-4 border border-border-primary flex items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
+                <span className="text-sm text-text-primary font-semibold">Diagnostic Assessment Completed</span>
+              </div>
+              <Link href="/dashboard/diagnostic-quiz" className="text-xs text-brand font-semibold hover:underline">
+                View My Results →
+              </Link>
+            </div>
+          )}
+
+          {!needsSetup && quizStatus?.completed && (
+          <>
           <h2 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
             <Layers className="w-5 h-5 text-brand" />
             <span>
@@ -596,6 +666,8 @@ function StudentDashboardView({
                 </p>
               </div>
             )
+          )}
+          </>
           )}
         </div>
       )}
@@ -749,6 +821,8 @@ function SchoolDashboardView({
   const [schoolSubjects, setSchoolSubjects] = useState<SchoolSubjectDetail[]>([]);
   const [loadingSubjects, setLoadingSubjects] = useState<boolean>(false);
   const [moduleToDelete, setModuleToDelete] = useState<ModuleOut | null>(null);
+  const [quizSummaries, setQuizSummaries] = useState<StudentQuizSummaryOut[]>([]);
+  const [loadingQuizSummaries, setLoadingQuizSummaries] = useState<boolean>(false);
 
   const fetchModules = () => {
     setLoadingModules(true);
@@ -766,12 +840,21 @@ function SchoolDashboardView({
       .finally(() => setLoadingSubjects(false));
   };
 
+  const fetchQuizSummaries = () => {
+    setLoadingQuizSummaries(true);
+    getSchoolClassQuizSummaries(selectedClass)
+      .then((res) => setQuizSummaries(res))
+      .catch((err) => console.log("Class quiz summaries fetch note:", err.message))
+      .finally(() => setLoadingQuizSummaries(false));
+  };
+
   // `completionNonce` changes when a background extraction reaches a result, so
   // the list re-reads the module records without polling on its own.
   useEffect(() => {
     if (activeTab === "modules" || activeTab === "overview") {
       fetchModules();
       fetchSubjects();
+      fetchQuizSummaries();
     }
   }, [selectedClass, activeTab, completionNonce]);
 
@@ -836,6 +919,70 @@ function SchoolDashboardView({
               <span className="text-lg font-bold text-text-primary">{school.state || "India"}</span>
               <span className="text-[11px] text-text-secondary">{school.email}</span>
             </div>
+          </div>
+
+          {/* Class Diagnostic Quiz Roster — class teacher view of each student's result */}
+          <div>
+            <h2 className="text-lg font-bold text-text-primary flex items-center gap-2 mb-4">
+              <Target className="w-5 h-5 text-brand" />
+              <span>Class {selectedClass} Diagnostic Results</span>
+            </h2>
+
+            {loadingQuizSummaries ? (
+              <div className="py-12 flex justify-center">
+                <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : quizSummaries.length > 0 ? (
+              <div className="space-y-3">
+                {quizSummaries.map((s) => (
+                  <div
+                    key={s.student_unique_number}
+                    className="glass rounded-[var(--radius-md)] p-4 border border-border-primary"
+                  >
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface border border-border-primary font-bold text-brand">
+                          {s.student_unique_number}
+                        </span>
+                        <span className="text-xs text-text-secondary">{s.student_email}</span>
+                      </div>
+                      {s.completed ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-text-primary">
+                            {s.overall_score !== null ? `${s.overall_score}%` : "—"}
+                          </span>
+                          {s.gaps_found > 0 && (
+                            <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                              {s.gaps_found} gap{s.gaps_found === 1 ? "" : "s"}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-text-tertiary italic">Not completed yet</span>
+                      )}
+                    </div>
+                    {s.ai_summary_status === "ready" && s.ai_summary && (
+                      <p className="text-xs text-text-secondary mt-2.5 pt-2.5 border-t border-border-primary/50 leading-relaxed">
+                        {s.ai_summary}
+                      </p>
+                    )}
+                    {s.completed && s.ai_summary_status === "pending" && (
+                      <p className="text-[10px] text-text-tertiary mt-2 italic">Summary generating...</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
+                <Target className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
+                <h3 className="text-sm font-semibold text-text-primary">
+                  No Students in Class {selectedClass} Yet
+                </h3>
+                <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
+                  Once students register under this branch and set their class, their diagnostic quiz results will appear here.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1495,14 +1642,113 @@ function ParentDashboardView({
 
       {/* TAB: REPORTS */}
       {activeTab === "reports" && (
-        <div className="glass rounded-[var(--radius-lg)] p-8 text-center border border-border-primary space-y-3">
-          <Award className="w-10 h-10 text-brand mx-auto" />
-          <h3 className="text-base font-bold text-text-primary">Academic Reports & Progress Analytics</h3>
-          <p className="text-xs text-text-secondary max-w-md mx-auto">
-            View detailed quiz performance, completion rates, and personalized feedback for all linked children.
+        <div className="space-y-6">
+          <div className="flex items-center gap-2">
+            <Award className="w-5 h-5 text-brand" />
+            <h2 className="text-base font-bold text-text-primary">Academic Reports & Progress Analytics</h2>
+          </div>
+          <p className="text-xs text-text-secondary max-w-md">
+            Diagnostic quiz performance, gap topics, and AI-generated summaries for each linked child.
           </p>
+
+          {loadingChildren ? (
+            <div className="py-12 flex justify-center">
+              <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : childrenList.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {childrenList.map((child) => (
+                <ChildCard key={child.id} child={child} />
+              ))}
+            </div>
+          ) : (
+            <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
+              <Users className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
+              <h3 className="text-sm font-semibold text-text-primary">No Wards Linked Yet</h3>
+              <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
+                Link a child from the Children tab to see their diagnostic assessment results here.
+              </p>
+            </div>
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Child Card (with diagnostic quiz summary) ────────────────────────────────
+
+function ChildCard({ child }: { child: ChildLinkOut }) {
+  const [result, setResult] = useState<GapReportOut | null>(null);
+  const [loadingResult, setLoadingResult] = useState<boolean>(true);
+
+  useEffect(() => {
+    getChildQuizResult(child.student_unique_number)
+      .then((res) => setResult(res))
+      .catch((err) => console.log("Child quiz result fetch note:", err.message))
+      .finally(() => setLoadingResult(false));
+  }, [child.student_unique_number]);
+
+  return (
+    <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all">
+      <div className="flex items-center justify-between mb-3">
+        <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-xs">
+          ID
+        </div>
+        <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface border border-border-primary font-bold text-brand">
+          {child.student_unique_number}
+        </span>
+      </div>
+      <p className="text-xs text-text-secondary mb-3">
+        Linked on {new Date(child.created_at).toLocaleDateString()}
+      </p>
+
+      <div className="pt-3 border-t border-border-primary/50">
+        <span className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
+          Gap Identification Quiz
+        </span>
+        {loadingResult ? (
+          <div className="mt-2 h-4 w-24 rounded bg-surface-hover animate-pulse" />
+        ) : result === null ? (
+          <p className="text-xs text-text-secondary mt-1.5">Not completed yet.</p>
+        ) : (
+          <div className="mt-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-bold text-text-primary">
+                {result.overall_score !== null ? `${result.overall_score}%` : "—"}
+              </span>
+              <span className="text-[10px] text-text-tertiary">overall score</span>
+            </div>
+            {result.gaps.length === 0 ? (
+              <p className="text-xs text-emerald-500 mt-1">No gaps found.</p>
+            ) : (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {result.gaps.slice(0, 3).map((gap) => (
+                  <span
+                    key={gap.topic_code}
+                    className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded"
+                  >
+                    {gap.subject}: Class {gap.originating_class}
+                  </span>
+                ))}
+                {result.gaps.length > 3 && (
+                  <span className="text-[10px] text-text-tertiary px-1.5 py-0.5">
+                    +{result.gaps.length - 3} more
+                  </span>
+                )}
+              </div>
+            )}
+            {result.ai_summary_status === "ready" && result.ai_summary && (
+              <p className="text-xs text-text-secondary mt-2.5 pt-2.5 border-t border-border-primary/50 leading-relaxed">
+                {result.ai_summary}
+              </p>
+            )}
+            {result.ai_summary_status === "pending" && (
+              <p className="text-[10px] text-text-tertiary mt-2 italic">Summary generating...</p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
