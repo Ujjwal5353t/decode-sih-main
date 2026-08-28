@@ -22,6 +22,8 @@ dependencies = [
     "email-validator>=2.2.0",
     "easyocr>=1.7.2",
     "fpdf2>=2.8.8",
+    "google-genai>=2.17.0",
+    "pypdf>=5.0.0",
 ]
 
 [dependency-groups]

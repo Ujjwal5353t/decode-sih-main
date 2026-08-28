@@ -163,6 +163,7 @@ ROLE_PERMISSIONS: Dict[str, RolePermissionsResponse] = {
             "can_edit_module",
             "can_delete_module",
             "can_link_ncert_books",
+            "can_review_admin_claims",
             "can_manage_teachers",
             "can_assign_teacher_classes",
             "can_deassign_teacher_classes",
@@ -193,13 +194,13 @@ ROLE_PERMISSIONS: Dict[str, RolePermissionsResponse] = {
                 ],
             ),
             DashboardPermissionItem(
-                id="ncert",
-                label="NCERT Library Catalog",
-                description="Add pre-loaded NCERT textbooks directly into your school branch curriculum",
-                icon="BookOpen",
-                category="Curriculum",
+                id="admin-requests",
+                label="Administrator Requests",
+                description="Approve or reject people requesting administrator access to your school",
+                icon="ShieldCheck",
+                category="Staff",
                 actions=[
-                    PermissionAction(key="link_ncert_books", label="Link NCERT Books", description="Attach NCERT textbooks into school modules"),
+                    PermissionAction(key="review_admin_claims", label="Review Requests", description="Approve or reject administrator access requests"),
                 ],
             ),
             DashboardPermissionItem(
@@ -265,6 +266,7 @@ ROLE_PERMISSIONS: Dict[str, RolePermissionsResponse] = {
             "can_edit_ncert_book",
             "can_delete_ncert_book",
             "can_view_all_schools",
+            "can_review_school_registrations",
         ],
         navigation=[
             DashboardPermissionItem(
@@ -289,6 +291,17 @@ ROLE_PERMISSIONS: Dict[str, RolePermissionsResponse] = {
                     PermissionAction(key="manage_ncert_master", label="Create Books", description="Add new official NCERT textbook entries"),
                     PermissionAction(key="upload_ncert_pdf", label="Upload PDF Content", description="Attach master PDF textbook files"),
                     PermissionAction(key="delete_ncert_book", label="Delete Books", description="Remove textbook entries from platform"),
+                ],
+            ),
+            DashboardPermissionItem(
+                id="school-requests",
+                label="School Requests",
+                description="Schools awaiting platform approval before their administrator gets access",
+                icon="ClipboardCheck",
+                category="Registrations",
+                badge="Review",
+                actions=[
+                    PermissionAction(key="review_school_registrations", label="Review Requests", description="Approve or reject school registration requests"),
                 ],
             ),
             DashboardPermissionItem(

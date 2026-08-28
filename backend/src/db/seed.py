@@ -14,6 +14,7 @@ from sqlmodel import select
 
 from src.core.config import settings
 from src.core.security import hash_password
+from src.db.curriculum_seed import seed_topics
 from src.models.admin import Admin
 from src.models.ncert import NCERTBook
 
@@ -182,85 +183,42 @@ async def seed_ncert_books(session: AsyncSession) -> None:
         await session.commit()
         print(f"[seed] {len(_NCERT_BOOKS)} NCERT books seeded.")
 
-    # Seed template chapter chunks for NCERT Class 4 EVS & Math
+    # Seed template chapter chunks for every NCERT book that has hand-authored
+    # content in ncert_content.py. Per-book idempotency (not "any SELF chunk
+    # exists") so this backfills newly-added books on an existing DB instead
+    # of silently no-op'ing forever once the first book was ever chunked.
+    from src.db.ncert_content import NCERT_CHAPTER_TEXT
     from src.models.chunk import DocumentChunk
     from src.services.chunk_service import ingest_module_text
 
-    chk_res = await session.execute(select(DocumentChunk).where(DocumentChunk.branch_name == "SELF").limit(1))
-    if not chk_res.scalar_one_or_none():
-        # Fetch Class 4 EVS NCERT Book
-        evs_res = await session.execute(
-            select(NCERTBook).where(NCERTBook.class_number == 4, NCERTBook.subject == "EVS")
+    all_books = await session.execute(select(NCERTBook))
+    books_by_key = {(b.subject, b.class_number): b for b in all_books.scalars().all()}
+
+    seeded_count = 0
+    for (subject, class_number), full_text in NCERT_CHAPTER_TEXT.items():
+        book = books_by_key.get((subject, class_number))
+        if book is None:
+            continue
+
+        chk_res = await session.execute(
+            select(DocumentChunk).where(DocumentChunk.ncert_book_id == book.id).limit(1)
         )
-        evs_book = evs_res.scalar_one_or_none()
+        if chk_res.scalar_one_or_none():
+            continue  # already chunked
 
-        if evs_book:
-            evs_full_text = (
-                "Chapter 1: Going to School\n"
-                "Children use different ways to reach school in different parts of India. "
-                "In Assam, children cross bamboo and rope bridges to reach school when it rains heavily. "
-                "In Ladakh, children use a trolley attached to a strong iron rope over a wide and deep river to cross over. "
-                "In Kerala, children use a Vallam (a small wooden boat) to reach school. "
-                "In Rajasthan desert, children ride in camel carts over hot sand. "
-                "In plains, children ride bullock carts or bicycles through green fields.\n\n"
-                "Chapter 2: Ear to Ear\n"
-                "Different animals have different types of ears. Animals like elephants, rabbits, dogs, and tigers have ears that can be seen. "
-                "Birds, frogs, lizards, and snakes have ears, but they are tiny holes covered with feathers or skin. "
-                "Animals whose ears can be seen and have hair on their skin give birth to young ones (Viviparous). "
-                "Animals whose ears cannot be seen and do not have hair on their skin lay eggs (Oviparous).\n\n"
-                "Chapter 3: A Day with Nandu\n"
-                "Nandu is a three-month-old baby elephant. Elephants live in herds. "
-                "An elephant herd has mainly females and baby elephants. The oldest female elephant is the leader of the herd. "
-                "Adult elephants eat more than 100 kilograms of leaves and twigs in one day. "
-                "Elephants sleep for only 2 to 4 hours a day. They love to play in mud and water to keep their skin cool.\n\n"
-                "Chapter 4: The Story of Amrita\n"
-                "Amrita lived in Khejadli village near Jodhpur in Rajasthan. The village got its name from the many Khejadi trees that grew there. "
-                "The people of Khejadli were called Bishnois. They cared deeply for plants and animals, saying 'Agar ped hain to hum hain'. "
-                "When the King sent soldiers to cut trees to build his palace, Amrita and her three daughters hugged the trees to protect them. "
-                "Over 300 villagers sacrificed their lives protecting the Khejadi trees."
-            )
-            await ingest_module_text(
-                session=session,
-                branch_name="SELF",
-                class_number=4,
-                subject="EVS",
-                text=evs_full_text,
-                ncert_book_id=evs_book.id,
-                module_title=evs_book.title,
-            )
-            print("[seed] Seeded 4 chapters of Class 4 EVS NCERT chunks under SELF.")
-
-        # Fetch Class 4 Math NCERT Book
-        math_res = await session.execute(
-            select(NCERTBook).where(NCERTBook.class_number == 4, NCERTBook.subject == "Mathematics")
+        await ingest_module_text(
+            session=session,
+            branch_name="SELF",
+            class_number=class_number,
+            subject=subject,
+            text=full_text,
+            ncert_book_id=book.id,
+            module_title=book.title,
         )
-        math_book = math_res.scalar_one_or_none()
+        seeded_count += 1
 
-        if math_book:
-            math_full_text = (
-                "Chapter 1: Building with Bricks\n"
-                "Bricks have 6 faces, 12 edges, and 8 corners. Masons in Murshidabad built beautiful brick floor patterns for Jagriti School. "
-                "Arches and brick patterns can be seen in old bridges and kilns. "
-                "A brick kiln bakes thousands of raw clay bricks. One brick usually measures 20 cm by 10 cm by 10 cm.\n\n"
-                "Chapter 2: Long and Short\n"
-                "Distance is measured in millimeters, centimeters, meters, and kilometers. 100 centimeters equals 1 meter, and 1000 meters equals 1 kilometer. "
-                "Marathon races are about 40 kilometers long. Height is measured using a measuring tape. "
-                "Comparing heights of classmates helps understand difference in length.\n\n"
-                "Chapter 3: A Trip to Bhopal\n"
-                "Class 4 students went on a school trip to Bhopal. Each mini bus held 35 children. "
-                "They crossed the Narmada bridge which is 756.8 meters long. "
-                "At Bhimbetka, they saw 10,000-year-old cave paintings of wild bulls, rhinos, and deer drawn on cave walls."
-            )
-            await ingest_module_text(
-                session=session,
-                branch_name="SELF",
-                class_number=4,
-                subject="Mathematics",
-                text=math_full_text,
-                ncert_book_id=math_book.id,
-                module_title=math_book.title,
-            )
-            print("[seed] Seeded 3 chapters of Class 4 Math NCERT chunks under SELF.")
+    if seeded_count:
+        print(f"[seed] Seeded template NCERT chunks for {seeded_count} book(s) under SELF.")
 
 
 from src.models.school import BranchCounter, School
@@ -312,14 +270,31 @@ async def seed_demo_accounts(session: AsyncSession) -> None:
             branch_name="LPS Karkarduma Branch",
             student_prefix="LKD",
             email="school@lps.edu",
+            phone_number="919810022002",
             password_hash=hash_password("123456789"),
             state="Delhi",
+            udise_code="07040100305",
+            district="East Delhi",
+            board="CBSE",
+            management="Private Unaided",
+            verification_status="verified",
         )
         session.add(school)
         await session.commit()
         await session.refresh(school)
         print("[seed] Demo School Branch 'LPS Karkarduma Branch' created.")
     else:
+        if not school.udise_code:
+            school.udise_code = "07040100305"
+        if not school.district:
+            school.district = "East Delhi"
+        if not school.board:
+            school.board = "CBSE"
+        if not school.management:
+            school.management = "Private Unaided"
+        if not school.phone_number:
+            school.phone_number = "919810022002"
+        school.verification_status = "verified"
         school.password_hash = hash_password("123456789")
         session.add(school)
         await session.commit()
@@ -476,12 +451,250 @@ async def seed_demo_accounts(session: AsyncSession) -> None:
         print(f"[seed] Demo EVS Module & Chunks for Class 4 ({b_name}) created.")
 
 
+# ── School directory (official records for school verification) ───────────────
+
+SCHOOL_DIRECTORY_SEED = [
+    {
+        "udise_code": "07040100201",
+        "school_name": "ABC Public School",
+        "state": "Delhi",
+        "district": "South Delhi",
+        "management": "Private Unaided",
+        "board": "CBSE",
+        "official_email": "principal@abcpublicschool.edu.in",
+        "official_phone": "+919810011001",
+        "head_name": "Rajesh Menon",
+    },
+    {
+        "udise_code": "07040100305",
+        "school_name": "LPS Karkarduma",
+        "state": "Delhi",
+        "district": "East Delhi",
+        "management": "Private Unaided",
+        "board": "CBSE",
+        "official_email": "school@lps.edu",
+        "official_phone": "+919810022002",
+        "head_name": "Anita Sharma",
+    },
+    {
+        "udise_code": "27260500712",
+        "school_name": "Shivaji Vidyalaya",
+        "state": "Maharashtra",
+        "district": "Pune",
+        "management": "Government Aided",
+        "board": "State Board",
+        "official_email": "head@shivajividyalaya.org",
+        "official_phone": "+919820033003",
+        "head_name": "Sunil Deshpande",
+    },
+    {
+        "udise_code": "29280600418",
+        "school_name": "Green Valley International School",
+        "state": "Karnataka",
+        "district": "Bengaluru Urban",
+        "management": "Private Unaided",
+        "board": "ICSE",
+        "official_email": "office@greenvalleyintl.edu.in",
+        "official_phone": "+919845044004",
+        "head_name": "Meera Iyer",
+    },
+    {
+        "udise_code": "33300700915",
+        "school_name": "Government Higher Secondary School Adyar",
+        "state": "Tamil Nadu",
+        "district": "Chennai",
+        "management": "Government",
+        "board": "State Board",
+        "official_email": "ghss.adyar@tn.gov.in",
+        "official_phone": "+919840055005",
+        "head_name": "K. Rajalakshmi",
+    },
+]
+
+
+async def seed_school_directory(session: AsyncSession) -> None:
+    """
+    Seed official school records used by the school verification flow.
+
+    This is sample directory data standing in for an official UDISE feed —
+    src/services/school_verification_service.py is the integration point where
+    a real directory would be plugged in.
+    """
+    from src.models.school_verification import SchoolDirectory
+
+    created = 0
+    for entry in SCHOOL_DIRECTORY_SEED:
+        existing = await session.execute(
+            select(SchoolDirectory).where(
+                SchoolDirectory.udise_code == entry["udise_code"]
+            )
+        )
+        if existing.scalar_one_or_none():
+            continue
+        session.add(SchoolDirectory(**entry))
+        created += 1
+
+PUBLISHER_SEED = [
+    {
+        "name": "NCERT",
+        "subjects": [
+            "Mathematics (Math-Magic)",
+            "English (Marigold / Mridang)",
+            "Hindi (Rimjhim / Sarangi)",
+            "Environmental Studies (EVS)",
+            "Art & Craft",
+            "Urdu (Ibtidai Urdu)",
+        ],
+    },
+    {
+        "name": "Oxford University Press",
+        "subjects": [
+            "English (New Oxford Modern English)",
+            "Mathematics (New Countdown)",
+            "Environmental Studies (EVS)",
+            "Computer Studies (Keyboard)",
+            "General Knowledge (GK)",
+            "Hindi (Madhur Hindi)",
+        ],
+    },
+    {
+        "name": "Cambridge University Press",
+        "subjects": [
+            "English (Cambridge Express)",
+            "Mathematics (Primary Mathematics)",
+            "Environmental Studies (EVS)",
+            "Computer Science (Click Start)",
+            "General Knowledge (Primary GK)",
+        ],
+    },
+    {
+        "name": "Pearson",
+        "subjects": [
+            "English (Longman Active English)",
+            "Mathematics (Universal Mathematics)",
+            "Environmental Studies (EVS)",
+            "Computer Science (Computer Masti)",
+            "General Knowledge (GK)",
+        ],
+    },
+    {
+        "name": "S. Chand",
+        "subjects": [
+            "Composite Mathematics",
+            "Awareness Environmental Studies (EVS)",
+            "English Grammar & Composition",
+            "General Knowledge (GK)",
+            "Computer Studies (IT Planet)",
+            "Moral Science / Value Education",
+        ],
+    },
+    {
+        "name": "Ratna Sagar",
+        "subjects": [
+            "Communicate in English",
+            "Number Magic (Mathematics)",
+            "Environmental Studies (My Green World)",
+            "Super GK (General Knowledge)",
+            "Living Values (Moral Science)",
+            "Art & Craft",
+        ],
+    },
+    {
+        "name": "Cordova Publications",
+        "subjects": [
+            "Mastering Mathematics",
+            "Enjoying Environmental Studies (EVS)",
+            "Stepping Stones English",
+            "Smart Tech Computer",
+            "Gyan Sarovar Hindi",
+            "Moral Values & Life Skills",
+        ],
+    },
+    {
+        "name": "Madhubun Educational Books",
+        "subjects": [
+            "Madhup Hindi Pathmala",
+            "Vitan Hindi",
+            "Gulmohar English",
+            "Headstart Mathematics",
+            "Green Circle (EVS)",
+            "General Knowledge",
+        ],
+    },
+    {
+        "name": "MacMillan Education",
+        "subjects": [
+            "English Ferry",
+            "Maths Xpress",
+            "Eco-Explorers (EVS)",
+            "Hop Skip and Jump",
+            "Computer Explorers",
+        ],
+    },
+    {
+        "name": "Orient BlackSwan",
+        "subjects": [
+            "Gul Mohar (English)",
+            "Orient Primary Math",
+            "Buzzword English",
+            "New Tree of Life (EVS)",
+            "General Knowledge",
+        ],
+    },
+]
+
+
+
+async def seed_publishers(session: AsyncSession) -> None:
+    """Seed initial list of standard textbook publishers and their subjects."""
+    from src.models.publisher import Publisher, PublisherSubject
+
+    pub_count = 0
+    sub_count = 0
+
+    for pub_data in PUBLISHER_SEED:
+        pub_name = pub_data["name"]
+        res = await session.execute(
+            select(Publisher).where(Publisher.name == pub_name)
+        )
+        pub = res.scalar_one_or_none()
+        if not pub:
+            pub = Publisher(name=pub_name)
+            session.add(pub)
+            await session.flush()
+            pub_count += 1
+
+        for sub_name in pub_data["subjects"]:
+            sub_res = await session.execute(
+                select(PublisherSubject).where(
+                    PublisherSubject.publisher_id == pub.id,
+                    PublisherSubject.subject_name == sub_name,
+                )
+            )
+            if not sub_res.scalar_one_or_none():
+                session.add(
+                    PublisherSubject(
+                        publisher_id=pub.id,
+                        subject_name=sub_name,
+                    )
+                )
+                sub_count += 1
+
+    if pub_count > 0 or sub_count > 0:
+        await session.commit()
+        print(f"[seed] Seeded {pub_count} publishers and {sub_count} publisher subjects.")
+
+
 async def run_all_seeds(session: AsyncSession) -> None:
     """Entry point — called from main.py lifespan or CLI."""
     await seed_admin(session)
     await seed_self_school(session)
+    await seed_school_directory(session)
+    await seed_publishers(session)
     await seed_ncert_books(session)
     await seed_demo_accounts(session)
+    await seed_topics(session)
+
 
 
 async def _cli_main() -> None:

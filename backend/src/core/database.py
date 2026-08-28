@@ -35,8 +35,28 @@ from sqlalchemy import text
 
 async def init_db() -> None:
     """Create all tables on startup (idempotent) and apply missing column migrations."""
+    import src.models  # noqa: F401
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+
+        # Ensure publishers & publisher_subjects tables exist
+        await conn.execute(
+            text("CREATE TABLE IF NOT EXISTS publishers (id UUID PRIMARY KEY, name VARCHAR(150) NOT NULL UNIQUE, created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW());")
+        )
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_publishers_name ON publishers (name);")
+        )
+        await conn.execute(
+            text("CREATE TABLE IF NOT EXISTS publisher_subjects (id UUID PRIMARY KEY, publisher_id UUID NOT NULL REFERENCES publishers(id) ON DELETE CASCADE, subject_name VARCHAR(150) NOT NULL, created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW());")
+        )
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_publisher_subjects_publisher_id ON publisher_subjects (publisher_id);")
+        )
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_publisher_subjects_subject_name ON publisher_subjects (subject_name);")
+        )
+
+
         # Migration: ensure enrollment_type column exists on students table
         await conn.execute(
             text("ALTER TABLE students ADD COLUMN IF NOT EXISTS enrollment_type VARCHAR(20) DEFAULT 'school';")
@@ -79,6 +99,103 @@ async def init_db() -> None:
         )
         await conn.execute(
             text("ALTER TABLE modules ADD COLUMN IF NOT EXISTS ocr_pdf_public_id TEXT;")
+        )
+        # Migration: school verification columns.
+        # DEFAULT 'verified' so every school account that existed before the
+        # verification flow keeps its current access unchanged.
+        await conn.execute(
+            text("ALTER TABLE schools ADD COLUMN IF NOT EXISTS verification_status VARCHAR(20) DEFAULT 'verified';")
+        )
+        await conn.execute(
+            text("UPDATE schools SET verification_status = 'verified' WHERE verification_status IS NULL;")
+        )
+        await conn.execute(
+            text("ALTER TABLE schools ADD COLUMN IF NOT EXISTS udise_code VARCHAR(20);")
+        )
+        await conn.execute(
+            text("ALTER TABLE schools ADD COLUMN IF NOT EXISTS district VARCHAR(120);")
+        )
+        await conn.execute(
+            text("ALTER TABLE schools ADD COLUMN IF NOT EXISTS board VARCHAR(60);")
+        )
+        await conn.execute(
+            text("ALTER TABLE schools ADD COLUMN IF NOT EXISTS management VARCHAR(120);")
+        )
+        await conn.execute(
+            text("ALTER TABLE schools ADD COLUMN IF NOT EXISTS owner_claim_id UUID;")
+        )
+        # Migration: first-run class/subject setup marker.
+        # NULL means "setup still due". School accounts that predate this column
+        # are stamped as already configured in the same step that adds it, so
+        # existing admins keep landing straight on their dashboard. Guarded by a
+        # column-existence check so the backfill can only ever run once.
+        await conn.execute(
+            text(
+                """
+                DO $do$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'schools'
+                          AND column_name = 'subjects_configured_at'
+                    ) THEN
+                        ALTER TABLE schools ADD COLUMN subjects_configured_at TIMESTAMP;
+                    END IF;
+                END
+                $do$;
+                """
+            )
+        )
+        # Migration: class-wise subjects & publishers for claims & school class subjects
+        await conn.execute(
+            text("ALTER TABLE school_admin_claims ADD COLUMN IF NOT EXISTS class_subjects_json TEXT;")
+        )
+        await conn.execute(
+            text("ALTER TABLE school_class_subjects ADD COLUMN IF NOT EXISTS publisher_name VARCHAR(150);")
+        )
+
+        # Migration: add scoring columns to quiz_attempts (added after the table
+        # first shipped without them)
+        await conn.execute(
+            text("ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS overall_score DOUBLE PRECISION;")
+        )
+        await conn.execute(
+            text("ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS subject_scores JSONB DEFAULT '{}'::jsonb;")
+        )
+        # Migration: school-module-grounded quiz questions
+        await conn.execute(
+            text("ALTER TABLE modules ADD COLUMN IF NOT EXISTS subject VARCHAR(100);")
+        )
+        await conn.execute(
+            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS module_id UUID REFERENCES modules(id);")
+        )
+        await conn.execute(
+            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS branch_name VARCHAR(120);")
+        )
+        # Migration: image-emoji stand-in for questions that identify
+        # something visually (no image-hosting pipeline exists)
+        await conn.execute(
+            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS image_emoji VARCHAR(8);")
+        )
+        # Migration: background-generated AI result summary
+        await conn.execute(
+            text("ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS ai_summary TEXT;")
+        )
+        await conn.execute(
+            text("ALTER TABLE quiz_attempts ADD COLUMN IF NOT EXISTS ai_summary_status VARCHAR(20) DEFAULT 'pending';")
+        )
+        # Migration: per-option emoji, for image-forward answer choices
+        await conn.execute(
+            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS option_emojis JSONB;")
+        )
+        # Migration: curated illustration library asset keys (real pictures,
+        # pre-seeded offline) — preferred over image_emoji/option_emojis
+        # when the question's picture is in the vocabulary.
+        await conn.execute(
+            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS image_asset_key VARCHAR(60);")
+        )
+        await conn.execute(
+            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS option_asset_keys JSONB;")
         )
 
 

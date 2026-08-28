@@ -72,6 +72,11 @@ export interface AdminProfile {
   created_at: string;
 }
 
+export type ModuleSourceType = "pdf_upload" | "image_upload" | "ncert";
+
+/** Mirrors backend `OcrStatus` — pending | processing | done | failed | na. */
+export type OcrStatusValue = "pending" | "processing" | "done" | "failed" | "na";
+
 export interface ModuleOut {
   id: string;
   branch_name: string;
@@ -80,6 +85,21 @@ export interface ModuleOut {
   title: string;
   file_url: string | null;
   created_at: string;
+  // Fields the backend always returns for school modules. Optional here so
+  // existing callers that only read the properties above stay unchanged.
+  source_type?: ModuleSourceType;
+  ncert_book_id?: string | null;
+  updated_at?: string;
+  ocr_status?: OcrStatusValue;
+  ocr_pdf_url?: string | null;
+}
+
+/** Response of GET /school/classes/{n}/modules/{id}/ocr */
+export interface OcrStatusOut {
+  module_id: string;
+  ocr_status: OcrStatusValue;
+  ocr_pdf_url: string | null;
+  message: string;
 }
 
 export interface ChildLinkOut {
@@ -124,6 +144,99 @@ export interface RolePermissionsResponse {
 export async function getRolePermissions(role?: Role): Promise<RolePermissionsResponse> {
   const q = role ? `?role=${encodeURIComponent(role)}` : "";
   return fetchApi<RolePermissionsResponse>(`/auth/permissions${q}`);
+}
+
+// ── Diagnostic Quiz Types ──────────────────────────────────────────────────────
+
+export type TopicType = "concept" | "skill";
+export type QuizAttemptStatus = "in_progress" | "completed" | "abandoned";
+
+export interface QuestionOut {
+  id: string;
+  subject: string;
+  class_number: number;
+  topic_name: string;
+  topic_type: TopicType;
+  question_text: string;
+  options: string[];
+  image_emoji: string | null;
+  option_emojis: string[] | null;
+  image_asset_key: string | null;
+  option_asset_keys: string[] | null;
+}
+
+export interface StartQuizResponse {
+  attempt_id: string;
+  question: QuestionOut | null;
+}
+
+export interface AnswerResponse {
+  finished: boolean;
+  next_question: QuestionOut | null;
+  was_correct: boolean;
+}
+
+export interface GapItemOut {
+  subject: string;
+  topic_code: string;
+  topic_name: string;
+  originating_class: number;
+  student_current_class: number;
+}
+
+export interface SubjectScoreOut {
+  score: number;
+  topics_tested: number;
+  gaps_found: number;
+  average_classes_behind: number;
+}
+
+export type AiSummaryStatus = "pending" | "ready" | "failed";
+
+export interface GapReportOut {
+  attempt_id: string;
+  subjects_covered: string[];
+  gaps: GapItemOut[];
+  completed_at: string | null;
+  overall_score: number | null;
+  subject_scores: Record<string, SubjectScoreOut | null>;
+  student_class: number;
+  ai_summary: string | null;
+  ai_summary_status: AiSummaryStatus;
+}
+
+export interface StudentQuizSummaryOut {
+  student_unique_number: string;
+  student_email: string;
+  completed: boolean;
+  overall_score: number | null;
+  gaps_found: number;
+  ai_summary: string | null;
+  ai_summary_status: AiSummaryStatus;
+  completed_at: string | null;
+}
+
+export interface CurrentGapOut {
+  subject: string;
+  topic_code: string;
+  topic_name: string;
+  originating_class: number;
+  updated_at: string;
+}
+
+export interface QuizAttemptSummaryOut {
+  id: string;
+  status: QuizAttemptStatus;
+  subjects: string[];
+  started_at: string;
+  completed_at: string | null;
+  overall_score: number | null;
+}
+
+export interface QuizStatusOut {
+  completed: boolean;
+  attempt_id: string | null;
+  in_progress_attempt_id: string | null;
 }
 
 // Token Helpers
@@ -385,6 +498,18 @@ export async function getStudentModules(): Promise<ModuleOut[]> {
   return fetchApi<ModuleOut[]>("/student/modules");
 }
 
+export interface SubjectPriorityOut {
+  subject: string;
+  priority_rank: number;
+  gap_count: number;
+  avg_classes_behind: number;
+  gap_topics: string[];
+}
+
+export async function getSubjectPriority(): Promise<SubjectPriorityOut[]> {
+  return fetchApi<SubjectPriorityOut[]>("/student/subject-priority");
+}
+
 export async function getSchoolClasses(): Promise<number[]> {
   return fetchApi<number[]>("/school/classes");
 }
@@ -393,6 +518,12 @@ export async function getSchoolClassModules(
   class_number: number
 ): Promise<ModuleOut[]> {
   return fetchApi<ModuleOut[]>(`/school/classes/${class_number}/modules`);
+}
+
+export async function getSchoolClassQuizSummaries(
+  class_number: number
+): Promise<StudentQuizSummaryOut[]> {
+  return fetchApi<StudentQuizSummaryOut[]>(`/school/classes/${class_number}/quiz-summaries`);
 }
 
 export async function getParentChildren(): Promise<ChildLinkOut[]> {
@@ -414,6 +545,21 @@ export async function getChildProfile(
   return fetchApi<StudentProfile>(
     `/parent/children/${student_unique_number}/profile`
   );
+}
+
+// Returns null (not thrown) if the child hasn't completed the diagnostic yet,
+// since that's an expected state a parent dashboard needs to render around.
+export async function getChildQuizResult(
+  student_unique_number: string
+): Promise<GapReportOut | null> {
+  try {
+    return await fetchApi<GapReportOut>(
+      `/parent/children/${student_unique_number}/quiz-result`
+    );
+  } catch (err: any) {
+    if (err?.message?.includes("has not completed their diagnostic")) return null;
+    throw err;
+  }
 }
 
 export async function searchSchools(query?: string): Promise<SchoolSearchResult[]> {
@@ -790,4 +936,581 @@ export async function deassignClassFromTeacher(
     `/school/teachers/${teacher_id}/assign-class/${class_number}/${section}`,
     { method: "DELETE" }
   );
+}
+
+// ── School Module Upload & OCR ────────────────────────────────────────────────
+// Wrappers around the module endpoints already exposed by the School Dashboard
+// router (see backend `src/api/routes/school.py`). Nothing here is new backend
+// surface — these are the same contracts the dashboard already relies on.
+
+/**
+ * Build the backend proxy URL used to view a stored PDF inline.
+ * Mirrors `GET /files/view-pdf`, which streams both local `/uploads/...` paths
+ * and remote Cloudinary URLs with the right `Content-Type`.
+ */
+export function buildPdfViewUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  return `${API_BASE_URL}/files/view-pdf?url=${encodeURIComponent(url)}`;
+}
+
+/**
+ * Multipart POST/PUT with real upload-progress reporting.
+ *
+ * `fetchApi` is used everywhere else, but `fetch` cannot report upload
+ * progress, so the multipart module endpoints go through XHR instead. Auth,
+ * error shape and the sliding-window token refresh behave identically.
+ */
+function uploadFormData<T>(
+  endpoint: string,
+  formData: FormData,
+  options: { method?: "POST" | "PUT"; onProgress?: (percent: number) => void } = {}
+): Promise<T> {
+  const { method = "POST", onProgress } = options;
+
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, `${API_BASE_URL}${endpoint}`);
+
+    const token = getStoredToken();
+    if (token) {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
+
+    if (onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && event.total > 0) {
+          onProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      // Sliding window token update check from backend header
+      const refreshedToken = xhr.getResponseHeader("x-access-token");
+      if (refreshedToken) {
+        const currentRole = getStoredRole();
+        if (currentRole) {
+          setStoredAuth(refreshedToken, currentRole);
+        }
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        if (xhr.status === 204 || !xhr.responseText) {
+          resolve({} as T);
+          return;
+        }
+        try {
+          resolve(JSON.parse(xhr.responseText) as T);
+        } catch {
+          reject(new Error("Received an invalid response from the server."));
+        }
+        return;
+      }
+
+      let errorMessage = "An unexpected error occurred.";
+      try {
+        const errorData = JSON.parse(xhr.responseText);
+        if (typeof errorData.detail === "string") {
+          errorMessage = errorData.detail;
+        } else if (Array.isArray(errorData.detail)) {
+          errorMessage = errorData.detail
+            .map((e: { msg?: string }) => e.msg)
+            .join(", ");
+        }
+      } catch {
+        errorMessage = xhr.statusText || errorMessage;
+      }
+      reject(new Error(errorMessage));
+    };
+
+    xhr.onerror = () =>
+      reject(new Error("Network error — could not reach the server."));
+    xhr.onabort = () => reject(new Error("Upload cancelled."));
+    xhr.ontimeout = () => reject(new Error("The upload timed out."));
+
+    xhr.send(formData);
+  });
+}
+
+/** POST /school/classes/{class_number}/modules/pdf — upload a PDF as a module. */
+export async function uploadSchoolPdfModule(
+  class_number: number,
+  title: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+  subject?: string
+): Promise<ModuleOut> {
+  const formData = new FormData();
+  formData.append("title", title);
+  formData.append("file", file);
+  if (subject) formData.append("subject", subject);
+  return uploadFormData<ModuleOut>(
+    `/school/classes/${class_number}/modules/pdf`,
+    formData,
+    { onProgress }
+  );
+}
+
+/**
+ * POST /school/classes/{class_number}/modules/images — upload page images.
+ * The backend merges them into one PDF and starts EasyOCR in the background,
+ * so the created module comes back with `ocr_status: "pending"`.
+ */
+export async function uploadSchoolImagesModule(
+  class_number: number,
+  title: string,
+  files: File[],
+  onProgress?: (percent: number) => void,
+  subject?: string
+): Promise<ModuleOut> {
+  const formData = new FormData();
+  formData.append("title", title);
+  files.forEach((file) => formData.append("files", file));
+  if (subject) formData.append("subject", subject);
+  return uploadFormData<ModuleOut>(
+    `/school/classes/${class_number}/modules/images`,
+    formData,
+    { onProgress }
+  );
+}
+
+
+/**
+ * PUT /school/classes/{class_number}/modules/{module_id}/replace-images
+ * Replaces the module's pages and re-runs OCR from scratch. This is the retry
+ * path the backend documents for a failed extraction.
+ */
+export async function replaceSchoolModuleImages(
+  class_number: number,
+  module_id: string,
+  files: File[],
+  title?: string,
+  onProgress?: (percent: number) => void
+): Promise<ModuleOut> {
+  const formData = new FormData();
+  if (title) formData.append("title", title);
+  files.forEach((file) => formData.append("files", file));
+  return uploadFormData<ModuleOut>(
+    `/school/classes/${class_number}/modules/${module_id}/replace-images`,
+    formData,
+    { method: "PUT", onProgress }
+  );
+}
+
+/** GET /school/classes/{class_number}/modules/{module_id}/ocr — poll OCR state. */
+export async function getModuleOcrStatus(
+  class_number: number,
+  module_id: string
+): Promise<OcrStatusOut> {
+  return fetchApi<OcrStatusOut>(
+    `/school/classes/${class_number}/modules/${module_id}/ocr`
+  );
+}
+
+/** PATCH /school/classes/{class_number}/modules/{module_id}/title */
+export async function updateSchoolModuleTitle(
+  class_number: number,
+  module_id: string,
+  title: string
+): Promise<ModuleOut> {
+  return fetchApi<ModuleOut>(
+    `/school/classes/${class_number}/modules/${module_id}/title`,
+    { method: "PATCH", body: JSON.stringify({ title }) }
+  );
+}
+
+/** DELETE /school/classes/{class_number}/modules/{module_id} */
+export async function deleteSchoolModule(
+  class_number: number,
+  module_id: string
+): Promise<void> {
+  await fetchApi<void>(`/school/classes/${class_number}/modules/${module_id}`, {
+    method: "DELETE",
+  });
+}
+
+// ── School Registration & Verification ────────────────────────────────────────
+// Backend: src/api/routes/school_verification.py
+// Phone verification reuses the existing sendOTP/verifyOTP helpers above —
+// there is no second OTP client here.
+
+export type ClaimStatusValue = "pending" | "approved" | "rejected";
+export type AuthorityStatusValue =
+  | "unverified"
+  | "verified"
+  | "manual_review"
+  | "failed";
+export type ClaimRouteValue = "first_admin" | "owner_approval";
+
+export interface SchoolRecordOut {
+  udise_code: string;
+  school_name: string;
+  state: string;
+  district: string;
+  management: string;
+  board: string | null;
+}
+
+export interface EmailVerificationResponse {
+  status: string;
+  message: string;
+  email?: string | null;
+  verified?: boolean | null;
+}
+
+export interface PublisherWithSubjectsOut {
+  id: string;
+  name: string;
+  subjects: string[];
+}
+
+export interface ClassSubjectPublisherItem {
+  class_number: number;
+  publisher_name: string;
+  subjects: string[];
+}
+
+export interface ClaimStatusOut {
+  id: string;
+  udise_code: string;
+  school_name: string;
+  full_name: string;
+  designation: string;
+  official_email: string;
+  phone_number: string;
+  school_identity_verified: boolean;
+  phone_verified: boolean;
+  email_verified: boolean;
+  authority_status: AuthorityStatusValue;
+  route: ClaimRouteValue;
+  status: ClaimStatusValue;
+  authority_notes: string | null;
+  decision_reason: string | null;
+  evidence_url: string | null;
+  class_subjects?: ClassSubjectPublisherItem[] | null;
+  created_at: string;
+  admin_access_granted: boolean;
+}
+
+export interface ClaimCreatedResponse {
+  claim: ClaimStatusOut;
+  message: string;
+}
+
+export interface OwnerClaimListItem {
+  id: string;
+  full_name: string;
+  designation: string;
+  official_email: string;
+  phone_number: string;
+  school_name: string;
+  status: ClaimStatusValue;
+  created_at: string;
+}
+
+/** List all textbook publishers and their available subjects */
+export async function getPublishersWithSubjects(): Promise<PublisherWithSubjectsOut[]> {
+  return fetchApi<PublisherWithSubjectsOut[]>("/school-verification/publishers");
+}
+
+/** Official school record by UDISE code. */
+export async function lookupSchoolByUdise(
+  udise_code: string
+): Promise<SchoolRecordOut> {
+  return fetchApi<SchoolRecordOut>(
+    `/school-verification/lookup?udise_code=${encodeURIComponent(udise_code)}`
+  );
+}
+
+/** Official school directory search by name / state / district. */
+export async function searchSchoolDirectory(params: {
+  name?: string;
+  state?: string;
+  district?: string;
+}): Promise<SchoolRecordOut[]> {
+  const query = new URLSearchParams();
+  if (params.name?.trim()) query.append("name", params.name.trim());
+  if (params.state?.trim()) query.append("state", params.state.trim());
+  if (params.district?.trim()) query.append("district", params.district.trim());
+  return fetchApi<SchoolRecordOut[]>(
+    `/school-verification/search?${query.toString()}`
+  );
+}
+
+export async function sendSchoolEmailCode(
+  email: string
+): Promise<EmailVerificationResponse> {
+  return fetchApi<EmailVerificationResponse>("/school-verification/email/send", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function verifySchoolEmailCode(
+  email: string,
+  code: string
+): Promise<EmailVerificationResponse> {
+  return fetchApi<EmailVerificationResponse>("/school-verification/email/verify", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
+}
+
+export async function createSchoolClaim(payload: {
+  udise_code: string;
+  full_name: string;
+  designation: string;
+  official_email: string;
+  phone_number: string;
+  password: string;
+  class_subjects?: ClassSubjectPublisherItem[];
+}): Promise<ClaimCreatedResponse> {
+  return fetchApi<ClaimCreatedResponse>("/school-verification/claims", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getSchoolClaim(claim_id: string): Promise<ClaimStatusOut> {
+  return fetchApi<ClaimStatusOut>(`/school-verification/claims/${claim_id}`);
+}
+
+/** Attach a supporting authority document. Never approves the claim by itself. */
+export async function uploadClaimEvidence(
+  claim_id: string,
+  file: File
+): Promise<ClaimStatusOut> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return uploadFormData<ClaimStatusOut>(
+    `/school-verification/claims/${claim_id}/evidence`,
+    formData
+  );
+}
+
+/**
+ * Exchange an approved claim for a School Admin session.
+ * Fails with 403 while the claim is pending or rejected.
+ */
+export async function activateSchoolClaim(
+  claim_id: string
+): Promise<TokenResponse> {
+  const res = await fetchApi<TokenResponse>(
+    `/school-verification/claims/${claim_id}/activate`,
+    { method: "POST", body: JSON.stringify({}) }
+  );
+  setStoredAuth(res.access_token, "school");
+  return res;
+}
+
+// ── Verified owner: approve / reject administrator requests ───────────────────
+
+export async function getOwnerClaimRequests(): Promise<OwnerClaimListItem[]> {
+  return fetchApi<OwnerClaimListItem[]>("/school-verification/owner/requests");
+}
+
+export async function approveOwnerClaim(
+  claim_id: string,
+  reason?: string
+): Promise<ClaimStatusOut> {
+  return fetchApi<ClaimStatusOut>(
+    `/school-verification/owner/requests/${claim_id}/approve`,
+    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) }
+  );
+}
+
+export async function rejectOwnerClaim(
+  claim_id: string,
+  reason?: string
+): Promise<ClaimStatusOut> {
+  return fetchApi<ClaimStatusOut>(
+    `/school-verification/owner/requests/${claim_id}/reject`,
+    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) }
+  );
+}
+
+// ── Super Admin: school registration requests ─────────────────────────────────
+
+export interface SchoolRequestListItem {
+  id: string;
+  school_name: string;
+  udise_code: string;
+  state: string | null;
+  district: string | null;
+  board: string | null;
+  management: string | null;
+  full_name: string;
+  designation: string;
+  official_email: string;
+  phone_number: string;
+  phone_verified: boolean;
+  email_verified: boolean;
+  authority_status: AuthorityStatusValue;
+  authority_notes: string | null;
+  evidence_url: string | null;
+  status: ClaimStatusValue;
+  decision_reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  class_subjects?: ClassSubjectPublisherItem[] | null;
+  admin_access_granted: boolean;
+}
+
+
+export async function getSchoolRegistrationRequests(
+  status?: ClaimStatusValue
+): Promise<SchoolRequestListItem[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return fetchApi<SchoolRequestListItem[]>(`/admin/school-requests${query}`);
+}
+
+export async function approveSchoolRequest(
+  claim_id: string,
+  reason?: string
+): Promise<SchoolRequestListItem> {
+  return fetchApi<SchoolRequestListItem>(
+    `/admin/school-requests/${claim_id}/approve`,
+    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) }
+  );
+}
+
+export async function rejectSchoolRequest(
+  claim_id: string,
+  reason?: string
+): Promise<SchoolRequestListItem> {
+  return fetchApi<SchoolRequestListItem>(
+    `/admin/school-requests/${claim_id}/reject`,
+    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) }
+  );
+}
+
+// ── School Admin: first-run class/subject setup ───────────────────────────────
+
+export interface ClassSubjectOptions {
+  class_number: number;
+  class_label: string;
+  subject_count: number;
+  subjects: string[];
+  selected: string[];
+}
+
+export interface SubjectSetupOut {
+  completed: boolean;
+  configured_at: string | null;
+  classes: ClassSubjectOptions[];
+}
+
+export async function getSchoolSubjectSetup(): Promise<SubjectSetupOut> {
+  return fetchApi<SubjectSetupOut>("/school/subject-setup");
+}
+
+export interface SchoolSubjectDetail {
+  id: string;
+  class_number: number;
+  subject: string;
+  publisher_name?: string | null;
+  created_at?: string;
+}
+
+export async function getSchoolSubjects(
+  class_number?: number
+): Promise<SchoolSubjectDetail[]> {
+  const q = class_number ? `?class_number=${class_number}` : "";
+  return fetchApi<SchoolSubjectDetail[]>(`/school/subjects${q}`);
+}
+
+export async function saveSchoolSubjectSetup(
+  classes: { class_number: number; subjects: string[] }[]
+): Promise<SubjectSetupOut> {
+  return fetchApi<SubjectSetupOut>("/school/subject-setup", {
+    method: "PUT",
+    body: JSON.stringify({ classes }),
+  });
+}
+
+// ── Diagnostic Quiz Endpoints ──────────────────────────────────────────────────
+
+export async function startQuiz(payload?: {
+  subjects?: string[];
+}): Promise<StartQuizResponse> {
+  return fetchApi<StartQuizResponse>("/quiz/start", {
+    method: "POST",
+    body: JSON.stringify(payload || {}),
+  });
+}
+
+export async function answerQuiz(
+  attemptId: string,
+  payload: { question_id: string; selected_option_index: number }
+): Promise<AnswerResponse> {
+  return fetchApi<AnswerResponse>(`/quiz/${attemptId}/answer`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getQuizResult(attemptId: string): Promise<GapReportOut> {
+  return fetchApi<GapReportOut>(`/quiz/${attemptId}/result`);
+}
+
+export async function getQuizAttempts(): Promise<QuizAttemptSummaryOut[]> {
+  return fetchApi<QuizAttemptSummaryOut[]>("/quiz/attempts");
+}
+
+export async function getCurrentGaps(): Promise<CurrentGapOut[]> {
+  return fetchApi<CurrentGapOut[]>("/quiz/gaps");
+}
+
+export async function getQuizStatus(): Promise<QuizStatusOut> {
+  return fetchApi<QuizStatusOut>("/quiz/status");
+}
+
+// ── Animated Lessons ───────────────────────────────────────────────────────────
+
+export interface LessonListItemOut {
+  id: string;
+  subject: string;
+  class_number: number;
+  chapter_number: number;
+  chapter_title: string;
+  slide_count: number;
+}
+
+export type LessonSlideType = "concept" | "example" | "check";
+
+export interface LessonSlideOut {
+  id: string;
+  slide_index: number;
+  slide_type: LessonSlideType;
+  text: string;
+  image_asset_key: string | null;
+  image_emoji: string | null;
+  options: string[] | null;
+  correct_option_index: number | null;
+  explanation: string | null;
+}
+
+export interface LessonOut {
+  id: string;
+  subject: string;
+  class_number: number;
+  chapter_number: number;
+  chapter_title: string;
+  slides: LessonSlideOut[];
+}
+
+export async function getLessons(
+  subject?: string,
+  classNumber?: number
+): Promise<LessonListItemOut[]> {
+  const params = new URLSearchParams();
+  if (subject) params.append("subject", subject);
+  if (classNumber) params.append("class_number", classNumber.toString());
+  const q = params.toString() ? `?${params.toString()}` : "";
+  return fetchApi<LessonListItemOut[]>(`/student/lessons${q}`);
+}
+
+export async function getLesson(lessonId: string): Promise<LessonOut> {
+  return fetchApi<LessonOut>(`/student/lessons/${lessonId}`);
 }

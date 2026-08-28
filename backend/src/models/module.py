@@ -43,6 +43,14 @@ class Module(SQLModel, table=True):
     title: str = Field(max_length=300)
     source_type: SourceType
 
+    # One of the diagnostic quiz's ALL_SUBJECTS ("Mathematics", "English",
+    # "Hindi", "EVS") — required for this module's content to be usable as a
+    # source for the diagnostic quiz question bank. Auto-filled from the
+    # NCERT book's subject when source_type is NCERT; supplied by the school
+    # for PDF/image uploads. Left unset until then — modules without a
+    # subject are simply skipped by question generation.
+    subject: Optional[str] = Field(default=None, max_length=100, index=True)
+
     # Public URL (Cloudinary CDN or NCERT official URL) — visual/original PDF
     file_url: str
 

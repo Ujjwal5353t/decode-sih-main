@@ -36,11 +36,26 @@ import {
   Phone,
   User,
   Menu,
+  RefreshCw,
+  Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { DashboardSidebar } from "@/components/dashboard/Sidebar";
+import { DeleteModuleDialog } from "@/components/school/DeleteModuleDialog";
+import { AdminRequestsPanel } from "@/components/school/registration/AdminRequestsPanel";
+import { SchoolRequestsPanel } from "@/components/admin/SchoolRequestsPanel";
+import { SubjectSetupGate } from "@/components/school/SubjectSetupGate";
+import {
+  ModuleStatusBadge,
+  type ModuleDisplayStatus,
+} from "@/components/school/ModuleStatusBadge";
+import {
+  isProcessing,
+  useModuleProcessing,
+} from "@/components/school/ModuleProcessingProvider";
 import { useAuth } from "@/hooks/useAuth";
+import { Mascot, MascotMood } from "@/components/quiz/Mascot";
 import {
   StudentProfile,
   SchoolProfile,
@@ -57,8 +72,13 @@ import {
   ChildLinkOut,
   RolePermissionsResponse,
   getRolePermissions,
+  GapReportOut,
+  QuizStatusOut,
+  StudentQuizSummaryOut,
   getStudentModules,
   getNCERTBooksForClass,
+  getSubjectPriority,
+  SubjectPriorityOut,
   getAllNCERTBooks,
   uploadNCERTBookPdf,
   createNCERTBook,
@@ -67,6 +87,7 @@ import {
   detachNCERTBookFile,
   addNCERTModuleToSchool,
   getSchoolClassModules,
+  getSchoolClassQuizSummaries,
   getParentChildren,
   addParentChild,
   getTeacherClasses,
@@ -85,15 +106,81 @@ import {
   submitStudentAssignment,
   getStudentAssignmentFeedback,
   getSchoolTeachers,
+  getSchoolSubjects,
+  SchoolSubjectDetail,
   assignClassToTeacher,
   deassignClassFromTeacher,
+  getQuizStatus,
+  getChildQuizResult,
 } from "@/lib/api";
+
 
 
 function formatPdfUrl(url: string | null | undefined): string | undefined {
   if (!url) return undefined;
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
   return `${apiBase}/files/view-pdf?url=${encodeURIComponent(url)}`;
+}
+
+// Simple, rule-based grouping — not a live personalization engine. Orders
+// a flat list of modules/books by subject, weakest-subject-first, using
+// the diagnostic-quiz-derived ranking from GET /student/subject-priority.
+// See LEARNING_PATH.txt for the plain-language write-up.
+function groupBySubjectPriority<T extends { subject?: string | null }>(
+  items: T[],
+  priority: SubjectPriorityOut[]
+): { subject: string; items: T[]; priorityInfo?: SubjectPriorityOut }[] {
+  const rankOf = new Map(priority.map((p) => [p.subject, p.priority_rank]));
+  const infoOf = new Map(priority.map((p) => [p.subject, p]));
+
+  const bySubject = new Map<string, T[]>();
+  for (const item of items) {
+    const subject = item.subject || "General";
+    if (!bySubject.has(subject)) bySubject.set(subject, []);
+    bySubject.get(subject)!.push(item);
+  }
+
+  return Array.from(bySubject.entries())
+    .map(([subject, groupItems]) => ({
+      subject,
+      items: groupItems,
+      priorityInfo: infoOf.get(subject),
+    }))
+    .sort((a, b) => (rankOf.get(a.subject) ?? 999) - (rankOf.get(b.subject) ?? 999));
+}
+
+function SubjectGroupHeader({
+  subject,
+  priorityInfo,
+  isTopPriority,
+}: {
+  subject: string;
+  priorityInfo?: SubjectPriorityOut;
+  isTopPriority: boolean;
+}) {
+  const hasGaps = !!priorityInfo && priorityInfo.gap_count > 0;
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <h3 className="text-sm font-bold text-text-primary">{subject}</h3>
+      {isTopPriority && hasGaps && (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand bg-brand/10 px-2 py-0.5 rounded-full border border-border-brand">
+          <Target className="w-3 h-3" /> Recommended first
+        </span>
+      )}
+      {hasGaps && priorityInfo!.gap_topics.length > 0 && (
+        <span className="text-[11px] text-text-tertiary truncate">
+          Review: {priorityInfo!.gap_topics.slice(0, 2).join(", ")}
+          {priorityInfo!.gap_topics.length > 2 ? "…" : ""}
+        </span>
+      )}
+      <Link
+        href={`/dashboard/learn?subject=${encodeURIComponent(subject)}`}
+        className="ml-auto inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline shrink-0"
+      >
+        View Animated Lessons →
+      </Link>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -229,10 +316,12 @@ export default function DashboardPage() {
             />
           )}
           {role === "school" && (
-            <SchoolDashboardView
-              school={user as SchoolProfile}
-              activeTab={activeTab}
-            />
+            <SubjectSetupGate>
+              <SchoolDashboardView
+                school={user as SchoolProfile}
+                activeTab={activeTab}
+              />
+            </SubjectSetupGate>
           )}
           {role === "parent" && (
             <ParentDashboardView
@@ -276,26 +365,59 @@ function StudentDashboardView({
   const [ncertBooks, setNcertBooks] = useState<NCERTBookOut[]>([]);
   const [loadingModules, setLoadingModules] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [quizStatus, setQuizStatus] = useState<QuizStatusOut | null>(null);
+  const [loadingQuizStatus, setLoadingQuizStatus] = useState<boolean>(true);
+  const [subjectPriority, setSubjectPriority] = useState<SubjectPriorityOut[]>([]);
 
   const isSelfEnrolled = student.enrollment_type === "self" || student.branch_name === "SELF";
   const needsSetup = isSelfEnrolled ? student.class_number === null : (student.class_number === null || student.section === null);
 
+  // A persistent companion mood, derived straight from state already in
+  // scope — no separate state of its own, no backend involvement. "idle"
+  // (now a genuinely lively animation — blink, sway, an occasional
+  // sparkle, tap-for-a-cheer) is the resting state; "encourage" is a
+  // reaction to a specific wrong answer elsewhere in the app, not
+  // something to show constantly just because the quiz isn't done yet —
+  // that would read as a nagging/puzzled face rather than a companion.
+  // "happy" is reserved as a steady positive state once the diagnostic is
+  // actually complete.
+  const mascotMood: MascotMood = !needsSetup && !loadingQuizStatus && quizStatus?.completed
+    ? "happy"
+    : "idle";
+
+
+  // The diagnostic quiz is mandatory — modules/curriculum stay locked until
+  // it's completed, so this must resolve before deciding what to render.
   useEffect(() => {
-    if (!needsSetup) {
-      setLoadingModules(true);
-      if (isSelfEnrolled) {
-        getNCERTBooksForClass(student.class_number || 1)
-          .then((res) => setNcertBooks(res))
-          .catch((err) => console.log("NCERT books fetch note:", err.message))
-          .finally(() => setLoadingModules(false));
-      } else {
-        getStudentModules()
-          .then((res) => setModules(res))
-          .catch((err) => console.log("School modules fetch note:", err.message))
-          .finally(() => setLoadingModules(false));
-      }
+    if (needsSetup) return;
+    setLoadingQuizStatus(true);
+    getQuizStatus()
+      .then((res) => setQuizStatus(res))
+      .catch((err) => console.log("Quiz status fetch note:", err.message))
+      .finally(() => setLoadingQuizStatus(false));
+  }, [needsSetup]);
+
+  useEffect(() => {
+    if (needsSetup || !quizStatus?.completed) return;
+    setLoadingModules(true);
+    if (isSelfEnrolled) {
+      getNCERTBooksForClass(student.class_number || 1)
+        .then((res) => setNcertBooks(res))
+        .catch((err) => console.log("NCERT books fetch note:", err.message))
+        .finally(() => setLoadingModules(false));
+    } else {
+      getStudentModules()
+        .then((res) => setModules(res))
+        .catch((err) => console.log("School modules fetch note:", err.message))
+        .finally(() => setLoadingModules(false));
     }
-  }, [needsSetup, student.class_number, isSelfEnrolled]);
+    // Simple, rule-based ordering (not a live personalization engine) — see
+    // LEARNING_PATH.txt. Purely additive: groups/orders the same module
+    // list above, never blocks it if this call fails.
+    getSubjectPriority()
+      .then((res) => setSubjectPriority(res))
+      .catch((err) => console.log("Subject priority fetch note:", err.message));
+  }, [needsSetup, quizStatus?.completed, student.class_number, isSelfEnrolled]);
 
   const handleSetupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,6 +435,12 @@ function StudentDashboardView({
 
   return (
     <div className="space-y-6">
+      {/* Persistent companion — stays mounted across every tab, mood
+          derived from state already in scope above (no backend call). */}
+      <div className="fixed bottom-5 right-5 z-30 hidden sm:block">
+        <Mascot mood={mascotMood} size={72} />
+      </div>
+
       {/* TAB: OVERVIEW */}
       {activeTab === "overview" && (
         <div className="space-y-6">
@@ -446,18 +574,18 @@ function StudentDashboardView({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
               <span className="text-xs text-text-tertiary block">Available Modules</span>
-              <span className="text-2xl font-bold text-text-primary">
+              <span className="text-2xl font-bold text-text-primary block">
                 {isSelfEnrolled ? ncertBooks.length : modules.length}
               </span>
-              <span className="text-[11px] text-brand">
+              <span className="text-[11px] text-brand block">
                 {isSelfEnrolled ? "NCERT Official Books" : "School Branch Syllabus"}
               </span>
             </div>
 
             <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
               <span className="text-xs text-text-tertiary block">Learning Format</span>
-              <span className="text-2xl font-bold text-text-primary">Interactive AI</span>
-              <span className="text-[11px] text-emerald-500">PDF Reader & AI Diagnostic Quizzes</span>
+              <span className="text-2xl font-bold text-text-primary block">Interactive AI</span>
+              <span className="text-[11px] text-emerald-500 block">PDF Reader & AI Diagnostic Quizzes</span>
             </div>
           </div>
         </div>
@@ -466,6 +594,56 @@ function StudentDashboardView({
       {/* TAB: MODULES */}
       {activeTab === "modules" && (
         <div>
+          {/* Diagnostic Quiz — mandatory gate: modules stay locked until this is done */}
+          {!needsSetup && loadingQuizStatus && (
+            <div className="py-8 flex justify-center">
+              <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+
+          {!needsSetup && !loadingQuizStatus && quizStatus && !quizStatus.completed && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass rounded-[var(--radius-lg)] p-6 border border-brand/40 bg-brand/5"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-[var(--radius-sm)] bg-brand text-white flex items-center justify-center shrink-0">
+                  <Target className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-base font-bold text-text-primary">
+                    Complete Your Diagnostic Assessment to Unlock Learning Modules
+                  </h2>
+                  <p className="text-xs text-text-secondary mt-1 max-w-lg">
+                    Before you can access your {isSelfEnrolled ? "NCERT curriculum" : "learning modules"}, take a
+                    short adaptive quiz that finds any weak topics from previous classes. This is a
+                    one-time assessment — you won't be asked to retake it.
+                  </p>
+                  <Link href="/dashboard/diagnostic-quiz" className="inline-block mt-4">
+                    <Button variant="primary" size="sm">
+                      {quizStatus.in_progress_attempt_id ? "Continue Quiz" : "Start Quiz"}
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {!needsSetup && quizStatus?.completed && (
+            <div className="glass rounded-[var(--radius-md)] p-4 border border-border-primary flex items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
+                <span className="text-sm text-text-primary font-semibold">Diagnostic Assessment Completed</span>
+              </div>
+              <Link href="/dashboard/diagnostic-quiz" className="text-xs text-brand font-semibold hover:underline">
+                View My Results →
+              </Link>
+            </div>
+          )}
+
+          {!needsSetup && quizStatus?.completed && (
+          <>
           <h2 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
             <Layers className="w-5 h-5 text-brand" />
             <span>
@@ -480,46 +658,57 @@ function StudentDashboardView({
               <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
             </div>
           ) : isSelfEnrolled ? (
-            /* Self-Enrolled NCERT Curriculum Display */
+            /* Self-Enrolled NCERT Curriculum Display — subject groups ordered by learning-path priority */
             ncertBooks.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {ncertBooks.map((book) => (
-                  <div
-                    key={book.id}
-                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                          {book.subject}
-                        </span>
-                        <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">
-                          NCERT Book
-                        </span>
-                      </div>
-                      <h3 className="text-sm font-bold text-text-primary">{book.title}</h3>
-                      <p className="text-xs text-text-secondary mt-1 line-clamp-2">
-                        {book.description}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-border-primary/50 flex items-center justify-between">
-                      <span className="text-[11px] text-text-tertiary">Official NCERT Standard</span>
-                      {book.file_url ? (
-                        <a
-                          href={formatPdfUrl(book.file_url)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-brand font-semibold hover:underline"
+              <div className="space-y-6">
+                {groupBySubjectPriority(ncertBooks, subjectPriority).map((group, idx) => (
+                  <div key={group.subject}>
+                    <SubjectGroupHeader
+                      subject={group.subject}
+                      priorityInfo={group.priorityInfo}
+                      isTopPriority={idx === 0}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {group.items.map((book) => (
+                        <div
+                          key={book.id}
+                          className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
                         >
-                          <FileText className="w-3.5 h-3.5" />
-                          Study Book PDF →
-                        </a>
-                      ) : (
-                        <span className="text-xs text-amber-500 font-semibold italic">
-                          PDF Pending Upload
-                        </span>
-                      )}
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
+                                {book.subject}
+                              </span>
+                              <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">
+                                NCERT Book
+                              </span>
+                            </div>
+                            <h3 className="text-sm font-bold text-text-primary">{book.title}</h3>
+                            <p className="text-xs text-text-secondary mt-1 line-clamp-2">
+                              {book.description}
+                            </p>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-border-primary/50 flex items-center justify-between">
+                            <span className="text-[11px] text-text-tertiary">Official NCERT Standard</span>
+                            {book.file_url ? (
+                              <a
+                                href={formatPdfUrl(book.file_url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-brand font-semibold hover:underline"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                Study Book PDF →
+                              </a>
+                            ) : (
+                              <span className="text-xs text-amber-500 font-semibold italic">
+                                PDF Pending Upload
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -534,37 +723,48 @@ function StudentDashboardView({
               </div>
             )
           ) : (
-            /* School-Enrolled Modules Display */
+            /* School-Enrolled Modules Display — subject groups ordered by learning-path priority */
             modules.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {modules.map((mod) => (
-                  <div
-                    key={mod.id}
-                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                          {mod.subject}
-                        </span>
-                        <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
-                      </div>
-                      <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
-                    </div>
+              <div className="space-y-6">
+                {groupBySubjectPriority(modules, subjectPriority).map((group, idx) => (
+                  <div key={group.subject}>
+                    <SubjectGroupHeader
+                      subject={group.subject}
+                      priorityInfo={group.priorityInfo}
+                      isTopPriority={idx === 0}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {group.items.map((mod) => (
+                        <div
+                          key={mod.id}
+                          className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
+                                {mod.subject}
+                              </span>
+                              <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
+                            </div>
+                            <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
+                          </div>
 
-                    {mod.file_url ? (
-                      <a
-                        href={formatPdfUrl(mod.file_url)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        Open PDF Module
-                      </a>
-                    ) : (
-                      <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module Content</span>
-                    )}
+                          {mod.file_url ? (
+                            <a
+                              href={formatPdfUrl(mod.file_url)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              Open PDF Module
+                            </a>
+                          ) : (
+                            <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module Content</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -578,6 +778,8 @@ function StudentDashboardView({
                 </p>
               </div>
             )
+          )}
+          </>
           )}
         </div>
       )}
@@ -723,9 +925,16 @@ function SchoolDashboardView({
   school: SchoolProfile;
   activeTab?: string;
 }) {
+  const router = useRouter();
+  const { jobFor, unwatch, completionNonce } = useModuleProcessing();
   const [selectedClass, setSelectedClass] = useState<number>(1);
   const [modules, setModules] = useState<ModuleOut[]>([]);
   const [loadingModules, setLoadingModules] = useState<boolean>(false);
+  const [schoolSubjects, setSchoolSubjects] = useState<SchoolSubjectDetail[]>([]);
+  const [loadingSubjects, setLoadingSubjects] = useState<boolean>(false);
+  const [moduleToDelete, setModuleToDelete] = useState<ModuleOut | null>(null);
+  const [quizSummaries, setQuizSummaries] = useState<StudentQuizSummaryOut[]>([]);
+  const [loadingQuizSummaries, setLoadingQuizSummaries] = useState<boolean>(false);
 
   const fetchModules = () => {
     setLoadingModules(true);
@@ -735,11 +944,44 @@ function SchoolDashboardView({
       .finally(() => setLoadingModules(false));
   };
 
+  const fetchSubjects = () => {
+    setLoadingSubjects(true);
+    getSchoolSubjects(selectedClass)
+      .then((res) => setSchoolSubjects(res))
+      .catch((err) => console.log("School subjects fetch note:", err.message))
+      .finally(() => setLoadingSubjects(false));
+  };
+
+  const fetchQuizSummaries = () => {
+    setLoadingQuizSummaries(true);
+    getSchoolClassQuizSummaries(selectedClass)
+      .then((res) => setQuizSummaries(res))
+      .catch((err) => console.log("Class quiz summaries fetch note:", err.message))
+      .finally(() => setLoadingQuizSummaries(false));
+  };
+
+  // `completionNonce` changes when a background extraction reaches a result, so
+  // the list re-reads the module records without polling on its own.
   useEffect(() => {
     if (activeTab === "modules" || activeTab === "overview") {
       fetchModules();
+      fetchSubjects();
+      fetchQuizSummaries();
     }
-  }, [selectedClass, activeTab]);
+  }, [selectedClass, activeTab, completionNonce]);
+
+  /** Live job status wins over the record fetched with the list. */
+  const statusOf = (mod: ModuleOut): ModuleDisplayStatus =>
+    jobFor(mod.id)?.status ?? mod.ocr_status ?? "na";
+
+  const classSubjects = schoolSubjects.filter((s) => s.class_number === selectedClass);
+  const unassignedModules = modules.filter(
+    (m) =>
+      !classSubjects.some(
+        (s) =>
+          s.subject.trim().toLowerCase() === (m.subject || "").trim().toLowerCase()
+      )
+  );
 
   return (
     <div className="space-y-6">
@@ -790,6 +1032,70 @@ function SchoolDashboardView({
               <span className="text-[11px] text-text-secondary">{school.email}</span>
             </div>
           </div>
+
+          {/* Class Diagnostic Quiz Roster — class teacher view of each student's result */}
+          <div>
+            <h2 className="text-lg font-bold text-text-primary flex items-center gap-2 mb-4">
+              <Target className="w-5 h-5 text-brand" />
+              <span>Class {selectedClass} Diagnostic Results</span>
+            </h2>
+
+            {loadingQuizSummaries ? (
+              <div className="py-12 flex justify-center">
+                <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : quizSummaries.length > 0 ? (
+              <div className="space-y-3">
+                {quizSummaries.map((s) => (
+                  <div
+                    key={s.student_unique_number}
+                    className="glass rounded-[var(--radius-md)] p-4 border border-border-primary"
+                  >
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface border border-border-primary font-bold text-brand">
+                          {s.student_unique_number}
+                        </span>
+                        <span className="text-xs text-text-secondary">{s.student_email}</span>
+                      </div>
+                      {s.completed ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-text-primary">
+                            {s.overall_score !== null ? `${s.overall_score}%` : "—"}
+                          </span>
+                          {s.gaps_found > 0 && (
+                            <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                              {s.gaps_found} gap{s.gaps_found === 1 ? "" : "s"}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-text-tertiary italic">Not completed yet</span>
+                      )}
+                    </div>
+                    {s.ai_summary_status === "ready" && s.ai_summary && (
+                      <p className="text-xs text-text-secondary mt-2.5 pt-2.5 border-t border-border-primary/50 leading-relaxed">
+                        {s.ai_summary}
+                      </p>
+                    )}
+                    {s.completed && s.ai_summary_status === "pending" && (
+                      <p className="text-[10px] text-text-tertiary mt-2 italic">Summary generating...</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
+                <Target className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
+                <h3 className="text-sm font-semibold text-text-primary">
+                  No Students in Class {selectedClass} Yet
+                </h3>
+                <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
+                  Once students register under this branch and set their class, their diagnostic quiz results will appear here.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -803,92 +1109,358 @@ function SchoolDashboardView({
                 <span>Class Curriculum & Learning Modules</span>
               </h2>
               <p className="text-xs text-text-secondary mt-0.5">
-                Manage PDF modules, OCR documents, and curriculum content for each class.
+                Manage PDF modules, textbook chapters, and OCR documents for each registered subject.
               </p>
             </div>
 
-            {/* Class Tabs */}
-            <div className="flex items-center gap-1 bg-surface-hover p-1 rounded-[var(--radius-md)] border border-border-primary">
-              {[1, 2, 3, 4, 5].map((cls) => (
-                <button
-                  key={cls}
-                  onClick={() => setSelectedClass(cls)}
-                  className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
-                    selectedClass === cls
-                      ? "bg-brand text-white shadow-sm"
-                      : "text-text-secondary hover:text-text-primary hover:bg-surface"
-                  }`}
-                >
-                  Class {cls}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() =>
+                  router.push(`/dashboard/modules/upload?class=${selectedClass}`)
+                }
+                className="text-xs"
+              >
+                <Upload className="w-3.5 h-3.5 mr-1" />
+                Upload Module
+              </Button>
+
+              {/* Class Tabs */}
+              <div className="flex items-center gap-1 bg-surface-hover p-1 rounded-[var(--radius-md)] border border-border-primary">
+                {[1, 2, 3, 4, 5].map((cls) => (
+                  <button
+                    key={cls}
+                    onClick={() => setSelectedClass(cls)}
+                    className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
+                      selectedClass === cls
+                        ? "bg-brand text-white shadow-sm"
+                        : "text-text-secondary hover:text-text-primary hover:bg-surface"
+                    }`}
+                  >
+                    Class {cls}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Modules List or Empty State */}
-          {loadingModules ? (
-            <div className="py-12 flex justify-center">
-              <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+          {/* Subject-Wise Curriculum Sections */}
+          {loadingModules || loadingSubjects ? (
+            <div className="py-16 flex flex-col items-center justify-center gap-3">
+              <div className="w-8 h-8 border-3 border-brand border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-text-tertiary">Loading Class {selectedClass} subjects &amp; modules…</p>
             </div>
-          ) : modules.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {modules.map((mod) => (
-                <div
-                  key={mod.id}
-                  className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                        {mod.subject}
-                      </span>
-                      <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
+          ) : classSubjects.length > 0 ? (
+            <div className="space-y-6">
+              {classSubjects.map((sub) => {
+                const subModules = modules.filter(
+                  (m) =>
+                    (m.subject || "").trim().toLowerCase() === sub.subject.trim().toLowerCase()
+                );
+
+                return (
+                  <div
+                    key={sub.id || sub.subject}
+                    className="glass rounded-[var(--radius-lg)] border border-border-primary p-5 space-y-4"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-primary/60">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-[var(--radius-md)] bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                          <BookOpen className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm font-bold text-text-primary">
+                              {sub.subject}
+                            </h3>
+                            {sub.publisher_name && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-brand/10 text-brand border border-border-brand">
+                                {sub.publisher_name}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-text-tertiary mt-0.5">
+                            Class {selectedClass} · {subModules.length}{" "}
+                            {subModules.length === 1 ? "Chapter / PDF" : "Chapters / PDFs"} uploaded
+                          </p>
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/modules/upload?class=${selectedClass}&subject=${encodeURIComponent(
+                              sub.subject
+                            )}`
+                          )
+                        }
+                        className="text-xs self-start sm:self-auto"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1 text-brand" />
+                        Upload PDF for {sub.subject}
+                      </Button>
                     </div>
-                    <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
+
+                    {/* Modules Under This Subject */}
+                    {subModules.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                        {subModules.map((mod) => {
+                          const status = statusOf(mod);
+                          const job = jobFor(mod.id);
+                          const ocrPdfUrl = job?.ocrPdfUrl ?? mod.ocr_pdf_url ?? null;
+
+                          return (
+                            <div
+                              key={mod.id}
+                              className="rounded-[var(--radius-md)] border border-border-primary bg-surface/60 hover:border-brand p-4 transition-all flex flex-col justify-between gap-3"
+                            >
+                              <div>
+                                <div className="flex items-center justify-between gap-2 mb-1.5">
+                                  <span className="text-[10px] font-bold text-brand uppercase tracking-wide">
+                                    Chapter / Material
+                                  </span>
+                                  <button
+                                    onClick={() => setModuleToDelete(mod)}
+                                    className="text-text-tertiary hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-500/10 cursor-pointer"
+                                    title={`Delete "${mod.title}"`}
+                                    aria-label={`Delete ${mod.title}`}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                                <h4 className="text-xs font-bold text-text-primary line-clamp-2">
+                                  {mod.title}
+                                </h4>
+
+                                <div className="mt-2.5">
+                                  <ModuleStatusBadge
+                                    status={status}
+                                    title={job?.message ?? undefined}
+                                  />
+                                </div>
+
+                                {status === "failed" && (
+                                  <p className="text-[10px] text-text-secondary mt-1.5 leading-relaxed">
+                                    Text could not be extracted. Re-upload to run extraction again.
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="pt-2.5 border-t border-border-primary/50 flex items-center justify-between gap-2 text-xs">
+                                {mod.file_url ? (
+                                  <a
+                                    href={formatPdfUrl(mod.file_url)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline"
+                                  >
+                                    <FileText className="w-3 h-3" />
+                                    View PDF
+                                  </a>
+                                ) : (
+                                  <span className="text-[11px] text-text-tertiary italic">No File</span>
+                                )}
+
+                                {status === "done" && ocrPdfUrl && (
+                                  <a
+                                    href={formatPdfUrl(ocrPdfUrl)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline"
+                                  >
+                                    <Layers className="w-3 h-3" />
+                                    Extracted Text
+                                  </a>
+                                )}
+
+                                {status === "failed" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      router.push(
+                                        `/dashboard/modules/upload?class=${mod.class_number}&replace=${mod.id}`
+                                      )
+                                    }
+                                    className="text-[10px] py-1 px-2"
+                                  >
+                                    <RefreshCw className="w-3 h-3 mr-1" />
+                                    Retry
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/modules/upload?class=${selectedClass}&subject=${encodeURIComponent(
+                              sub.subject
+                            )}`
+                          )
+                        }
+                        className="rounded-[var(--radius-md)] border border-dashed border-border-primary/80 bg-surface/30 p-6 text-center hover:bg-surface-hover/50 hover:border-brand transition-colors cursor-pointer space-y-2 group"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-surface border border-border-primary flex items-center justify-center mx-auto text-text-tertiary group-hover:text-brand group-hover:border-brand transition-colors">
+                          <Upload className="w-4 h-4" />
+                        </div>
+                        <p className="text-xs font-semibold text-text-secondary group-hover:text-text-primary">
+                          No PDF chapters uploaded yet for {sub.subject}
+                        </p>
+                        <p className="text-[11px] text-text-tertiary max-w-xs mx-auto">
+                          Click to upload textbook chapters or study notes for Class {selectedClass} students.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Unassigned / General Modules Section if any */}
+              {unassignedModules.length > 0 && (
+                <div className="glass rounded-[var(--radius-lg)] border border-border-primary p-5 space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-border-primary/60">
+                    <div>
+                      <h3 className="text-sm font-bold text-text-primary">
+                        Additional / General Modules
+                      </h3>
+                      <p className="text-[11px] text-text-tertiary mt-0.5">
+                        {unassignedModules.length} module(s) not mapped to specific registered subjects
+                      </p>
+                    </div>
                   </div>
 
-                  {mod.file_url ? (
-                    <a
-                      href={formatPdfUrl(mod.file_url)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      View Module Document
-                    </a>
-                  ) : (
-                    <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module (No File)</span>
-                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {unassignedModules.map((mod) => {
+                      const status = statusOf(mod);
+                      const job = jobFor(mod.id);
+                      const ocrPdfUrl = job?.ocrPdfUrl ?? mod.ocr_pdf_url ?? null;
+
+                      return (
+                        <div
+                          key={mod.id}
+                          className="rounded-[var(--radius-md)] border border-border-primary bg-surface/60 p-4 flex flex-col justify-between gap-3"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <span className="text-[10px] font-bold text-brand uppercase tracking-wide">
+                                {mod.subject || "General"}
+                              </span>
+                              <button
+                                onClick={() => setModuleToDelete(mod)}
+                                className="text-text-tertiary hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-500/10 cursor-pointer"
+                                title={`Delete "${mod.title}"`}
+                                aria-label={`Delete ${mod.title}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <h4 className="text-xs font-bold text-text-primary line-clamp-2">
+                              {mod.title}
+                            </h4>
+
+                            <div className="mt-2.5">
+                              <ModuleStatusBadge
+                                status={status}
+                                title={job?.message ?? undefined}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="pt-2.5 border-t border-border-primary/50 flex items-center justify-between text-xs">
+                            {mod.file_url ? (
+                              <a
+                                href={formatPdfUrl(mod.file_url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline"
+                              >
+                                <FileText className="w-3 h-3" />
+                                View PDF
+                              </a>
+                            ) : (
+                              <span className="text-[11px] text-text-tertiary italic">No File</span>
+                            )}
+
+                            {status === "done" && ocrPdfUrl && (
+                              <a
+                                href={formatPdfUrl(ocrPdfUrl)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline"
+                              >
+                                <Layers className="w-3 h-3" />
+                                Extracted Text
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
           ) : (
             <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed space-y-3">
               <BookOpen className="w-10 h-10 text-text-tertiary mx-auto opacity-50" />
               <h3 className="text-sm font-semibold text-text-primary">
-                No Modules Added for Class {selectedClass}
+                No Subjects Registered for Class {selectedClass}
               </h3>
               <p className="text-xs text-text-secondary max-w-sm mx-auto">
-                Attach NCERT books with uploaded PDF files from the NCERT Library tab to make content available for Class {selectedClass} students & AI quizzes.
+                Upload your curriculum books or worksheets as PDFs to make content available for Class {selectedClass} students &amp; AI quizzes.
               </p>
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() =>
+                    router.push(`/dashboard/modules/upload?class=${selectedClass}`)
+                  }
+                  className="text-xs"
+                >
+                  <Upload className="w-3.5 h-3.5 mr-1" />
+                  Upload Module
+                </Button>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* TAB: NCERT BOOKS MANAGEMENT */}
-      {activeTab === "ncert" && (
-        <NCERTBookManagementPanel onModuleAttached={fetchModules} />
-      )}
+      {/* TAB: ADMINISTRATOR REQUESTS (school verification — owner approval) */}
+      {activeTab === "admin-requests" && <AdminRequestsPanel />}
 
       {/* TAB: TEACHER MANAGEMENT */}
       {activeTab === "teachers" && <SchoolTeacherManagement />}
+
+      {/* DELETE MODULE CONFIRMATION */}
+      {moduleToDelete && (
+        <DeleteModuleDialog
+          module={moduleToDelete}
+          classNumber={moduleToDelete.class_number}
+          isProcessing={isProcessing(statusOf(moduleToDelete))}
+          onClose={() => setModuleToDelete(null)}
+          onDeleted={(moduleId) => {
+            unwatch(moduleId);
+            setModuleToDelete(null);
+            setModules((prev) => prev.filter((m) => m.id !== moduleId));
+            fetchModules();
+          }}
+        />
+      )}
     </div>
   );
 }
 
 // ── Parent Dashboard View ────────────────────────────────────────────────────
+
 
 function ParentDashboardView({
   parent,
@@ -1182,14 +1754,113 @@ function ParentDashboardView({
 
       {/* TAB: REPORTS */}
       {activeTab === "reports" && (
-        <div className="glass rounded-[var(--radius-lg)] p-8 text-center border border-border-primary space-y-3">
-          <Award className="w-10 h-10 text-brand mx-auto" />
-          <h3 className="text-base font-bold text-text-primary">Academic Reports & Progress Analytics</h3>
-          <p className="text-xs text-text-secondary max-w-md mx-auto">
-            View detailed quiz performance, completion rates, and personalized feedback for all linked children.
+        <div className="space-y-6">
+          <div className="flex items-center gap-2">
+            <Award className="w-5 h-5 text-brand" />
+            <h2 className="text-base font-bold text-text-primary">Academic Reports & Progress Analytics</h2>
+          </div>
+          <p className="text-xs text-text-secondary max-w-md">
+            Diagnostic quiz performance, gap topics, and AI-generated summaries for each linked child.
           </p>
+
+          {loadingChildren ? (
+            <div className="py-12 flex justify-center">
+              <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : childrenList.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {childrenList.map((child) => (
+                <ChildCard key={child.id} child={child} />
+              ))}
+            </div>
+          ) : (
+            <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
+              <Users className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
+              <h3 className="text-sm font-semibold text-text-primary">No Wards Linked Yet</h3>
+              <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
+                Link a child from the Children tab to see their diagnostic assessment results here.
+              </p>
+            </div>
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Child Card (with diagnostic quiz summary) ────────────────────────────────
+
+function ChildCard({ child }: { child: ChildLinkOut }) {
+  const [result, setResult] = useState<GapReportOut | null>(null);
+  const [loadingResult, setLoadingResult] = useState<boolean>(true);
+
+  useEffect(() => {
+    getChildQuizResult(child.student_unique_number)
+      .then((res) => setResult(res))
+      .catch((err) => console.log("Child quiz result fetch note:", err.message))
+      .finally(() => setLoadingResult(false));
+  }, [child.student_unique_number]);
+
+  return (
+    <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all">
+      <div className="flex items-center justify-between mb-3">
+        <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-xs">
+          ID
+        </div>
+        <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface border border-border-primary font-bold text-brand">
+          {child.student_unique_number}
+        </span>
+      </div>
+      <p className="text-xs text-text-secondary mb-3">
+        Linked on {new Date(child.created_at).toLocaleDateString()}
+      </p>
+
+      <div className="pt-3 border-t border-border-primary/50">
+        <span className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
+          Gap Identification Quiz
+        </span>
+        {loadingResult ? (
+          <div className="mt-2 h-4 w-24 rounded bg-surface-hover animate-pulse" />
+        ) : result === null ? (
+          <p className="text-xs text-text-secondary mt-1.5">Not completed yet.</p>
+        ) : (
+          <div className="mt-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-bold text-text-primary">
+                {result.overall_score !== null ? `${result.overall_score}%` : "—"}
+              </span>
+              <span className="text-[10px] text-text-tertiary">overall score</span>
+            </div>
+            {result.gaps.length === 0 ? (
+              <p className="text-xs text-emerald-500 mt-1">No gaps found.</p>
+            ) : (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {result.gaps.slice(0, 3).map((gap) => (
+                  <span
+                    key={gap.topic_code}
+                    className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded"
+                  >
+                    {gap.subject}: Class {gap.originating_class}
+                  </span>
+                ))}
+                {result.gaps.length > 3 && (
+                  <span className="text-[10px] text-text-tertiary px-1.5 py-0.5">
+                    +{result.gaps.length - 3} more
+                  </span>
+                )}
+              </div>
+            )}
+            {result.ai_summary_status === "ready" && result.ai_summary && (
+              <p className="text-xs text-text-secondary mt-2.5 pt-2.5 border-t border-border-primary/50 leading-relaxed">
+                {result.ai_summary}
+              </p>
+            )}
+            {result.ai_summary_status === "pending" && (
+              <p className="text-[10px] text-text-tertiary mt-2 italic">Summary generating...</p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1253,6 +1924,9 @@ function AdminDashboardView({
 
       {/* TAB: NCERT MASTER CATALOGUE */}
       {activeTab === "ncert_master" && <NCERTBookManagementPanel />}
+
+      {/* TAB: REGISTRATIONS → SCHOOL REQUESTS */}
+      {activeTab === "school-requests" && <SchoolRequestsPanel />}
 
       {/* TAB: SCHOOLS / INSTITUTIONS */}
       {activeTab === "schools" && (

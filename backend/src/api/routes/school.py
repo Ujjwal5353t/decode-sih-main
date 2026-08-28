@@ -3,7 +3,10 @@ School dashboard routes (protected — school role required).
 
 GET  /school/me                                  — profile
 GET  /school/classes                             — list available classes (1–5)
+GET  /school/subject-setup                       — class-wise subject options + current selection
+PUT  /school/subject-setup                       — save the subjects this school teaches
 GET  /school/classes/{class_number}/modules      — modules for a class
+GET  /school/classes/{class_number}/quiz-summaries — students' diagnostic quiz results
 POST /school/classes/{class_number}/modules/pdf  — upload PDF module
 POST /school/classes/{class_number}/modules/images — upload image(s) → PDF module
 POST /school/classes/{class_number}/modules/ncert  — add pre-loaded NCERT book
@@ -23,16 +26,25 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_session
 from src.core.dependencies import get_current_school
 from src.models.module import Module, OcrStatus
 from src.models.school import School
+from src.models.school_subject import SchoolClassSubject
 from src.schemas.module import ModuleOut, NCERTModuleAddRequest, UpdateModuleTitleRequest
+from src.schemas.quiz import StudentQuizSummaryOut
 from src.schemas.school import SchoolProfile
+from src.schemas.school_subject import (
+    ClassSubjectOptions,
+    SchoolSubjectDetail,
+    SubjectSetupOut,
+    SubjectSetupRequest,
+)
 from src.schemas.teacher import AssignClassRequest, TeacherClassOut, TeacherListItem
-from src.services import module_service, teacher_service
+from src.services import module_service, quiz_service, school_subject_service, teacher_service
 
 router = APIRouter(prefix="/school", tags=["School Dashboard"])
 
@@ -58,7 +70,74 @@ async def get_school_profile(school: School = Depends(get_current_school)):
     summary="List available classes (always 1–5)",
 )
 async def list_classes(_: School = Depends(get_current_school)):
-    return list(range(1, 6))
+    return list(school_subject_service.SUPPORTED_CLASSES)
+
+
+@router.get(
+    "/subjects",
+    response_model=list[SchoolSubjectDetail],
+    summary="Get all configured class-wise subjects and publishers for this school",
+)
+async def get_school_subjects(
+    class_number: Optional[int] = None,
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    stmt = select(SchoolClassSubject).where(SchoolClassSubject.school_id == school.id)
+    if class_number is not None:
+        stmt = stmt.where(SchoolClassSubject.class_number == class_number)
+    stmt = stmt.order_by(SchoolClassSubject.class_number, SchoolClassSubject.subject)
+    res = await session.execute(stmt)
+    return res.scalars().all()
+
+
+# ── First-run setup: which subjects this school teaches, per class ────────────
+
+@router.get(
+    "/subject-setup",
+    response_model=SubjectSetupOut,
+    summary="Class-wise subject options and this school's current selection",
+)
+async def get_subject_setup(
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    catalog = await school_subject_service.get_catalog(session)
+    selected = await school_subject_service.get_selection(school, session)
+
+    return SubjectSetupOut(
+        completed=school_subject_service.is_complete(school),
+        configured_at=school.subjects_configured_at,
+        classes=[
+            ClassSubjectOptions(
+                class_number=class_number,
+                class_label=school_subject_service.class_label(class_number),
+                subject_count=len(subjects),
+                subjects=subjects,
+                selected=selected.get(class_number, []),
+            )
+            for class_number, subjects in catalog.items()
+        ],
+    )
+
+
+@router.put(
+    "/subject-setup",
+    response_model=SubjectSetupOut,
+    summary="Save the subjects this school teaches for each class",
+)
+async def save_subject_setup(
+    data: SubjectSetupRequest,
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    await school_subject_service.save_selection(
+        school,
+        [(entry.class_number, entry.subjects) for entry in data.classes],
+        session,
+    )
+    await session.flush()
+    return await get_subject_setup(school=school, session=session)
 
 
 @router.get(
@@ -74,6 +153,22 @@ async def get_class_modules(
     return await module_service.get_class_modules(school.branch_name, class_number, session)
 
 
+@router.get(
+    "/classes/{class_number}/quiz-summaries",
+    response_model=list[StudentQuizSummaryOut],
+    summary="Get every student's diagnostic quiz result for a class (class teacher view)",
+)
+async def get_class_quiz_summaries(
+    class_number: int,
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    summaries = await quiz_service.get_class_quiz_summaries(
+        school.branch_name, class_number, session
+    )
+    return [StudentQuizSummaryOut(**s) for s in summaries]
+
+
 @router.post(
     "/classes/{class_number}/modules/pdf",
     response_model=ModuleOut,
@@ -84,13 +179,16 @@ async def upload_pdf_module(
     class_number: int,
     title: Annotated[str, Form()],
     file: Annotated[UploadFile, File(description="PDF file (max 50 MB)")],
-    subject: Annotated[Optional[str], Form()] = "General",
+    subject: Annotated[
+        Optional[str],
+        Form(description="Mathematics | English | Hindi | EVS — enables this module as a "
+                          "diagnostic-quiz question source for this school"),
+    ] = None,
     school: School = Depends(get_current_school),
     session: AsyncSession = Depends(get_session),
 ):
-    eff_subject = subject or "General"
     module = await module_service.add_pdf_module(
-        school.branch_name, class_number, title, file, session, subject=eff_subject
+        school.branch_name, class_number, title, file, session, subject=subject
     )
     return ModuleOut.model_validate(module)
 
@@ -105,13 +203,16 @@ async def upload_images_module(
     class_number: int,
     title: Annotated[str, Form()],
     files: Annotated[list[UploadFile], File(description="JPEG/PNG images (max 50 MB each)")],
-    subject: Annotated[Optional[str], Form()] = "General",
+    subject: Annotated[
+        Optional[str],
+        Form(description="Mathematics | English | Hindi | EVS — enables this module as a "
+                          "diagnostic-quiz question source for this school"),
+    ] = None,
     school: School = Depends(get_current_school),
     session: AsyncSession = Depends(get_session),
 ):
-    eff_subject = subject or "General"
     module = await module_service.add_images_module(
-        school.branch_name, class_number, title, files, session, subject=eff_subject
+        school.branch_name, class_number, title, files, session, subject=subject
     )
     return ModuleOut.model_validate(module)
 
