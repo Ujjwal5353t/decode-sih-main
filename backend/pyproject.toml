@@ -29,4 +29,6 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    # Backing store for the in-memory test databases in tests/.
+    "aiosqlite>=0.20.0",
 ]

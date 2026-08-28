@@ -198,6 +198,48 @@ async def init_db() -> None:
             text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS option_asset_keys JSONB;")
         )
 
+        # Migration: append-only learning-activity event log (see
+        # src/models/learning.py). Created here as well as via create_all so
+        # deployments that run with AUTO_CREATE_TABLES off still get it, the
+        # same way the publishers tables above are handled.
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS learning_events (
+                    id UUID PRIMARY KEY,
+                    client_event_id VARCHAR(80) NOT NULL,
+                    student_id UUID NOT NULL REFERENCES students(id),
+                    event_type VARCHAR(30) NOT NULL,
+                    module_key VARCHAR(160) NOT NULL,
+                    subject VARCHAR(100) NOT NULL,
+                    class_number INTEGER NOT NULL,
+                    lesson_id UUID REFERENCES lessons(id),
+                    occurred_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+                    received_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+                    duration_ms INTEGER,
+                    detail JSON
+                );
+                """
+            )
+        )
+        # The idempotency guarantee the offline sync queue relies on: a
+        # re-sent event can never become a second row.
+        await conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_learning_event_client_id "
+                "ON learning_events (student_id, client_event_id);"
+            )
+        )
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_learning_events_student_id ON learning_events (student_id);")
+        )
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_learning_events_module_key ON learning_events (module_key);")
+        )
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_learning_events_occurred_at ON learning_events (occurred_at);")
+        )
+
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency — yields an async DB session."""

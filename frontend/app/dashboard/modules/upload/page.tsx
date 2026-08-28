@@ -1,15 +1,16 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Building2, Sparkles } from "lucide-react";
+import { ArrowLeft, Building2, Menu } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { DashboardSidebar } from "@/components/dashboard/Sidebar";
 import { ModuleUploadWizard } from "@/components/school/module-upload/ModuleUploadWizard";
 import { CLASS_OPTIONS } from "@/components/school/module-upload/primitives";
 import { useAuth } from "@/hooks/useAuth";
-import type { SchoolProfile } from "@/lib/api";
+import { getRolePermissions, type RolePermissionsResponse, type SchoolProfile } from "@/lib/api";
 
 function LoadingScreen({ message }: { message: string }) {
   return (
@@ -25,7 +26,9 @@ function LoadingScreen({ message }: { message: string }) {
 function ModuleUploadContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, logout } = useAuth();
+  const [permissions, setPermissions] = useState<RolePermissionsResponse | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
 
   // Only a signed-in school branch admin can upload class modules.
   useEffect(() => {
@@ -37,7 +40,15 @@ function ModuleUploadContent() {
     }
   }, [loading, user, role, router]);
 
-  if (loading || !user || role !== "school") {
+  useEffect(() => {
+    if (role) {
+      getRolePermissions(role)
+        .then((res) => setPermissions(res))
+        .catch((err) => console.log("Fetch permissions note:", err.message));
+    }
+  }, [role]);
+
+  if (loading || !user || role !== "school" || !permissions) {
     return <LoadingScreen message="Loading module upload..." />;
   }
 
@@ -51,25 +62,53 @@ function ModuleUploadContent() {
     : CLASS_OPTIONS[0];
 
   return (
-    <div className="min-h-screen flex flex-col bg-background relative">
-      <header className="sticky top-0 z-30 glass border-b border-border-primary px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div
-              className="w-9 h-9 rounded-[var(--radius-sm)] flex items-center justify-center"
-              style={{ background: "var(--gradient-brand)" }}
-            >
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-[family-name:var(--font-display)] text-lg font-bold text-text-primary group-hover:text-brand transition-colors">
-              VidyaSetu
-            </span>
-          </Link>
+    <div className="min-h-screen bg-background relative flex console">
+      {/* Left Dynamic RBAC Permissions Sidebar */}
+      <DashboardSidebar
+        permissions={permissions}
+        activeTab="modules"
+        onSelectTab={(tabId) => {
+          router.push(`/dashboard?tab=${tabId}`);
+        }}
+        user={user}
+        role={role}
+        isMobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+        logout={logout}
+      />
 
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand/10 border border-border-brand text-xs font-semibold text-brand uppercase tracking-wider">
+      {/* Main Content Area */}
+      <div className="lg:pl-72 flex-1 flex flex-col min-w-0 min-h-screen">
+        {/* Top Navbar Header */}
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--c-line)] bg-[var(--c-panel)] px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="p-2 rounded-[var(--radius-sm)] text-text-secondary hover:text-text-primary hover:bg-surface lg:hidden cursor-pointer"
+              aria-label="Open navigation sidebar"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-[15px] font-semibold tracking-[-0.01em] text-text-primary font-[family-name:var(--font-display)]">
+                  Curriculum Modules
+                </h1>
+                <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-brand/10 text-brand border border-border-brand">
+                  Class {initialClass}
+                </span>
+              </div>
+              <p className="text-xs text-text-secondary truncate hidden sm:block">
+                Upload, update, and manage PDF and image OCR modules for Classes 1 to 5
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/10 border border-border-brand text-xs font-semibold text-brand uppercase tracking-wider">
               <Building2 className="w-3.5 h-3.5" />
-              <span>school dashboard</span>
+              <span>{permissions?.role_label || `${school.branch_name} (${school.student_prefix})`}</span>
             </div>
 
             <ThemeToggle />
@@ -77,51 +116,49 @@ function ModuleUploadContent() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push("/dashboard")}
-              className="text-text-secondary"
+              onClick={() => router.push("/dashboard?tab=modules")}
+              className="text-text-secondary hover:text-text-primary text-xs px-2.5 sm:px-3"
             >
-              <ArrowLeft className="w-4 h-4 mr-1.5" />
-              Dashboard
+              <ArrowLeft className="w-4 h-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Back to Modules</span>
             </Button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="flex-1 max-w-5xl w-full mx-auto p-6 space-y-6">
-        <div>
-          <nav className="flex items-center gap-1.5 text-[11px] text-text-tertiary mb-2">
-            <Link href="/dashboard" className="hover:text-brand transition-colors">
-              Dashboard
-            </Link>
-            <span>/</span>
-            <Link href="/dashboard" className="hover:text-brand transition-colors">
-              Modules &amp; Content
-            </Link>
-            <span>/</span>
-            <span className="text-text-secondary font-semibold">Upload Module</span>
-          </nav>
+        <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-6">
+          <div>
+            <nav className="flex items-center gap-1.5 text-[11px] text-text-tertiary mb-2">
+              <Link href="/dashboard" className="hover:text-brand transition-colors">
+                Dashboard
+              </Link>
+              <span>/</span>
+              <Link href="/dashboard" className="hover:text-brand transition-colors">
+                Curriculum Modules
+              </Link>
+              <span>/</span>
+              <span className="text-text-secondary font-semibold">Upload Module</span>
+            </nav>
 
-          <h1 className="text-xl font-bold text-text-primary font-[family-name:var(--font-display)]">
-            Upload Module
-          </h1>
-          <p className="text-sm text-text-secondary mt-1">
-            Add a book, chapter or worksheet to {school.school_name} —{" "}
-            {school.branch_name}. Text is extracted on the server so the content can
-            power AI quizzes and adaptive lessons.
-          </p>
-        </div>
+            <h2 className="text-xl font-bold text-text-primary font-[family-name:var(--font-display)]">
+              Upload Learning Module
+            </h2>
+            <p className="text-sm text-text-secondary mt-1">
+              Add a book, chapter or worksheet to {school.school_name} — {school.branch_name}.
+              Text is extracted on the server so the content can power AI quizzes and adaptive lessons.
+            </p>
+          </div>
 
-        <ModuleUploadWizard
-          initialClass={initialClass}
-          initialSubject={requestedSubject}
-          branchName={school.branch_name}
-          replaceModuleId={searchParams.get("replace") ?? undefined}
-          onExit={() => router.push("/dashboard")}
-        />
-      </main>
+          <ModuleUploadWizard
+            initialClass={initialClass}
+            initialSubject={requestedSubject}
+            branchName={school.branch_name}
+            replaceModuleId={searchParams.get("replace") ?? undefined}
+            onExit={() => router.push("/dashboard")}
+          />
+        </main>
+      </div>
     </div>
   );
-
 }
 
 export default function ModuleUploadPage() {

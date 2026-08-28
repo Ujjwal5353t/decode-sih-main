@@ -4,6 +4,7 @@ Teacher dashboard routes (protected -- teacher role required).
 GET  /teacher/me
 GET  /teacher/classes
 GET  /teacher/classes/{class_number}/{section}/students
+GET  /teacher/classes/{class_number}/{section}/progress
 GET  /teacher/classes/{class_number}/{section}/modules
 GET  /teacher/classes/{class_number}/{section}/assignments
 POST /teacher/classes/{class_number}/{section}/assignments/upload-pdf   (multipart)
@@ -36,10 +37,16 @@ from src.schemas.teacher import (
     TeacherClassOut,
     TeacherProfile,
 )
+from src.schemas.learning import ClassProgressOut
 from src.schemas.student import StudentProfile
 from src.schemas.module import ModuleOut
 from src.schemas.chunk import ChapterOut, ChunkOut, RAGChunkSearchRequest, RAGSearchResult
-from src.services import teacher_service, module_service, chunk_service
+from src.services import (
+    teacher_service,
+    module_service,
+    chunk_service,
+    learning_progress_service,
+)
 
 router = APIRouter(prefix="/teacher", tags=["Teacher Dashboard"])
 
@@ -91,6 +98,33 @@ async def get_class_students(
         teacher.branch_name, class_number, section.upper(), session
     )
     return [StudentProfile.model_validate(s) for s in students]
+
+
+@router.get(
+    "/classes/{class_number}/{section}/progress",
+    response_model=ClassProgressOut,
+    summary="Learning-module progress for every student in a class section",
+)
+async def get_class_learning_progress(
+    class_number: int,
+    section: str,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Scoped twice over, both times from the token rather than the URL: the
+    teacher must hold an assignment for this class+section, and the roster is
+    read from their own branch. A class number the teacher is not assigned to
+    is a 403 even if it exists, so student ids never have to be trusted from
+    the frontend.
+    """
+    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session)
+    students = await teacher_service.get_class_students(
+        teacher.branch_name, class_number, section.upper(), session
+    )
+    return await learning_progress_service.get_class_progress(
+        students, class_number, section, session
+    )
 
 
 @router.get(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,6 +11,7 @@ import {
   Volume2,
   VolumeX,
   Sparkles,
+  CloudOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
@@ -25,7 +26,9 @@ import {
   playCelebrationSound,
   triggerHaptic,
 } from "@/lib/quizAudio";
-import { StudentProfile, LessonOut, LessonSlideOut, getLesson } from "@/lib/api";
+import { StudentProfile, LessonOut, LessonSlideOut } from "@/lib/api";
+import { loadLesson } from "@/lib/offline/contentCache";
+import { recordLearningEvent } from "@/lib/offline/learningEvents";
 
 export default function LessonViewerPage() {
   const router = useRouter();
@@ -84,6 +87,38 @@ function LessonFlow({ student }: { student: StudentProfile }) {
   const [mascotMood, setMascotMood] = useState<MascotMood>("idle");
   const [confettiTrigger, setConfettiTrigger] = useState<number>(0);
   const [muted, setMuted] = useState<boolean>(() => isSoundMuted());
+  const [stale, setStale] = useState<boolean>(false);
+
+  // When this lesson was opened, so "time spent" is measured rather than
+  // guessed. Wall-clock on one device — best effort, and the server drops
+  // implausible spans rather than believing them.
+  const openedAtRef = useRef<number>(0);
+  // Slides already reported, so re-visiting one by going Back does not
+  // record a second ACTIVITY_COMPLETED for it.
+  const reportedSlidesRef = useRef<Set<number>>(new Set());
+  const quizStartedRef = useRef<boolean>(false);
+
+  const track = useCallback(
+    (
+      eventType: Parameters<typeof recordLearningEvent>[0]["eventType"],
+      detail?: Record<string, unknown>
+    ) => {
+      if (!lesson) return;
+      void recordLearningEvent({
+        studentId: student.id,
+        eventType,
+        lessonId: lesson.id,
+        subject: lesson.subject,
+        classNumber: lesson.class_number,
+        detail: detail ?? null,
+        durationMs:
+          eventType === "LESSON_COMPLETED" && openedAtRef.current
+            ? Date.now() - openedAtRef.current
+            : null,
+      });
+    },
+    [lesson, student.id]
+  );
 
   const toggleMute = () => {
     setMuted((prev) => {
@@ -97,9 +132,13 @@ function LessonFlow({ student }: { student: StudentProfile }) {
     let cancelled = false;
     (async () => {
       try {
-        const data = await getLesson(lessonId);
+        // Cached per lesson id on first view, so losing connectivity part-way
+        // through a chapter does not end the session.
+        const result = await loadLesson(lessonId);
         if (cancelled) return;
-        setLesson(data);
+        setLesson(result.data);
+        setStale(result.stale);
+        openedAtRef.current = Date.now();
         setViewState("slide");
       } catch (err: any) {
         if (!cancelled) {
@@ -112,6 +151,21 @@ function LessonFlow({ student }: { student: StudentProfile }) {
       cancelled = true;
     };
   }, [lessonId]);
+
+  // Opening a lesson starts it. The matching MODULE_STARTED is derived by
+  // the server, which is the only side that sees every device's events.
+  useEffect(() => {
+    if (!lesson) return;
+    track("LESSON_STARTED");
+  }, [lesson, track]);
+
+  // The quick-check slide reaching the screen starts this lesson's quiz.
+  useEffect(() => {
+    if (!lesson || quizStartedRef.current) return;
+    if (lesson.slides[slideIdx]?.slide_type !== "check") return;
+    quizStartedRef.current = true;
+    track("QUIZ_STARTED", { slide_index: slideIdx });
+  }, [lesson, slideIdx, track]);
 
   // Mascot settles back to idle a beat after a reaction.
   useEffect(() => {
@@ -150,6 +204,14 @@ function LessonFlow({ student }: { student: StudentProfile }) {
 
   const handleNext = () => {
     if (slideIdx < slides.length - 1) {
+      // Moving on from a concept/example slide means that activity is done.
+      if (!reportedSlidesRef.current.has(slideIdx)) {
+        reportedSlidesRef.current.add(slideIdx);
+        track("ACTIVITY_COMPLETED", {
+          slide_index: slideIdx,
+          slide_type: currentSlide.slide_type,
+        });
+      }
       setSlideIdx((i) => i + 1);
       setSelectedOption(null);
     }
@@ -166,6 +228,14 @@ function LessonFlow({ student }: { student: StudentProfile }) {
     if (selectedOption !== null) return;
     setSelectedOption(idx);
     const correct = idx === checkSlide.correct_option_index;
+    // The check slide is this lesson's quiz. Answers are recorded per
+    // attempt; nothing here is scored or graded — the quiz-attempt system
+    // in /dashboard/diagnostic-quiz remains the assessment of record.
+    track("QUIZ_COMPLETED", {
+      slide_index: slideIdx,
+      selected_option_index: idx,
+      correct,
+    });
     if (correct) {
       if (!muted) playCorrectSound();
       setMascotMood("happy");
@@ -178,6 +248,7 @@ function LessonFlow({ student }: { student: StudentProfile }) {
   };
 
   const handleFinish = () => {
+    track("LESSON_COMPLETED");
     if (!muted) playCelebrationSound();
     setConfettiTrigger(Date.now());
     setMascotMood("celebrate");
@@ -215,6 +286,16 @@ function LessonFlow({ student }: { student: StudentProfile }) {
       </div>
 
       <main className="flex-1 max-w-3xl w-full mx-auto p-6">
+        {stale && (
+          <div className="mb-4 p-3 rounded bg-amber-500/10 text-amber-600 text-xs flex items-center gap-2">
+            <CloudOff className="w-4 h-4 shrink-0" />
+            <span>
+              You&apos;re offline — this lesson is loaded from your device, and your
+              progress will sync once you&apos;re back online.
+            </span>
+          </div>
+        )}
+
         {viewState === "slide" && (
           <>
             <div className="mb-5">

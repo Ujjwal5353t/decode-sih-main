@@ -28,6 +28,7 @@ import {
   getTeacherProfile,
   setupStudentClass as setupStudentClassApi,
 } from "@/lib/api";
+import { readCache, writeCache } from "@/lib/offline/db";
 
 type UserProfile = StudentProfile | SchoolProfile | ParentProfile | AdminProfile | TeacherProfile | null;
 
@@ -57,23 +58,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfileForRole = useCallback(async (currentRole: Role) => {
     try {
+      let profile: UserProfile = null;
       if (currentRole === "student") {
-        const profile = await getStudentProfile();
-        setUser(profile);
+        profile = await getStudentProfile();
       } else if (currentRole === "school") {
-        const profile = await getSchoolProfile();
-        setUser(profile);
+        profile = await getSchoolProfile();
       } else if (currentRole === "parent") {
-        const profile = await getParentProfile();
-        setUser(profile);
+        profile = await getParentProfile();
       } else if (currentRole === "admin") {
-        const profile = await getAdminProfile();
-        setUser(profile);
+        profile = await getAdminProfile();
       } else if (currentRole === "teacher") {
-        const profile = await getTeacherProfile();
-        setUser(profile);
+        profile = await getTeacherProfile();
       }
+      setUser(profile);
+      // Kept so an offline-first session can resume without a round trip.
+      if (profile) void writeCache(`profile:${currentRole}`, profile);
     } catch (err: any) {
+      // Only an actual rejection by the server means the session is invalid.
+      // A request that never got there (offline, server down) must not sign
+      // the learner out — offline learning depends on the session surviving
+      // a dead network.
+      const rejectedByServer = err?.status === 401 || err?.status === 403;
+      if (!rejectedByServer) {
+        const cached = await readCache<UserProfile>(`profile:${currentRole}`);
+        if (cached) {
+          setUser(cached);
+          return;
+        }
+      }
       console.error("Failed to fetch user profile:", err);
       // Clear invalid session
       clearStoredAuth();
