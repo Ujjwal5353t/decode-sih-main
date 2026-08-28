@@ -498,6 +498,18 @@ export async function getStudentModules(): Promise<ModuleOut[]> {
   return fetchApi<ModuleOut[]>("/student/modules");
 }
 
+export interface SubjectPriorityOut {
+  subject: string;
+  priority_rank: number;
+  gap_count: number;
+  avg_classes_behind: number;
+  gap_topics: string[];
+}
+
+export async function getSubjectPriority(): Promise<SubjectPriorityOut[]> {
+  return fetchApi<SubjectPriorityOut[]>("/student/subject-priority");
+}
+
 export async function getSchoolClasses(): Promise<number[]> {
   return fetchApi<number[]>("/school/classes");
 }

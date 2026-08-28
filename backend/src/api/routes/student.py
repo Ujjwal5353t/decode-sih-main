@@ -1,9 +1,10 @@
 """
 Student dashboard routes (protected — student role required).
 
-GET  /student/me             — student profile (includes unique_number, class, section)
-GET  /student/modules        — modules for the student's class (from their school branch)
-GET  /student/assignments    — assignments for the student's class+section
+GET  /student/me               — student profile (includes unique_number, class, section)
+GET  /student/modules          — modules for the student's class (from their school branch)
+GET  /student/subject-priority — simple rule-based subject ordering, from diagnostic quiz gaps
+GET  /student/assignments      — assignments for the student's class+section
 POST /student/assignments/{assignment_id}/submit  — mark as submitted
 GET  /student/assignments/{assignment_id}/feedback — get teacher feedback
 """
@@ -18,6 +19,7 @@ from src.core.database import get_session
 from src.core.dependencies import get_current_student
 from src.models.student import Student
 from src.schemas.module import ModuleOut
+from src.schemas.quiz import SubjectPriorityOut
 from src.schemas.student import StudentProfile
 from src.schemas.teacher import AssignmentOut, FeedbackOut, SubmissionOut
 from src.services import module_service, quiz_service, teacher_service
@@ -57,6 +59,33 @@ async def get_student_modules(
     return await module_service.get_class_modules(
         student.branch_name, student.class_number, session
     )
+
+
+@router.get(
+    "/subject-priority",
+    response_model=list[SubjectPriorityOut],
+    summary="Simple, rule-based subject ordering — which subjects to review first, based on diagnostic quiz gaps",
+)
+async def get_student_subject_priority(
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    from fastapi import HTTPException, status
+
+    if student.class_number is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please complete your class setup first via POST /auth/student/setup-class.",
+        )
+
+    if not await quiz_service.has_completed_diagnostic(student.id, session):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please complete your diagnostic assessment first via the Gap "
+                   "Identification Quiz (POST /quiz/start) before accessing modules.",
+        )
+
+    return await quiz_service.get_subject_priority(student, session)
 
 
 @router.get(

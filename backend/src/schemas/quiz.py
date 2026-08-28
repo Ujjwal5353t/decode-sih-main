@@ -93,6 +93,19 @@ class QuizStatusOut(BaseModel):
     in_progress_attempt_id: Optional[uuid.UUID]
 
 
+class SubjectPriorityOut(BaseModel):
+    """One subject's position in a student's learning order, now ranked by
+    a Bayesian Knowledge Tracing mastery estimate (avg_mastery) with the
+    old gap-count rule as a tiebreaker — see LEARNING_PATH.txt for the
+    plain-language explanation."""
+    subject: str
+    priority_rank: int
+    gap_count: int
+    avg_classes_behind: float
+    gap_topics: list[str]
+    avg_mastery: float
+
+
 class StudentQuizSummaryOut(BaseModel):
     """One row of the class teacher's roster view — a student plus their
     latest completed diagnostic, if any."""

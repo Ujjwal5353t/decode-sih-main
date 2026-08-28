@@ -76,6 +76,8 @@ import {
   StudentQuizSummaryOut,
   getStudentModules,
   getNCERTBooksForClass,
+  getSubjectPriority,
+  SubjectPriorityOut,
   getAllNCERTBooks,
   uploadNCERTBookPdf,
   createNCERTBook,
@@ -117,6 +119,61 @@ function formatPdfUrl(url: string | null | undefined): string | undefined {
   if (!url) return undefined;
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
   return `${apiBase}/files/view-pdf?url=${encodeURIComponent(url)}`;
+}
+
+// Simple, rule-based grouping — not a live personalization engine. Orders
+// a flat list of modules/books by subject, weakest-subject-first, using
+// the diagnostic-quiz-derived ranking from GET /student/subject-priority.
+// See LEARNING_PATH.txt for the plain-language write-up.
+function groupBySubjectPriority<T extends { subject?: string | null }>(
+  items: T[],
+  priority: SubjectPriorityOut[]
+): { subject: string; items: T[]; priorityInfo?: SubjectPriorityOut }[] {
+  const rankOf = new Map(priority.map((p) => [p.subject, p.priority_rank]));
+  const infoOf = new Map(priority.map((p) => [p.subject, p]));
+
+  const bySubject = new Map<string, T[]>();
+  for (const item of items) {
+    const subject = item.subject || "General";
+    if (!bySubject.has(subject)) bySubject.set(subject, []);
+    bySubject.get(subject)!.push(item);
+  }
+
+  return Array.from(bySubject.entries())
+    .map(([subject, groupItems]) => ({
+      subject,
+      items: groupItems,
+      priorityInfo: infoOf.get(subject),
+    }))
+    .sort((a, b) => (rankOf.get(a.subject) ?? 999) - (rankOf.get(b.subject) ?? 999));
+}
+
+function SubjectGroupHeader({
+  subject,
+  priorityInfo,
+  isTopPriority,
+}: {
+  subject: string;
+  priorityInfo?: SubjectPriorityOut;
+  isTopPriority: boolean;
+}) {
+  const hasGaps = !!priorityInfo && priorityInfo.gap_count > 0;
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <h3 className="text-sm font-bold text-text-primary">{subject}</h3>
+      {isTopPriority && hasGaps && (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand bg-brand/10 px-2 py-0.5 rounded-full border border-border-brand">
+          <Target className="w-3 h-3" /> Recommended first
+        </span>
+      )}
+      {hasGaps && priorityInfo!.gap_topics.length > 0 && (
+        <span className="text-[11px] text-text-tertiary truncate">
+          Review: {priorityInfo!.gap_topics.slice(0, 2).join(", ")}
+          {priorityInfo!.gap_topics.length > 2 ? "…" : ""}
+        </span>
+      )}
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -303,6 +360,7 @@ function StudentDashboardView({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [quizStatus, setQuizStatus] = useState<QuizStatusOut | null>(null);
   const [loadingQuizStatus, setLoadingQuizStatus] = useState<boolean>(true);
+  const [subjectPriority, setSubjectPriority] = useState<SubjectPriorityOut[]>([]);
 
   const isSelfEnrolled = student.enrollment_type === "self" || student.branch_name === "SELF";
   const needsSetup = isSelfEnrolled ? student.class_number === null : (student.class_number === null || student.section === null);
@@ -333,6 +391,12 @@ function StudentDashboardView({
         .catch((err) => console.log("School modules fetch note:", err.message))
         .finally(() => setLoadingModules(false));
     }
+    // Simple, rule-based ordering (not a live personalization engine) — see
+    // LEARNING_PATH.txt. Purely additive: groups/orders the same module
+    // list above, never blocks it if this call fails.
+    getSubjectPriority()
+      .then((res) => setSubjectPriority(res))
+      .catch((err) => console.log("Subject priority fetch note:", err.message));
   }, [needsSetup, quizStatus?.completed, student.class_number, isSelfEnrolled]);
 
   const handleSetupSubmit = async (e: React.FormEvent) => {
@@ -568,46 +632,57 @@ function StudentDashboardView({
               <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
             </div>
           ) : isSelfEnrolled ? (
-            /* Self-Enrolled NCERT Curriculum Display */
+            /* Self-Enrolled NCERT Curriculum Display — subject groups ordered by learning-path priority */
             ncertBooks.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {ncertBooks.map((book) => (
-                  <div
-                    key={book.id}
-                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                          {book.subject}
-                        </span>
-                        <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">
-                          NCERT Book
-                        </span>
-                      </div>
-                      <h3 className="text-sm font-bold text-text-primary">{book.title}</h3>
-                      <p className="text-xs text-text-secondary mt-1 line-clamp-2">
-                        {book.description}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-border-primary/50 flex items-center justify-between">
-                      <span className="text-[11px] text-text-tertiary">Official NCERT Standard</span>
-                      {book.file_url ? (
-                        <a
-                          href={formatPdfUrl(book.file_url)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-brand font-semibold hover:underline"
+              <div className="space-y-6">
+                {groupBySubjectPriority(ncertBooks, subjectPriority).map((group, idx) => (
+                  <div key={group.subject}>
+                    <SubjectGroupHeader
+                      subject={group.subject}
+                      priorityInfo={group.priorityInfo}
+                      isTopPriority={idx === 0}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {group.items.map((book) => (
+                        <div
+                          key={book.id}
+                          className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
                         >
-                          <FileText className="w-3.5 h-3.5" />
-                          Study Book PDF →
-                        </a>
-                      ) : (
-                        <span className="text-xs text-amber-500 font-semibold italic">
-                          PDF Pending Upload
-                        </span>
-                      )}
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
+                                {book.subject}
+                              </span>
+                              <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">
+                                NCERT Book
+                              </span>
+                            </div>
+                            <h3 className="text-sm font-bold text-text-primary">{book.title}</h3>
+                            <p className="text-xs text-text-secondary mt-1 line-clamp-2">
+                              {book.description}
+                            </p>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-border-primary/50 flex items-center justify-between">
+                            <span className="text-[11px] text-text-tertiary">Official NCERT Standard</span>
+                            {book.file_url ? (
+                              <a
+                                href={formatPdfUrl(book.file_url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-brand font-semibold hover:underline"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                Study Book PDF →
+                              </a>
+                            ) : (
+                              <span className="text-xs text-amber-500 font-semibold italic">
+                                PDF Pending Upload
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -622,37 +697,48 @@ function StudentDashboardView({
               </div>
             )
           ) : (
-            /* School-Enrolled Modules Display */
+            /* School-Enrolled Modules Display — subject groups ordered by learning-path priority */
             modules.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {modules.map((mod) => (
-                  <div
-                    key={mod.id}
-                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                          {mod.subject}
-                        </span>
-                        <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
-                      </div>
-                      <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
-                    </div>
+              <div className="space-y-6">
+                {groupBySubjectPriority(modules, subjectPriority).map((group, idx) => (
+                  <div key={group.subject}>
+                    <SubjectGroupHeader
+                      subject={group.subject}
+                      priorityInfo={group.priorityInfo}
+                      isTopPriority={idx === 0}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {group.items.map((mod) => (
+                        <div
+                          key={mod.id}
+                          className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
+                                {mod.subject}
+                              </span>
+                              <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
+                            </div>
+                            <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
+                          </div>
 
-                    {mod.file_url ? (
-                      <a
-                        href={formatPdfUrl(mod.file_url)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        Open PDF Module
-                      </a>
-                    ) : (
-                      <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module Content</span>
-                    )}
+                          {mod.file_url ? (
+                            <a
+                              href={formatPdfUrl(mod.file_url)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              Open PDF Module
+                            </a>
+                          ) : (
+                            <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module Content</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>

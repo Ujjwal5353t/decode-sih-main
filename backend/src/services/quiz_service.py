@@ -33,6 +33,7 @@ from src.models.quiz import (
     Topic,
 )
 from src.models.student import Student
+from src.services.bkt_service import P_INIT, get_student_topic_mastery
 
 MAX_PROBES_PER_TOPIC = 1  # spec allows 1-2; 1 keeps a demo-length quiz
 MAX_TOTAL_PROBES_PER_SUBJECT = 10
@@ -621,6 +622,74 @@ async def get_current_gaps(student_id: uuid.UUID, session: AsyncSession) -> list
             "updated_at": gap_row.updated_at,
         })
     return gaps
+
+
+async def get_subject_priority(student: Student, session: AsyncSession) -> list[dict]:
+    """Ranks a student's subjects by how urgently they need review. The
+    primary signal is now a Bayesian Knowledge Tracing (BKT) mastery
+    estimate per topic (see bkt_service.py) averaged per subject — a
+    probabilistic read of the student's full right/wrong history per
+    topic, not just a gap count. The diagnostic quiz's already-recorded
+    StudentTopicGap rows are still computed and returned (gap_count /
+    avg_classes_behind / gap_topics) since the UI's explanatory text
+    ("Review: X, Y") still uses them, and gap_count remains the tiebreaker
+    for subjects tied on mastery (notably: subjects with no BKT evidence
+    at all, which all land on the P_INIT default). See LEARNING_PATH.txt
+    for the plain-language write-up.
+
+    Priority order: lowest average mastery first (most urgent), then (as a
+    tiebreaker) more open gaps, then further behind on average."""
+    subjects = list(ALL_SUBJECTS)
+    if student.class_number is not None and student.class_number < 3:
+        subjects = [s for s in subjects if s != "EVS"]
+
+    gaps = await get_current_gaps(student.id, session)
+    gaps_by_subject: dict[str, list[dict]] = {s: [] for s in subjects}
+    for gap in gaps:
+        if gap["subject"] in gaps_by_subject:
+            gaps_by_subject[gap["subject"]].append(gap)
+
+    mastery_by_topic_id = await get_student_topic_mastery(student.id, session)
+
+    rows = []
+    for subject in subjects:
+        subject_gaps = gaps_by_subject[subject]
+        gap_count = len(subject_gaps)
+        avg_behind = 0.0
+        if gap_count and student.class_number is not None:
+            classes_behind = [student.class_number - g["originating_class"] for g in subject_gaps]
+            avg_behind = round(sum(classes_behind) / gap_count, 1)
+
+        topic_ids = []
+        if student.class_number is not None:
+            result = await session.execute(
+                select(Topic.id).where(
+                    Topic.subject == subject, Topic.class_number == student.class_number
+                )
+            )
+            topic_ids = list(result.scalars().all())
+
+        if topic_ids:
+            avg_mastery = round(
+                sum(mastery_by_topic_id.get(topic_id, P_INIT) for topic_id in topic_ids)
+                / len(topic_ids),
+                2,
+            )
+        else:
+            avg_mastery = round(P_INIT, 2)
+
+        rows.append({
+            "subject": subject,
+            "gap_count": gap_count,
+            "avg_classes_behind": avg_behind,
+            "gap_topics": [g["topic_name"] for g in subject_gaps][:5],
+            "avg_mastery": avg_mastery,
+        })
+
+    rows.sort(key=lambda r: (r["avg_mastery"], -r["gap_count"], -r["avg_classes_behind"]))
+    for rank, row in enumerate(rows):
+        row["priority_rank"] = rank
+    return rows
 
 
 async def get_class_quiz_summaries(
