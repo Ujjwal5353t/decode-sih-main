@@ -14,6 +14,7 @@ from sqlmodel import select
 
 from src.core.config import settings
 from src.core.security import hash_password
+from src.db.curriculum_seed import seed_topics
 from src.models.admin import Admin
 from src.models.ncert import NCERTBook
 
@@ -182,85 +183,42 @@ async def seed_ncert_books(session: AsyncSession) -> None:
         await session.commit()
         print(f"[seed] {len(_NCERT_BOOKS)} NCERT books seeded.")
 
-    # Seed template chapter chunks for NCERT Class 4 EVS & Math
+    # Seed template chapter chunks for every NCERT book that has hand-authored
+    # content in ncert_content.py. Per-book idempotency (not "any SELF chunk
+    # exists") so this backfills newly-added books on an existing DB instead
+    # of silently no-op'ing forever once the first book was ever chunked.
+    from src.db.ncert_content import NCERT_CHAPTER_TEXT
     from src.models.chunk import DocumentChunk
     from src.services.chunk_service import ingest_module_text
 
-    chk_res = await session.execute(select(DocumentChunk).where(DocumentChunk.branch_name == "SELF").limit(1))
-    if not chk_res.scalar_one_or_none():
-        # Fetch Class 4 EVS NCERT Book
-        evs_res = await session.execute(
-            select(NCERTBook).where(NCERTBook.class_number == 4, NCERTBook.subject == "EVS")
+    all_books = await session.execute(select(NCERTBook))
+    books_by_key = {(b.subject, b.class_number): b for b in all_books.scalars().all()}
+
+    seeded_count = 0
+    for (subject, class_number), full_text in NCERT_CHAPTER_TEXT.items():
+        book = books_by_key.get((subject, class_number))
+        if book is None:
+            continue
+
+        chk_res = await session.execute(
+            select(DocumentChunk).where(DocumentChunk.ncert_book_id == book.id).limit(1)
         )
-        evs_book = evs_res.scalar_one_or_none()
+        if chk_res.scalar_one_or_none():
+            continue  # already chunked
 
-        if evs_book:
-            evs_full_text = (
-                "Chapter 1: Going to School\n"
-                "Children use different ways to reach school in different parts of India. "
-                "In Assam, children cross bamboo and rope bridges to reach school when it rains heavily. "
-                "In Ladakh, children use a trolley attached to a strong iron rope over a wide and deep river to cross over. "
-                "In Kerala, children use a Vallam (a small wooden boat) to reach school. "
-                "In Rajasthan desert, children ride in camel carts over hot sand. "
-                "In plains, children ride bullock carts or bicycles through green fields.\n\n"
-                "Chapter 2: Ear to Ear\n"
-                "Different animals have different types of ears. Animals like elephants, rabbits, dogs, and tigers have ears that can be seen. "
-                "Birds, frogs, lizards, and snakes have ears, but they are tiny holes covered with feathers or skin. "
-                "Animals whose ears can be seen and have hair on their skin give birth to young ones (Viviparous). "
-                "Animals whose ears cannot be seen and do not have hair on their skin lay eggs (Oviparous).\n\n"
-                "Chapter 3: A Day with Nandu\n"
-                "Nandu is a three-month-old baby elephant. Elephants live in herds. "
-                "An elephant herd has mainly females and baby elephants. The oldest female elephant is the leader of the herd. "
-                "Adult elephants eat more than 100 kilograms of leaves and twigs in one day. "
-                "Elephants sleep for only 2 to 4 hours a day. They love to play in mud and water to keep their skin cool.\n\n"
-                "Chapter 4: The Story of Amrita\n"
-                "Amrita lived in Khejadli village near Jodhpur in Rajasthan. The village got its name from the many Khejadi trees that grew there. "
-                "The people of Khejadli were called Bishnois. They cared deeply for plants and animals, saying 'Agar ped hain to hum hain'. "
-                "When the King sent soldiers to cut trees to build his palace, Amrita and her three daughters hugged the trees to protect them. "
-                "Over 300 villagers sacrificed their lives protecting the Khejadi trees."
-            )
-            await ingest_module_text(
-                session=session,
-                branch_name="SELF",
-                class_number=4,
-                subject="EVS",
-                text=evs_full_text,
-                ncert_book_id=evs_book.id,
-                module_title=evs_book.title,
-            )
-            print("[seed] Seeded 4 chapters of Class 4 EVS NCERT chunks under SELF.")
-
-        # Fetch Class 4 Math NCERT Book
-        math_res = await session.execute(
-            select(NCERTBook).where(NCERTBook.class_number == 4, NCERTBook.subject == "Mathematics")
+        await ingest_module_text(
+            session=session,
+            branch_name="SELF",
+            class_number=class_number,
+            subject=subject,
+            text=full_text,
+            ncert_book_id=book.id,
+            module_title=book.title,
         )
-        math_book = math_res.scalar_one_or_none()
+        seeded_count += 1
 
-        if math_book:
-            math_full_text = (
-                "Chapter 1: Building with Bricks\n"
-                "Bricks have 6 faces, 12 edges, and 8 corners. Masons in Murshidabad built beautiful brick floor patterns for Jagriti School. "
-                "Arches and brick patterns can be seen in old bridges and kilns. "
-                "A brick kiln bakes thousands of raw clay bricks. One brick usually measures 20 cm by 10 cm by 10 cm.\n\n"
-                "Chapter 2: Long and Short\n"
-                "Distance is measured in millimeters, centimeters, meters, and kilometers. 100 centimeters equals 1 meter, and 1000 meters equals 1 kilometer. "
-                "Marathon races are about 40 kilometers long. Height is measured using a measuring tape. "
-                "Comparing heights of classmates helps understand difference in length.\n\n"
-                "Chapter 3: A Trip to Bhopal\n"
-                "Class 4 students went on a school trip to Bhopal. Each mini bus held 35 children. "
-                "They crossed the Narmada bridge which is 756.8 meters long. "
-                "At Bhimbetka, they saw 10,000-year-old cave paintings of wild bulls, rhinos, and deer drawn on cave walls."
-            )
-            await ingest_module_text(
-                session=session,
-                branch_name="SELF",
-                class_number=4,
-                subject="Mathematics",
-                text=math_full_text,
-                ncert_book_id=math_book.id,
-                module_title=math_book.title,
-            )
-            print("[seed] Seeded 3 chapters of Class 4 Math NCERT chunks under SELF.")
+    if seeded_count:
+        print(f"[seed] Seeded template NCERT chunks for {seeded_count} book(s) under SELF.")
 
 
 from src.models.school import BranchCounter, School
@@ -735,6 +693,7 @@ async def run_all_seeds(session: AsyncSession) -> None:
     await seed_publishers(session)
     await seed_ncert_books(session)
     await seed_demo_accounts(session)
+    await seed_topics(session)
 
 
 
