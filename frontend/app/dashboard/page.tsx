@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -43,6 +43,7 @@ import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { DashboardSidebar } from "@/components/dashboard/Sidebar";
 import { DeleteModuleDialog } from "@/components/school/DeleteModuleDialog";
+import { TeacherSearchModal } from "@/components/school/TeacherSearchModal";
 import { AdminRequestsPanel } from "@/components/school/registration/AdminRequestsPanel";
 import { SchoolRequestsPanel } from "@/components/admin/SchoolRequestsPanel";
 import { SubjectSetupGate } from "@/components/school/SubjectSetupGate";
@@ -3605,16 +3606,17 @@ function SchoolTeacherManagement() {
   const [selectedClassNum, setSelectedClassNum] = useState<number>(1);
   const [selectedSection, setSelectedSection] = useState<string>("A");
 
-  // Inline assignment state per subject row
-  const [rowTeacherSelect, setRowTeacherSelect] = useState<{ [subject: string]: string }>({});
-
-  // Quick assignment modal state
-  const [assignTeacherId, setAssignTeacherId] = useState<string>("");
-  const [assignClassNum, setAssignClassNum] = useState<number>(1);
-  const [assignSec, setAssignSec] = useState<string>("A");
-  const [assignSubj, setAssignSubj] = useState<string>("");
+  // Search & Filter Teacher Selection Modal state
+  const [showTeacherModal, setShowTeacherModal] = useState<boolean>(false);
+  const [modalClassNum, setModalClassNum] = useState<number>(1);
+  const [modalSection, setModalSection] = useState<string>("A");
+  const [modalSubject, setModalSubject] = useState<string>("");
+  const [modalInitialTeacherId, setModalInitialTeacherId] = useState<string>("");
   const [isAssigning, setIsAssigning] = useState<boolean>(false);
-  const [showAssignModal, setShowAssignModal] = useState<boolean>(false);
+
+  // Directory search & filter state
+  const [directorySearch, setDirectorySearch] = useState<string>("");
+  const [directoryFilter, setDirectoryFilter] = useState<"all" | "assigned" | "unassigned" | "active">("all");
 
   // Status message
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -3737,17 +3739,15 @@ function SchoolTeacherManagement() {
         type: "success",
         text: `Assigned Class ${normalizedClassNum}${normalizedSec} (${parseSubjectMeta(cleanSubj).title}) successfully!`,
       });
-      setShowAssignModal(false);
-      setAssignSubj("");
-      setRowTeacherSelect((prev) => ({ ...prev, [rawSubj]: "" }));
+      setShowTeacherModal(false);
       await fetchTeachersAndSubjects();
       setTimeout(() => setMsg(null), 4000);
     } catch (err: any) {
       const errMsg: string = err.message || "";
       // If server says teacher is already assigned (409), it means the DB is already correct.
-      // Just refresh state from server so the UI reflects the truth.
       if (errMsg.toLowerCase().includes("already assigned") || String(err.status) === "409") {
         await fetchTeachersAndSubjects();
+        setShowTeacherModal(false);
         setMsg({
           type: "success",
           text: `Teacher is already assigned to Class ${normalizedClassNum}${normalizedSec} for this subject.`,
@@ -3819,6 +3819,48 @@ function SchoolTeacherManagement() {
     }
   };
 
+  // Filtered teachers for Directory View
+  const filteredDirectoryTeachers = useMemo(() => {
+    let list = [...teachers];
+
+    // Filter by tab
+    if (directoryFilter === "assigned") {
+      list = list.filter((t) => (t.assigned_classes || []).length > 0);
+    } else if (directoryFilter === "unassigned") {
+      list = list.filter((t) => (t.assigned_classes || []).length === 0);
+    } else if (directoryFilter === "active") {
+      list = list.filter((t) => t.is_active);
+    }
+
+    // Search query
+    if (directorySearch.trim()) {
+      const q = directorySearch.toLowerCase().trim();
+      list = list.filter((t) => {
+        const nameMatch = (t.name || "").toLowerCase().includes(q);
+        const phoneMatch = (t.phone_number || "").toLowerCase().includes(q);
+        const subjectMatch = (t.assigned_classes || []).some((c) =>
+          (c.subject || "").toLowerCase().includes(q) ||
+          `class ${c.class_number}${c.section}`.toLowerCase().includes(q)
+        );
+        return nameMatch || phoneMatch || subjectMatch;
+      });
+    }
+
+    return list;
+  }, [teachers, directoryFilter, directorySearch]);
+
+  const directoryCounts = useMemo(() => {
+    let assigned = 0;
+    let unassigned = 0;
+    let active = 0;
+    teachers.forEach((t) => {
+      if ((t.assigned_classes || []).length > 0) assigned++;
+      else unassigned++;
+      if (t.is_active) active++;
+    });
+    return { all: teachers.length, assigned, unassigned, active };
+  }, [teachers]);
+
   const currentClassSubjects = getSubjectsForClass(selectedClassNum);
 
   // Calculate allocation statistics for active class & section
@@ -3870,14 +3912,14 @@ function SchoolTeacherManagement() {
             variant="primary"
             size="sm"
             onClick={() => {
-              setAssignClassNum(selectedClassNum);
-              setAssignSec(selectedSection);
-              setAssignSubj(currentClassSubjects[0] || "");
-              setAssignTeacherId(teachers[0]?.id || "");
-              setShowAssignModal(true);
+              setModalClassNum(selectedClassNum);
+              setModalSection(selectedSection);
+              setModalSubject(currentClassSubjects[0] || "Mathematics");
+              setModalInitialTeacherId("");
+              setShowTeacherModal(true);
             }}
             disabled={teachers.length === 0}
-            className="text-xs shrink-0"
+            className="text-xs shrink-0 font-semibold"
           >
             <Plus className="w-3.5 h-3.5 mr-1" />
             Assign Teacher
@@ -3996,7 +4038,6 @@ function SchoolTeacherManagement() {
                     rawSubj
                   );
                   const hasTeacher = !!assignedInfo;
-                  const selectedTeacherForRow = rowTeacherSelect[rawSubj] || "";
 
                   return (
                     <tr
@@ -4039,11 +4080,11 @@ function SchoolTeacherManagement() {
                         )}
                       </td>
 
-                      {/* Assigned Teacher or Inline Select */}
+                      {/* Assigned Teacher or Search & Select Trigger */}
                       <td className="py-3.5 px-4">
                         {hasTeacher ? (
                           <div className="flex items-center gap-2.5">
-                            <div className="w-6 h-6 rounded-full bg-brand/10 text-brand font-bold text-[10px] flex items-center justify-center border border-border-brand">
+                            <div className="w-7 h-7 rounded-full bg-brand/10 text-brand font-bold text-xs flex items-center justify-center border border-border-brand shrink-0">
                               {assignedInfo.teacher.name
                                 .split(" ")
                                 .map((n) => n[0])
@@ -4052,8 +4093,22 @@ function SchoolTeacherManagement() {
                                 .toUpperCase()}
                             </div>
                             <div>
-                              <div className="font-semibold text-text-primary text-xs">
-                                {assignedInfo.teacher.name}
+                              <div className="font-semibold text-text-primary text-xs flex items-center gap-2">
+                                <span>{assignedInfo.teacher.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setModalClassNum(selectedClassNum);
+                                    setModalSection(selectedSection);
+                                    setModalSubject(rawSubj);
+                                    setModalInitialTeacherId(assignedInfo.teacher.id);
+                                    setShowTeacherModal(true);
+                                  }}
+                                  className="text-[10px] text-brand hover:underline font-medium cursor-pointer"
+                                  title="Change assigned teacher"
+                                >
+                                  (Change)
+                                </button>
                               </div>
                               <div className="text-[10px] text-text-tertiary font-mono">
                                 {assignedInfo.teacher.phone_number}
@@ -4061,58 +4116,70 @@ function SchoolTeacherManagement() {
                             </div>
                           </div>
                         ) : (
-                          <select
-                            value={selectedTeacherForRow}
-                            onChange={(e) =>
-                              setRowTeacherSelect({
-                                ...rowTeacherSelect,
-                                [rawSubj]: e.target.value,
-                              })
-                            }
-                            className="w-full max-w-xs px-2.5 py-1.5 bg-background text-text-primary text-xs rounded-md border border-border-primary outline-none focus:border-brand cursor-pointer"
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModalClassNum(selectedClassNum);
+                              setModalSection(selectedSection);
+                              setModalSubject(rawSubj);
+                              setModalInitialTeacherId("");
+                              setShowTeacherModal(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface hover:bg-surface/80 text-brand border border-dashed border-border-brand transition-all cursor-pointer shadow-sm hover:shadow"
                           >
-                            <option value="">Choose teacher to assign...</option>
-                            {teachers.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.name} ({t.phone_number})
-                              </option>
-                            ))}
-                          </select>
+                            <Search className="w-3.5 h-3.5" />
+                            <span>Select Teacher</span>
+                          </button>
                         )}
                       </td>
 
                       {/* Action */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         {hasTeacher ? (
-                          <button
-                            onClick={() =>
-                              handleDeassign(
-                                assignedInfo.teacher.id,
-                                selectedClassNum,
-                                selectedSection,
-                                assignedInfo.assignment.subject || rawSubj,
-                                assignedInfo.assignment.id
-                              )
-                            }
-                            className="text-xs text-text-tertiary hover:text-rose-500 hover:bg-rose-500/10 px-2.5 py-1 rounded transition-colors font-medium cursor-pointer"
-                            title="Remove teacher from subject"
-                          >
-                            De-assign
-                          </button>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setModalClassNum(selectedClassNum);
+                                setModalSection(selectedSection);
+                                setModalSubject(rawSubj);
+                                setModalInitialTeacherId(assignedInfo.teacher.id);
+                                setShowTeacherModal(true);
+                              }}
+                              className="text-xs text-text-secondary hover:text-brand hover:bg-brand/10 px-2 py-1 rounded transition-colors font-medium cursor-pointer"
+                              title="Change teacher for this subject"
+                            >
+                              Reassign
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDeassign(
+                                  assignedInfo.teacher.id,
+                                  selectedClassNum,
+                                  selectedSection,
+                                  assignedInfo.assignment.subject || rawSubj,
+                                  assignedInfo.assignment.id
+                                )
+                              }
+                              className="text-xs text-text-tertiary hover:text-rose-500 hover:bg-rose-500/10 px-2.5 py-1 rounded transition-colors font-medium cursor-pointer"
+                              title="Remove teacher from subject"
+                            >
+                              De-assign
+                            </button>
+                          </div>
                         ) : (
                           <Button
                             variant="primary"
                             size="sm"
-                            disabled={isAssigning || !selectedTeacherForRow}
-                            onClick={() =>
-                              handleAssign(
-                                selectedTeacherForRow,
-                                selectedClassNum,
-                                selectedSection,
-                                rawSubj
-                              )
-                            }
-                            className="text-xs px-3 py-1 h-auto"
+                            onClick={() => {
+                              setModalClassNum(selectedClassNum);
+                              setModalSection(selectedSection);
+                              setModalSubject(rawSubj);
+                              setModalInitialTeacherId("");
+                              setShowTeacherModal(true);
+                            }}
+                            className="text-xs px-3 py-1 h-auto font-semibold"
                           >
                             Assign
                           </Button>
@@ -4129,236 +4196,200 @@ function SchoolTeacherManagement() {
         /* ═════════════════════════════════════════════════════════════════════
            TEACHER DIRECTORY VIEW (Teacher Workload & Assigned Subjects)
            ═════════════════════════════════════════════════════════════════════ */
-        <div className="divide-y divide-border-primary/40">
-          {teachers.map((t) => (
-            <div
-              key={t.id}
-              className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
-            >
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-brand/10 text-brand font-bold text-xs flex items-center justify-center border border-border-brand">
-                    {t.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .slice(0, 2)
-                      .join("")
-                      .toUpperCase()}
-                  </div>
-                  <span className="font-bold text-sm text-text-primary">
-                    {t.name}
-                  </span>
-                  <span className="text-xs text-text-tertiary font-mono">
-                    ({t.phone_number})
-                  </span>
-                  <span
-                    className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${
-                      t.is_active
-                        ? "bg-emerald-500/10 text-emerald-500"
-                        : "bg-rose-500/10 text-rose-500"
-                    }`}
-                  >
-                    {t.is_active ? "Active" : "Inactive"}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5 flex-wrap pl-9">
-                  <span className="text-xs text-text-secondary font-medium">
-                    Teaching:
-                  </span>
-                  {t.assigned_classes && t.assigned_classes.length > 0 ? (
-                    t.assigned_classes.map((c) => (
-                      <span
-                        key={c.id || `${c.class_number}-${c.section}-${c.subject}`}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand border border-border-brand"
-                      >
-                        <span>
-                          Class {c.class_number}{c.section} • {parseSubjectMeta(c.subject || "General").title}
-                        </span>
-                        <button
-                          onClick={() =>
-                            handleDeassign(
-                              t.id,
-                              c.class_number,
-                              c.section,
-                              c.subject || "General",
-                              c.id
-                            )
-                          }
-                          className="hover:text-rose-500 cursor-pointer ml-0.5"
-                          title="De-assign subject"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-text-tertiary italic">
-                      No classes assigned yet
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="shrink-0 pl-9 md:pl-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setAssignTeacherId(t.id);
-                    setAssignClassNum(selectedClassNum);
-                    setAssignSec(selectedSection);
-                    const subjs = getSubjectsForClass(selectedClassNum);
-                    setAssignSubj(subjs[0] || "");
-                    setShowAssignModal(true);
-                  }}
-                  className="text-xs"
+        <div className="space-y-4">
+          {/* Directory Search & Filters */}
+          <div className="p-3 bg-surface/50 rounded-lg border border-border-primary flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="w-3.5 h-3.5 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search by teacher name, phone, or class..."
+                value={directorySearch}
+                onChange={(e) => setDirectorySearch(e.target.value)}
+                className="w-full pl-8 pr-8 py-1.5 bg-background text-text-primary text-xs rounded-md border border-border-primary outline-none focus:border-brand placeholder:text-text-tertiary"
+              />
+              {directorySearch && (
+                <button
+                  type="button"
+                  onClick={() => setDirectorySearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary cursor-pointer"
                 >
-                  <Plus className="w-3.5 h-3.5 mr-1" />
-                  Assign Class
-                </Button>
-              </div>
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
-          ))}
-        </div>
-      )}
 
-      {/* MODAL: ASSIGN TEACHER TO CLASS & SUBJECT */}
-      {showAssignModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass rounded-[var(--radius-xl)] p-6 max-w-md w-full border border-border-primary space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                <UserCog className="w-4 h-4 text-brand" />
-                <span>Assign Subject Teacher</span>
-              </h3>
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
-                onClick={() => setShowAssignModal(false)}
-                className="text-text-tertiary hover:text-text-primary cursor-pointer"
+                type="button"
+                onClick={() => setDirectoryFilter("all")}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  directoryFilter === "all"
+                    ? "bg-brand text-white shadow-sm"
+                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
+                }`}
               >
-                <X className="w-4 h-4" />
+                All ({directoryCounts.all})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirectoryFilter("unassigned")}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                  directoryFilter === "unassigned"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
+                }`}
+              >
+                <Sparkles className="w-3 h-3 text-emerald-400" />
+                <span>Unassigned ({directoryCounts.unassigned})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirectoryFilter("assigned")}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  directoryFilter === "assigned"
+                    ? "bg-brand text-white shadow-sm"
+                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
+                }`}
+              >
+                Assigned ({directoryCounts.assigned})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirectoryFilter("active")}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  directoryFilter === "active"
+                    ? "bg-brand text-white shadow-sm"
+                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
+                }`}
+              >
+                Active Only ({directoryCounts.active})
               </button>
             </div>
+          </div>
 
-            <p className="text-xs text-text-secondary">
-              Select the teacher, class, section, and subject. Only 1 teacher can be assigned per subject in any given class section.
-            </p>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleAssign(assignTeacherId, assignClassNum, assignSec, assignSubj);
-              }}
-              className="space-y-4"
-            >
-              {/* Teacher Selector */}
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">
-                  Teacher *
-                </label>
-                <select
-                  value={assignTeacherId}
-                  onChange={(e) => setAssignTeacherId(e.target.value)}
-                  className="w-full px-3 py-2 bg-surface text-text-primary text-xs rounded-md border border-border-primary outline-none focus:border-brand"
-                  required
-                >
-                  <option value="" disabled>Choose teacher...</option>
-                  {teachers.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({t.phone_number})
-                    </option>
-                  ))}
-                </select>
+          {/* Teacher Directory List */}
+          <div className="divide-y divide-border-primary/40">
+            {filteredDirectoryTeachers.length === 0 ? (
+              <div className="py-8 text-center text-xs text-text-tertiary">
+                <p className="font-semibold text-text-secondary">No teachers found</p>
+                <p className="text-[11px] mt-1">Try clearing the search query or changing filter tabs.</p>
               </div>
+            ) : (
+              filteredDirectoryTeachers.map((t: TeacherListItem) => (
+                <div
+                  key={t.id}
+                  className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="w-7 h-7 rounded-full bg-brand/10 text-brand font-bold text-xs flex items-center justify-center border border-border-brand">
+                        {t.name
+                          .split(" ")
+                          .map((n: string) => n[0])
+                          .slice(0, 2)
+                          .join("")
+                          .toUpperCase()}
+                      </div>
+                      <span className="font-bold text-sm text-text-primary">
+                        {t.name}
+                      </span>
+                      <span className="text-xs text-text-tertiary font-mono">
+                        ({t.phone_number})
+                      </span>
+                      <span
+                        className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${
+                          t.is_active
+                            ? "bg-emerald-500/10 text-emerald-500"
+                            : "bg-rose-500/10 text-rose-500"
+                        }`}
+                      >
+                        {t.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </div>
 
-              {/* Class & Section Grid */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">
-                    Class *
-                  </label>
-                  <select
-                    value={assignClassNum}
-                    onChange={(e) => {
-                      const newCls = Number(e.target.value);
-                      setAssignClassNum(newCls);
-                      const subjs = getSubjectsForClass(newCls);
-                      if (!subjs.includes(assignSubj)) {
-                        setAssignSubj(subjs[0] || "");
-                      }
-                    }}
-                    className="w-full px-3 py-2 bg-surface text-text-primary text-xs rounded-md border border-border-primary outline-none focus:border-brand"
-                  >
-                    {[1, 2, 3, 4, 5].map((cls) => (
-                      <option key={cls} value={cls}>
-                        Class {cls}
-                      </option>
-                    ))}
-                  </select>
+                    <div className="flex items-center gap-1.5 flex-wrap pl-9">
+                      <span className="text-xs text-text-secondary font-medium">
+                        Teaching:
+                      </span>
+                      {t.assigned_classes && t.assigned_classes.length > 0 ? (
+                        t.assigned_classes.map((c: TeacherClassOut) => (
+                          <span
+                            key={c.id || `${c.class_number}-${c.section}-${c.subject}`}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand border border-border-brand"
+                          >
+                            <span>
+                              Class {c.class_number}{c.section} • {parseSubjectMeta(c.subject || "General").title}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDeassign(
+                                  t.id,
+                                  c.class_number,
+                                  c.section,
+                                  c.subject || "General",
+                                  c.id
+                                )
+                              }
+                              className="hover:text-rose-500 cursor-pointer ml-0.5"
+                              title="De-assign subject"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-text-tertiary italic">
+                          No classes assigned yet (Available)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 pl-9 md:pl-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setModalInitialTeacherId(t.id);
+                        setModalClassNum(selectedClassNum);
+                        setModalSection(selectedSection);
+                        const subjs = getSubjectsForClass(selectedClassNum);
+                        setModalSubject(subjs[0] || "Mathematics");
+                        setShowTeacherModal(true);
+                      }}
+                      className="text-xs font-semibold"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      Assign Class
+                    </Button>
+                  </div>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">
-                    Section *
-                  </label>
-                  <select
-                    value={assignSec}
-                    onChange={(e) => setAssignSec(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface text-text-primary text-xs rounded-md border border-border-primary outline-none focus:border-brand"
-                  >
-                    {["A", "B", "C", "D"].map((sec) => (
-                      <option key={sec} value={sec}>
-                        Section {sec}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Subject Selector */}
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">
-                  Subject *
-                </label>
-                <select
-                  value={assignSubj}
-                  onChange={(e) => setAssignSubj(e.target.value)}
-                  className="w-full px-3 py-2 bg-surface text-text-primary text-xs rounded-md border border-border-primary outline-none focus:border-brand"
-                  required
-                >
-                  <option value="" disabled>Select subject...</option>
-                  {getSubjectsForClass(assignClassNum).map((s) => (
-                    <option key={s} value={s}>
-                      {parseSubjectMeta(s).title} {parseSubjectMeta(s).subtitle ? `(${parseSubjectMeta(s).subtitle})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  type="button"
-                  onClick={() => setShowAssignModal(false)}
-                  className="text-xs"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  type="submit"
-                  disabled={isAssigning || !assignTeacherId || !assignSubj}
-                  className="text-xs"
-                >
-                  {isAssigning ? "Assigning..." : "Confirm Assignment"}
-                </Button>
-              </div>
-            </form>
+              ))
+            )}
           </div>
         </div>
       )}
+
+      {/* Modern Filter-based Teacher Selection Modal */}
+      <TeacherSearchModal
+        isOpen={showTeacherModal}
+        onClose={() => setShowTeacherModal(false)}
+        teachers={teachers}
+        classNum={modalClassNum}
+        section={modalSection}
+        subject={modalSubject}
+        onClassNumChange={setModalClassNum}
+        onSectionChange={setModalSection}
+        onSubjectChange={setModalSubject}
+        availableSubjects={getSubjectsForClass(modalClassNum)}
+        onAssign={handleAssign}
+        isAssigning={isAssigning}
+        initialTeacherId={modalInitialTeacherId}
+        parseSubjectMeta={parseSubjectMeta}
+        isMatchingSubject={isMatchingSubject}
+      />
     </div>
   );
 }
