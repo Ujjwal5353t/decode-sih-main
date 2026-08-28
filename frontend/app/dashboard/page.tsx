@@ -574,18 +574,18 @@ function StudentDashboardView({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
               <span className="text-xs text-text-tertiary block">Available Modules</span>
-              <span className="text-2xl font-bold text-text-primary">
+              <span className="text-2xl font-bold text-text-primary block">
                 {isSelfEnrolled ? ncertBooks.length : modules.length}
               </span>
-              <span className="text-[11px] text-brand">
+              <span className="text-[11px] text-brand block">
                 {isSelfEnrolled ? "NCERT Official Books" : "School Branch Syllabus"}
               </span>
             </div>
 
             <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
               <span className="text-xs text-text-tertiary block">Learning Format</span>
-              <span className="text-2xl font-bold text-text-primary">Interactive AI</span>
-              <span className="text-[11px] text-emerald-500">PDF Reader & AI Diagnostic Quizzes</span>
+              <span className="text-2xl font-bold text-text-primary block">Interactive AI</span>
+              <span className="text-[11px] text-emerald-500 block">PDF Reader & AI Diagnostic Quizzes</span>
             </div>
           </div>
         </div>
