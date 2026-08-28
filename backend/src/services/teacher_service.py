@@ -41,6 +41,41 @@ _ASSIGNMENT_PDF_MAX_MB = 5
 _ASSIGNMENT_PDF_MAX_BYTES = _ASSIGNMENT_PDF_MAX_MB * 1024 * 1024
 
 
+def _normalize_subject_key(s: str) -> str:
+    """Return a canonical subject key that strips book/series names in parentheses
+    and maps common synonyms.  Used for semantic deduplication.
+    E.g.  'English (Marigold / Mridang)' -> 'english'
+          'Environmental Studies (EVS)'   -> 'evs'
+          'Mathematics (Math-Magic)'      -> 'mathematics'
+    """
+    if not s:
+        return ""
+    clean = s.lower().strip()
+    # Strip everything inside parentheses
+    import re
+    base = re.sub(r"\s*\([^)]*\)", "", clean).strip()
+    # Map synonyms
+    if "environmental" in base or "evs" in base:
+        return "evs"
+    if "mathematics" in base or "math" in base:
+        return "mathematics"
+    if "english" in base:
+        return "english"
+    if "hindi" in base:
+        return "hindi"
+    if "science" in base and "social" not in base:
+        return "science"
+    if "social" in base:
+        return "social studies"
+    if "computer" in base:
+        return "computer"
+    if "art" in base:
+        return "art"
+    if "urdu" in base:
+        return "urdu"
+    return base
+
+
 # ── Auth ───────────────────────────────────────────────────────────────────────
 
 from sqlalchemy import func, or_
@@ -119,7 +154,11 @@ async def get_assigned_classes(
     result = await session.execute(
         select(TeacherClassAssignment)
         .where(TeacherClassAssignment.teacher_id == teacher.id)
-        .order_by(TeacherClassAssignment.class_number, TeacherClassAssignment.section)
+        .order_by(
+            TeacherClassAssignment.class_number,
+            TeacherClassAssignment.section,
+            TeacherClassAssignment.subject,
+        )
     )
     return list(result.scalars().all())
 
@@ -153,7 +192,7 @@ async def create_pdf_assignment(
     file: UploadFile,
     session: AsyncSession,
 ) -> Assignment:
-    _verify_teacher_owns_class(teacher, class_number, section.upper(), session)
+    await verify_teacher_class_access(teacher, class_number, section.upper(), session, subject=data.subject)
 
     # Validate file type and size
     if file.content_type != "application/pdf":
@@ -177,6 +216,7 @@ async def create_pdf_assignment(
         branch_name=teacher.branch_name,
         class_number=class_number,
         section=section.upper(),
+        subject=data.subject.strip() if data.subject else None,
         title=data.title,
         description=data.description,
         assignment_type="pdf_upload",
@@ -197,11 +237,13 @@ async def create_quiz_assignment(
     data: AssignmentCreateQuizRequest,
     session: AsyncSession,
 ) -> Assignment:
+    await verify_teacher_class_access(teacher, class_number, section.upper(), session, subject=data.subject)
     asgn = Assignment(
         teacher_id=teacher.id,
         branch_name=teacher.branch_name,
         class_number=class_number,
         section=section.upper(),
+        subject=data.subject.strip() if data.subject else None,
         title=data.title,
         description=data.description,
         assignment_type="ai_quiz",
@@ -447,25 +489,68 @@ async def assign_class_to_teacher(
             detail="Teacher not found in this branch.",
         )
 
-    # Check not already assigned
-    existing = await session.execute(
+    clean_sec = data.section.strip().upper()
+    clean_subj = data.subject.strip()
+    if not clean_subj:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Subject is required. A teacher cannot be assigned to a class without a subject.",
+        )
+
+    target_key = _normalize_subject_key(clean_subj)
+
+    # Edge Case / Core Rule: A single subject in a class section can ONLY have 1 teacher assigned at a time.
+    # Fetch ALL assignments for this class+section in this branch and use semantic matching.
+    all_existing_result = await session.execute(
         select(TeacherClassAssignment).where(
-            TeacherClassAssignment.teacher_id == teacher_id,
+            TeacherClassAssignment.branch_name == branch_name,
             TeacherClassAssignment.class_number == data.class_number,
-            TeacherClassAssignment.section == data.section,
+            TeacherClassAssignment.section == clean_sec,
         )
     )
-    if existing.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Teacher is already assigned to Class {data.class_number}{data.section}.",
+    all_existing = all_existing_result.scalars().all()
+    for existing_assignment in all_existing:
+        existing_key = _normalize_subject_key(existing_assignment.subject or "")
+        if existing_key and target_key and existing_key == target_key:
+            if existing_assignment.teacher_id == teacher_id:
+                # Same teacher already has this subject — upgrade the subject name to the new canonical form
+                existing_assignment.subject = clean_subj
+                session.add(existing_assignment)
+                await session.commit()
+                await session.refresh(existing_assignment)
+                return existing_assignment
+            else:
+                assigned_teacher = await session.get(Teacher, existing_assignment.teacher_id)
+                teacher_name = assigned_teacher.name if assigned_teacher else "another teacher"
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Class {data.class_number}{clean_sec} for '{clean_subj}' is already assigned to {teacher_name}. Only 1 teacher can be assigned per subject in a class.",
+                )
+
+    # If the teacher already has a legacy 'General' placeholder for this class section, upgrade it
+    legacy_general = await session.execute(
+        select(TeacherClassAssignment).where(
+            TeacherClassAssignment.teacher_id == teacher_id,
+            TeacherClassAssignment.branch_name == branch_name,
+            TeacherClassAssignment.class_number == data.class_number,
+            TeacherClassAssignment.section == clean_sec,
+            func.lower(TeacherClassAssignment.subject) == "general",
         )
+    )
+    general_rec = legacy_general.scalar_one_or_none()
+    if general_rec:
+        general_rec.subject = clean_subj
+        session.add(general_rec)
+        await session.commit()
+        await session.refresh(general_rec)
+        return general_rec
 
     tca = TeacherClassAssignment(
         teacher_id=teacher_id,
         branch_name=branch_name,
         class_number=data.class_number,
-        section=data.section,
+        section=clean_sec,
+        subject=clean_subj,
     )
     session.add(tca)
     await session.commit()
@@ -476,9 +561,11 @@ async def assign_class_to_teacher(
 async def deassign_class_from_teacher(
     teacher_id: uuid.UUID,
     branch_name: str,
-    class_number: int,
-    section: str,
-    session: AsyncSession,
+    class_number: Optional[int] = None,
+    section: Optional[str] = None,
+    subject: Optional[str] = None,
+    assignment_id: Optional[uuid.UUID] = None,
+    session: AsyncSession = None,
 ) -> None:
     teacher = await session.get(Teacher, teacher_id)
     if not teacher or teacher.branch_name != branch_name:
@@ -486,20 +573,41 @@ async def deassign_class_from_teacher(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Teacher not found in this branch.",
         )
-    result = await session.execute(
-        select(TeacherClassAssignment).where(
-            TeacherClassAssignment.teacher_id == teacher_id,
-            TeacherClassAssignment.class_number == class_number,
-            TeacherClassAssignment.section == section.upper(),
-        )
+
+    if assignment_id:
+        tca = await session.get(TeacherClassAssignment, assignment_id)
+        if not tca or tca.teacher_id != teacher_id or tca.branch_name != branch_name:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Class assignment not found.",
+            )
+        await session.delete(tca)
+        await session.commit()
+        return
+
+    stmt = select(TeacherClassAssignment).where(
+        TeacherClassAssignment.teacher_id == teacher_id,
+        TeacherClassAssignment.branch_name == branch_name,
     )
-    tca = result.scalar_one_or_none()
-    if not tca:
+    if class_number is not None:
+        stmt = stmt.where(TeacherClassAssignment.class_number == class_number)
+    if section:
+        stmt = stmt.where(TeacherClassAssignment.section == section.strip().upper())
+    if subject:
+        stmt = stmt.where(func.lower(TeacherClassAssignment.subject) == subject.strip().lower())
+
+    result = await session.execute(stmt)
+    assignments = list(result.scalars().all())
+    if not assignments:
+        sec_str = section.strip().upper() if section else ""
+        subj_str = f" for {subject}" if subject else ""
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No assignment found for Class {class_number}{section.upper()}.",
+            detail=f"No assignment found for Class {class_number}{sec_str}{subj_str}.",
         )
-    await session.delete(tca)
+
+    for a in assignments:
+        await session.delete(a)
     await session.commit()
 
 
@@ -513,20 +621,27 @@ def _verify_teacher_owns_class(
 
 
 async def verify_teacher_class_access(
-    teacher: Teacher, class_number: int, section: str, session: AsyncSession
+    teacher: Teacher,
+    class_number: int,
+    section: str,
+    session: AsyncSession,
+    subject: Optional[str] = None,
 ) -> TeacherClassAssignment:
-    result = await session.execute(
-        select(TeacherClassAssignment).where(
-            TeacherClassAssignment.teacher_id == teacher.id,
-            TeacherClassAssignment.class_number == class_number,
-            TeacherClassAssignment.section == section.upper(),
-        )
+    stmt = select(TeacherClassAssignment).where(
+        TeacherClassAssignment.teacher_id == teacher.id,
+        TeacherClassAssignment.class_number == class_number,
+        TeacherClassAssignment.section == section.upper(),
     )
-    tca = result.scalar_one_or_none()
+    if subject:
+        stmt = stmt.where(func.lower(TeacherClassAssignment.subject) == subject.strip().lower())
+
+    result = await session.execute(stmt)
+    tca = result.scalars().first()
     if not tca:
+        sub_msg = f" for '{subject}'" if subject else ""
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"You are not assigned to Class {class_number}{section.upper()}.",
+            detail=f"You are not assigned to Class {class_number}{section.upper()}{sub_msg}.",
         )
     return tca
 

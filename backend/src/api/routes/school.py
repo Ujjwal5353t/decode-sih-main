@@ -489,15 +489,20 @@ async def list_teachers(
     result = []
     for t in teachers:
         classes = await teacher_service.get_assigned_classes(t, session)
+        # Skip records with NULL/empty subject — broken legacy entries that
+        # would crash Pydantic serialization and break the entire response.
         class_outs = [
             TeacherClassOut(
                 id=c.id,
+                teacher_id=c.teacher_id,
                 class_number=c.class_number,
                 section=c.section,
-                label=f"{c.class_number}{c.section}",
+                subject=c.subject or "",
+                label=f"{c.class_number}{c.section} \u2022 {c.subject or 'Unset'}",
                 assigned_at=c.assigned_at,
             )
             for c in classes
+            if c.subject  # skip NULL/empty subject records
         ]
         result.append(
             TeacherListItem(
@@ -516,7 +521,7 @@ async def list_teachers(
     "/teachers/{teacher_id}/assign-class",
     response_model=TeacherClassOut,
     status_code=status.HTTP_201_CREATED,
-    summary="Assign a class section to a teacher",
+    summary="Assign a class section and subject to a teacher",
 )
 async def assign_class_to_teacher(
     teacher_id: uuid.UUID,
@@ -529,25 +534,52 @@ async def assign_class_to_teacher(
     )
     return TeacherClassOut(
         id=tca.id,
+        teacher_id=tca.teacher_id,
         class_number=tca.class_number,
         section=tca.section,
-        label=f"{tca.class_number}{tca.section}",
+        subject=tca.subject,
+        label=f"{tca.class_number}{tca.section} • {tca.subject}",
         assigned_at=tca.assigned_at,
+    )
+
+
+@router.delete(
+    "/teachers/{teacher_id}/assignments/{assignment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a teacher class subject assignment by assignment ID",
+)
+async def deassign_by_id(
+    teacher_id: uuid.UUID,
+    assignment_id: uuid.UUID,
+    school: School = Depends(get_current_school),
+    session: AsyncSession = Depends(get_session),
+):
+    await teacher_service.deassign_class_from_teacher(
+        teacher_id=teacher_id,
+        branch_name=school.branch_name,
+        assignment_id=assignment_id,
+        session=session,
     )
 
 
 @router.delete(
     "/teachers/{teacher_id}/assign-class/{class_number}/{section}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Remove a class section assignment from a teacher",
+    summary="Remove a class section and optional subject assignment from a teacher",
 )
 async def deassign_class_from_teacher(
     teacher_id: uuid.UUID,
     class_number: int,
     section: str,
+    subject: Optional[str] = None,
     school: School = Depends(get_current_school),
     session: AsyncSession = Depends(get_session),
 ):
     await teacher_service.deassign_class_from_teacher(
-        teacher_id, school.branch_name, class_number, section, session
+        teacher_id=teacher_id,
+        branch_name=school.branch_name,
+        class_number=class_number,
+        section=section,
+        subject=subject,
+        session=session,
     )

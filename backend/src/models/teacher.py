@@ -1,4 +1,4 @@
-﻿"""
+"""
 Teacher domain models.
 
 Teacher                -- teacher account linked to a school branch
@@ -40,8 +40,9 @@ class Teacher(SQLModel, table=True):
 
 class TeacherClassAssignment(SQLModel, table=True):
     """
-    Links a teacher to a specific class+section within their branch.
-    School admin assigns/de-assigns classes to teachers.
+    Links a teacher to a specific class+section and subject within their branch.
+    School admin assigns/de-assigns classes and subjects to teachers.
+    Every subject within a class can only have 1 teacher assigned at a time.
     """
 
     __tablename__ = "teacher_class_assignments"
@@ -51,6 +52,7 @@ class TeacherClassAssignment(SQLModel, table=True):
     branch_name: str = Field(foreign_key="schools.branch_name", max_length=120)
     class_number: int = Field(ge=1, le=5)
     section: str = Field(max_length=10)
+    subject: str = Field(max_length=100, index=True)
     assigned_at: datetime = Field(default_factory=_utcnow)
 
 
@@ -74,6 +76,7 @@ class Assignment(SQLModel, table=True):
     branch_name: str = Field(foreign_key="schools.branch_name", max_length=120)
     class_number: int = Field(ge=1, le=5)
     section: str = Field(max_length=10)
+    subject: Optional[str] = Field(default=None, max_length=100, index=True)
     title: str = Field(max_length=300)
     description: Optional[str] = Field(default=None, max_length=2000)
     assignment_type: str = Field(max_length=20)

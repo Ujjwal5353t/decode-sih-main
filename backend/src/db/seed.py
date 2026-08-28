@@ -326,12 +326,13 @@ async def seed_demo_accounts(session: AsyncSession) -> None:
         await session.refresh(teacher)
         print("[seed] Demo Teacher 'Dr. Rajesh Sharma' created.")
 
-    # Assign Class 4A to teacher
+    # Assign Class 4A Mathematics to teacher
     tca_res = await session.execute(
         select(TeacherClassAssignment).where(
             TeacherClassAssignment.teacher_id == teacher.id,
             TeacherClassAssignment.class_number == 4,
             TeacherClassAssignment.section == "A",
+            TeacherClassAssignment.subject == "Mathematics",
         )
     )
     if not tca_res.scalar_one_or_none():
@@ -341,10 +342,11 @@ async def seed_demo_accounts(session: AsyncSession) -> None:
                 branch_name=b_name,
                 class_number=4,
                 section="A",
+                subject="Mathematics",
             )
         )
         await session.commit()
-        print("[seed] Class 4A assigned to teacher.")
+        print("[seed] Class 4A (Mathematics) assigned to teacher.")
 
     # 3. Student: LKD0001
     std_res = await session.execute(select(Student).where(Student.unique_number == "LKD0001"))

@@ -161,6 +161,15 @@ export default function RegisterPage() {
     }
   };
 
+  const handleResetPhoneVerification = () => {
+    setOtpVerified(false);
+    setOtpSent(false);
+    setOtpCode("");
+    setOtpMessage(null);
+    clearError();
+    setLocalError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
@@ -289,7 +298,17 @@ export default function RegisterPage() {
 
       router.push("/dashboard");
     } catch (err: any) {
-      // Handled in auth provider / context
+      // If backend reports that the phone number is already registered, unlock phone verification so user can edit it immediately
+      const errMsg = (err?.message || error || "").toLowerCase();
+      if (
+        errMsg.includes("already registered") ||
+        errMsg.includes("phone") ||
+        errMsg.includes("mobile")
+      ) {
+        setOtpVerified(false);
+        setOtpSent(false);
+        setOtpCode("");
+      }
     }
   };
 
@@ -501,10 +520,23 @@ export default function RegisterPage() {
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
-                className="mb-6 p-3.5 rounded-[var(--radius-md)] bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs flex items-center gap-2.5"
+                className="mb-6 p-3.5 rounded-[var(--radius-md)] bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs flex items-center justify-between gap-2.5"
               >
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{activeError}</span>
+                <div className="flex items-center gap-2.5">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{activeError}</span>
+                </div>
+                {(activeError.toLowerCase().includes("phone") ||
+                  activeError.toLowerCase().includes("already registered") ||
+                  activeError.toLowerCase().includes("mobile")) && (
+                  <button
+                    type="button"
+                    onClick={handleResetPhoneVerification}
+                    className="underline hover:text-rose-400 font-semibold cursor-pointer shrink-0 text-xs"
+                  >
+                    Change Number
+                  </button>
+                )}
               </motion.div>
             )}
 
@@ -715,7 +747,18 @@ export default function RegisterPage() {
                         />
                       </div>
 
-                      {!otpVerified && (
+                      {otpVerified ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleResetPhoneVerification}
+                          className="shrink-0 text-xs px-3 text-brand border-border-brand hover:bg-brand/10 cursor-pointer"
+                          title="Change mobile number"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5 mr-1" /> Change
+                        </Button>
+                      ) : (
                         <Button
                           type="button"
                           variant="outline"
@@ -784,10 +827,19 @@ export default function RegisterPage() {
                     <motion.div
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="p-2.5 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs flex items-center gap-2 font-medium"
+                      className="p-2.5 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs flex items-center justify-between gap-2 font-medium"
                     >
-                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
-                      <span>Mobile Number Verified Successfully</span>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+                        <span>Mobile Number Verified Successfully</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleResetPhoneVerification}
+                        className="text-xs text-text-secondary hover:text-text-primary underline cursor-pointer font-semibold"
+                      >
+                        Change Number
+                      </button>
                     </motion.div>
                   )}
                 </div>

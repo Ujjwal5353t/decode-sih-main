@@ -81,7 +81,18 @@ async def test_db_chunking_ingestion_and_teacher_retrieval():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     
     async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+        await conn.run_sync(
+            lambda sync_conn: SQLModel.metadata.create_all(
+                sync_conn,
+                tables=[
+                    School.__table__,
+                    Teacher.__table__,
+                    TeacherClassAssignment.__table__,
+                    Module.__table__,
+                    DocumentChunk.__table__,
+                ],
+            )
+        )
 
     async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
