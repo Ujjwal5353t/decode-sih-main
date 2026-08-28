@@ -1465,3 +1465,52 @@ export async function getCurrentGaps(): Promise<CurrentGapOut[]> {
 export async function getQuizStatus(): Promise<QuizStatusOut> {
   return fetchApi<QuizStatusOut>("/quiz/status");
 }
+
+// ── Animated Lessons ───────────────────────────────────────────────────────────
+
+export interface LessonListItemOut {
+  id: string;
+  subject: string;
+  class_number: number;
+  chapter_number: number;
+  chapter_title: string;
+  slide_count: number;
+}
+
+export type LessonSlideType = "concept" | "example" | "check";
+
+export interface LessonSlideOut {
+  id: string;
+  slide_index: number;
+  slide_type: LessonSlideType;
+  text: string;
+  image_asset_key: string | null;
+  image_emoji: string | null;
+  options: string[] | null;
+  correct_option_index: number | null;
+  explanation: string | null;
+}
+
+export interface LessonOut {
+  id: string;
+  subject: string;
+  class_number: number;
+  chapter_number: number;
+  chapter_title: string;
+  slides: LessonSlideOut[];
+}
+
+export async function getLessons(
+  subject?: string,
+  classNumber?: number
+): Promise<LessonListItemOut[]> {
+  const params = new URLSearchParams();
+  if (subject) params.append("subject", subject);
+  if (classNumber) params.append("class_number", classNumber.toString());
+  const q = params.toString() ? `?${params.toString()}` : "";
+  return fetchApi<LessonListItemOut[]>(`/student/lessons${q}`);
+}
+
+export async function getLesson(lessonId: string): Promise<LessonOut> {
+  return fetchApi<LessonOut>(`/student/lessons/${lessonId}`);
+}

@@ -173,6 +173,12 @@ function SubjectGroupHeader({
           {priorityInfo!.gap_topics.length > 2 ? "…" : ""}
         </span>
       )}
+      <Link
+        href={`/dashboard/learn?subject=${encodeURIComponent(subject)}`}
+        className="ml-auto inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline shrink-0"
+      >
+        View Animated Lessons →
+      </Link>
     </div>
   );
 }

@@ -7,6 +7,8 @@ GET  /student/subject-priority — simple rule-based subject ordering, from diag
 GET  /student/assignments      — assignments for the student's class+section
 POST /student/assignments/{assignment_id}/submit  — mark as submitted
 GET  /student/assignments/{assignment_id}/feedback — get teacher feedback
+GET  /student/lessons          — animated lessons for a class/subject (NCERT-grounded)
+GET  /student/lessons/{lesson_id} — one lesson with its full slide list
 """
 
 import uuid
@@ -18,11 +20,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_session
 from src.core.dependencies import get_current_student
 from src.models.student import Student
+from src.schemas.lesson import LessonListItemOut, LessonOut, LessonSlideOut
 from src.schemas.module import ModuleOut
 from src.schemas.quiz import SubjectPriorityOut
 from src.schemas.student import StudentProfile
 from src.schemas.teacher import AssignmentOut, FeedbackOut, SubmissionOut
-from src.services import module_service, quiz_service, teacher_service
+from src.services import lesson_service, module_service, quiz_service, teacher_service
 
 router = APIRouter(prefix="/student", tags=["Student Dashboard"])
 
@@ -137,3 +140,74 @@ async def get_assignment_feedback(
     if not fb:
         return None
     return FeedbackOut.model_validate(fb)
+
+
+@router.get(
+    "/lessons",
+    response_model=list[LessonListItemOut],
+    summary="Get animated lessons for the student's class (requires class setup + diagnostic first)",
+)
+async def get_student_lessons(
+    subject: Optional[str] = None,
+    class_number: Optional[int] = None,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    from fastapi import HTTPException, status
+
+    if student.class_number is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please complete your class setup first via POST /auth/student/setup-class.",
+        )
+
+    if not await quiz_service.has_completed_diagnostic(student.id, session):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please complete your diagnostic assessment first via the Gap "
+                   "Identification Quiz (POST /quiz/start) before accessing modules.",
+        )
+
+    return await lesson_service.list_lessons(
+        session, class_number or student.class_number, subject
+    )
+
+
+@router.get(
+    "/lessons/{lesson_id}",
+    response_model=LessonOut,
+    summary="Get one lesson with its full ordered slide list",
+)
+async def get_student_lesson(
+    lesson_id: uuid.UUID,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    from fastapi import HTTPException, status
+
+    if student.class_number is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please complete your class setup first via POST /auth/student/setup-class.",
+        )
+
+    if not await quiz_service.has_completed_diagnostic(student.id, session):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please complete your diagnostic assessment first via the Gap "
+                   "Identification Quiz (POST /quiz/start) before accessing modules.",
+        )
+
+    found = await lesson_service.get_lesson_with_slides(lesson_id, session)
+    if not found:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found.")
+
+    lesson, slides = found
+    return LessonOut(
+        id=lesson.id,
+        subject=lesson.subject,
+        class_number=lesson.class_number,
+        chapter_number=lesson.chapter_number,
+        chapter_title=lesson.chapter_title,
+        slides=[LessonSlideOut.model_validate(s) for s in slides],
+    )
