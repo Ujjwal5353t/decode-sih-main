@@ -911,11 +911,13 @@ export async function uploadSchoolPdfModule(
   class_number: number,
   title: string,
   file: File,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  subject?: string
 ): Promise<ModuleOut> {
   const formData = new FormData();
   formData.append("title", title);
   formData.append("file", file);
+  if (subject) formData.append("subject", subject);
   return uploadFormData<ModuleOut>(
     `/school/classes/${class_number}/modules/pdf`,
     formData,
@@ -932,17 +934,20 @@ export async function uploadSchoolImagesModule(
   class_number: number,
   title: string,
   files: File[],
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  subject?: string
 ): Promise<ModuleOut> {
   const formData = new FormData();
   formData.append("title", title);
   files.forEach((file) => formData.append("files", file));
+  if (subject) formData.append("subject", subject);
   return uploadFormData<ModuleOut>(
     `/school/classes/${class_number}/modules/images`,
     formData,
     { onProgress }
   );
 }
+
 
 /**
  * PUT /school/classes/{class_number}/modules/{module_id}/replace-images
@@ -1027,6 +1032,18 @@ export interface EmailVerificationResponse {
   verified?: boolean | null;
 }
 
+export interface PublisherWithSubjectsOut {
+  id: string;
+  name: string;
+  subjects: string[];
+}
+
+export interface ClassSubjectPublisherItem {
+  class_number: number;
+  publisher_name: string;
+  subjects: string[];
+}
+
 export interface ClaimStatusOut {
   id: string;
   udise_code: string;
@@ -1044,6 +1061,7 @@ export interface ClaimStatusOut {
   authority_notes: string | null;
   decision_reason: string | null;
   evidence_url: string | null;
+  class_subjects?: ClassSubjectPublisherItem[] | null;
   created_at: string;
   admin_access_granted: boolean;
 }
@@ -1062,6 +1080,11 @@ export interface OwnerClaimListItem {
   school_name: string;
   status: ClaimStatusValue;
   created_at: string;
+}
+
+/** List all textbook publishers and their available subjects */
+export async function getPublishersWithSubjects(): Promise<PublisherWithSubjectsOut[]> {
+  return fetchApi<PublisherWithSubjectsOut[]>("/school-verification/publishers");
 }
 
 /** Official school record by UDISE code. */
@@ -1114,6 +1137,7 @@ export async function createSchoolClaim(payload: {
   official_email: string;
   phone_number: string;
   password: string;
+  class_subjects?: ClassSubjectPublisherItem[];
 }): Promise<ClaimCreatedResponse> {
   return fetchApi<ClaimCreatedResponse>("/school-verification/claims", {
     method: "POST",
@@ -1203,8 +1227,10 @@ export interface SchoolRequestListItem {
   reviewed_by: string | null;
   reviewed_at: string | null;
   created_at: string;
+  class_subjects?: ClassSubjectPublisherItem[] | null;
   admin_access_granted: boolean;
 }
+
 
 export async function getSchoolRegistrationRequests(
   status?: ClaimStatusValue
@@ -1253,6 +1279,21 @@ export async function getSchoolSubjectSetup(): Promise<SubjectSetupOut> {
   return fetchApi<SubjectSetupOut>("/school/subject-setup");
 }
 
+export interface SchoolSubjectDetail {
+  id: string;
+  class_number: number;
+  subject: string;
+  publisher_name?: string | null;
+  created_at?: string;
+}
+
+export async function getSchoolSubjects(
+  class_number?: number
+): Promise<SchoolSubjectDetail[]> {
+  const q = class_number ? `?class_number=${class_number}` : "";
+  return fetchApi<SchoolSubjectDetail[]>(`/school/subjects${q}`);
+}
+
 export async function saveSchoolSubjectSetup(
   classes: { class_number: number; subjects: string[] }[]
 ): Promise<SubjectSetupOut> {
@@ -1261,3 +1302,4 @@ export async function saveSchoolSubjectSetup(
     body: JSON.stringify({ classes }),
   });
 }
+

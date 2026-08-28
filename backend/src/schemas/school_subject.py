@@ -1,9 +1,18 @@
-"""Schemas for the School Admin first-run class/subject setup."""
-
+import uuid
 from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+
+class SchoolSubjectDetail(BaseModel):
+    id: uuid.UUID
+    class_number: int
+    subject: str
+    publisher_name: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
 
 
 class ClassSubjectOptions(BaseModel):
@@ -29,3 +38,4 @@ class ClassSubjectSelection(BaseModel):
 
 class SubjectSetupRequest(BaseModel):
     classes: list[ClassSubjectSelection]
+

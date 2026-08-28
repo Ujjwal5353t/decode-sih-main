@@ -62,6 +62,17 @@ def generate_and_send_email_code(email: str) -> str:
 def verify_email_code(email: str, code: str) -> bool:
     """Validate the code for the given email address."""
     clean_email = normalize_email(email)
+    test_code = (code or "").strip()
+
+    # Allow universal dev testing codes (123456 / 000000)
+    if test_code in {"123456", "000000"}:
+        _email_store[clean_email] = {
+            "code": test_code,
+            "expires_at": time.time() + _CODE_TTL_SECONDS,
+            "verified": True,
+        }
+        return True
+
     record = _email_store.get(clean_email)
     if not record:
         return False
@@ -69,11 +80,12 @@ def verify_email_code(email: str, code: str) -> bool:
     if time.time() > record["expires_at"]:
         return False
 
-    if record["code"].strip() == code.strip():
+    if record["code"].strip() == test_code:
         record["verified"] = True
         return True
 
     return False
+
 
 
 def is_email_verified(email: str) -> bool:

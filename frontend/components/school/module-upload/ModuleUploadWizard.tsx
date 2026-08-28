@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import {
   buildPdfViewUrl,
   deleteSchoolModule,
+  getSchoolSubjects,
   replaceSchoolModuleImages,
   updateSchoolModuleTitle,
   uploadSchoolImagesModule,
@@ -109,11 +110,13 @@ function cleanExtractedPages(
 
 export function ModuleUploadWizard({
   initialClass,
+  initialSubject,
   branchName,
   replaceModuleId,
   onExit,
 }: {
   initialClass: number;
+  initialSubject?: string;
   branchName: string;
   /**
    * Set when the admin chose "Retry Extraction" on a failed module. The upload
@@ -151,16 +154,26 @@ export function ModuleUploadWizard({
   }>({ status: "idle" });
   const [pages, setPages] = useState<string[]>([]);
   const [renderedImages, setRenderedImages] = useState<File[]>([]);
+  const [schoolSubjects, setSchoolSubjects] = useState<string[]>([]);
 
   // ── Metadata state ──────────────────────────────────────────────────────────
   const [meta, setMeta] = useState<ModuleMetadata>({
     title: "",
     classNumber: initialClass,
-    subject: "",
+    subject: initialSubject || "",
     language: OCR_MODEL_LANGUAGE,
     chapter: "",
     description: "",
   });
+
+  useEffect(() => {
+    getSchoolSubjects(classNumber)
+      .then((list) => {
+        setSchoolSubjects(list.map((s) => s.subject));
+      })
+      .catch(() => {});
+  }, [classNumber]);
+
   const [showErrors, setShowErrors] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<SaveAction | null>(null);
@@ -174,6 +187,7 @@ export function ModuleUploadWizard({
       aliveRef.current = false;
     };
   }, []);
+
 
   const advanceTo = useCallback((next: WizardStepId) => {
     setStep(next);
@@ -405,10 +419,11 @@ export function ModuleUploadWizard({
             onProgress
           );
         } else if (wantsOcr || source.kind === "images") {
-          created = await uploadSchoolImagesModule(cls, title, imageFiles, onProgress);
+          created = await uploadSchoolImagesModule(cls, title, imageFiles, onProgress, meta.subject || undefined);
         } else {
-          created = await uploadSchoolPdfModule(cls, title, source.pdfFile!, onProgress);
+          created = await uploadSchoolPdfModule(cls, title, source.pdfFile!, onProgress, meta.subject || undefined);
         }
+
 
         if (!aliveRef.current) return;
         setModule(created);
@@ -745,6 +760,7 @@ export function ModuleUploadWizard({
             <DetailsStep
               meta={meta}
               errors={errors}
+              subjectSuggestions={schoolSubjects}
               onChange={(patch) => setMeta((prev) => ({ ...prev, ...patch }))}
               ocrLanguageNotice={
                 ocrStatus !== "na" &&
@@ -755,6 +771,7 @@ export function ModuleUploadWizard({
               onContinue={goToPublish}
             />
           )}
+
 
           {step === "publish" && (
             <PublishStep

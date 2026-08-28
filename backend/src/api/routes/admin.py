@@ -52,9 +52,18 @@ async def get_admin_profile(admin: Admin = Depends(get_current_admin)):
 
 # ── Registrations → School Requests ───────────────────────────────────────────
 
+import json
+
 def _request_out(
     claim: SchoolAdminClaim, record: Optional[SchoolDirectory]
 ) -> SchoolRequestListItem:
+    class_subjects = None
+    if claim.class_subjects_json:
+        try:
+            class_subjects = json.loads(claim.class_subjects_json)
+        except Exception:
+            class_subjects = None
+
     return SchoolRequestListItem(
         id=claim.id,
         school_name=record.school_name if record else claim.udise_code,
@@ -77,11 +86,13 @@ def _request_out(
         reviewed_by=claim.reviewed_by,
         reviewed_at=claim.reviewed_at,
         created_at=claim.created_at,
+        class_subjects=class_subjects,
         # Only ever true once approved AND an account exists for the claimant.
         admin_access_granted=(
             claim.status == ClaimStatus.APPROVED and claim.school_id is not None
         ),
     )
+
 
 
 @router.get(

@@ -9,8 +9,10 @@ school, which is what this table records.
 
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from sqlmodel import Field, SQLModel
+
 
 
 def _utcnow() -> datetime:
@@ -30,5 +32,7 @@ class SchoolClassSubject(SQLModel, table=True):
     school_id: uuid.UUID = Field(foreign_key="schools.id", index=True)
     class_number: int = Field(ge=1, le=5, index=True)
     subject: str = Field(max_length=100)
+    publisher_name: Optional[str] = Field(default=None, max_length=150)
 
     created_at: datetime = Field(default_factory=_utcnow)
+

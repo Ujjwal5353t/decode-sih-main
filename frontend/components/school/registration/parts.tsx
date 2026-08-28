@@ -35,15 +35,23 @@ export const DESIGNATIONS = [
   "Other",
 ];
 
-export type RegStepId = "find" | "confirm" | "claim" | "verify" | "result";
+export type RegStepId =
+  | "find"
+  | "confirm"
+  | "claim"
+  | "curriculum"
+  | "verify"
+  | "result";
 
 export const REG_STEPS: { id: RegStepId; label: string; hint: string }[] = [
   { id: "find", label: "Find School", hint: "UDISE or name" },
   { id: "confirm", label: "Confirm", hint: "Official record" },
-  { id: "claim", label: "Claim", hint: "Your details" },
-  { id: "verify", label: "Verify", hint: "Phone & email" },
-  { id: "result", label: "Authority", hint: "Access decision" },
+  { id: "claim", label: "Admin Details", hint: "Your identity" },
+  { id: "curriculum", label: "Subjects & Books", hint: "Class-wise publishers" },
+  { id: "verify", label: "Verify", hint: "Phone & email OTP" },
+  { id: "result", label: "Status", hint: "Approval & access" },
 ];
+
 
 /** Horizontal progress rail, matching the module-upload wizard's language. */
 export function RegStepRail({ current }: { current: RegStepId }) {

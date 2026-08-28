@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -10,16 +10,20 @@ import {
   ClipboardCheck,
   Clock,
   Loader2,
+  RefreshCw,
+  RotateCcw,
   Search,
   ShieldCheck,
   Upload,
   UserCheck,
   X,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
   activateSchoolClaim,
   createSchoolClaim,
+  getSchoolClaim,
   lookupSchoolByUdise,
   searchSchoolDirectory,
   sendOTP,
@@ -28,6 +32,7 @@ import {
   verifyOTP,
   verifySchoolEmailCode,
   type ClaimStatusOut,
+  type ClassSubjectPublisherItem,
   type SchoolRecordOut,
 } from "@/lib/api";
 import {
@@ -46,8 +51,11 @@ import {
   type CheckState,
   type RegStepId,
 } from "./parts";
+import { CurriculumStep } from "./CurriculumStep";
 
 type LookupMode = "udise" | "name";
+
+const STORAGE_KEY = "vidyasetu_school_registration_flow_v1";
 
 export function SchoolRegistrationFlow() {
   const router = useRouter();
@@ -74,7 +82,10 @@ export function SchoolRegistrationFlow() {
   const [password, setPassword] = useState("");
   const [claimError, setClaimError] = useState<string | null>(null);
 
-  // ── Step 4: verification ────────────────────────────────────────────────────
+  // ── Step 4: curriculum & publishers ─────────────────────────────────────────
+  const [classSubjects, setClassSubjects] = useState<ClassSubjectPublisherItem[]>([]);
+
+  // ── Step 5: verification ────────────────────────────────────────────────────
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [phoneVerified, setPhoneVerified] = useState(false);
@@ -90,15 +101,135 @@ export function SchoolRegistrationFlow() {
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // ── Step 5: result ──────────────────────────────────────────────────────────
+  // ── Step 6: result ──────────────────────────────────────────────────────────
   const [claim, setClaim] = useState<ClaimStatusOut | null>(null);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [evidenceBusy, setEvidenceBusy] = useState(false);
   const [resultError, setResultError] = useState<string | null>(null);
   const [entering, setEntering] = useState(false);
 
-  // ── Lookup ──────────────────────────────────────────────────────────────────
+  // ── Restore State from localStorage on Mount ────────────────────────────────
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
 
+      if (saved.step) setStep(saved.step);
+      if (saved.mode) setMode(saved.mode);
+      if (saved.udise) setUdise(saved.udise);
+      if (saved.name) setName(saved.name);
+      if (saved.state) setState(saved.state);
+      if (saved.district) setDistrict(saved.district);
+      if (saved.record) setRecord(saved.record);
+      if (saved.fullName) setFullName(saved.fullName);
+      if (saved.designation) setDesignation(saved.designation);
+      if (saved.email) setEmail(saved.email);
+      if (saved.phone) setPhone(saved.phone);
+      if (saved.password) setPassword(saved.password);
+      if (saved.classSubjects && Array.isArray(saved.classSubjects)) {
+        setClassSubjects(saved.classSubjects);
+      }
+      if (saved.phoneVerified) setPhoneVerified(saved.phoneVerified);
+      if (saved.emailVerified) setEmailVerified(saved.emailVerified);
+      if (saved.resultMessage) setResultMessage(saved.resultMessage);
+
+      if (saved.claim) {
+        setClaim(saved.claim);
+      }
+
+    } catch (err) {
+      console.error("Failed to restore registration state from localStorage:", err);
+    }
+  }, []);
+
+  // ── Sync State to localStorage on change ────────────────────────────────────
+  useEffect(() => {
+    try {
+      const stateToSave = {
+        step,
+        mode,
+        udise,
+        name,
+        state,
+        district,
+        record,
+        fullName,
+        designation,
+        email,
+        phone,
+        password,
+        classSubjects,
+        phoneVerified,
+        emailVerified,
+        claimId: claim?.id ?? null,
+        claim,
+        resultMessage,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+    } catch (err) {
+      console.error("Failed to save registration state:", err);
+    }
+  }, [
+    step,
+    mode,
+    udise,
+    name,
+    state,
+    district,
+    record,
+    fullName,
+    designation,
+    email,
+    phone,
+    password,
+    classSubjects,
+    phoneVerified,
+    emailVerified,
+    claim,
+    resultMessage,
+  ]);
+
+  // ── Reset / Start Over ──────────────────────────────────────────────────────
+  const handleResetRegistration = () => {
+    if (
+      window.confirm(
+        "Are you sure you want to start over? All entered details will be cleared."
+      )
+    ) {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (err) {
+        // ignore
+      }
+      setStep("find");
+      setMode("udise");
+      setUdise("");
+      setName("");
+      setState("");
+      setDistrict("");
+      setRecord(null);
+      setFullName("");
+      setDesignation(DESIGNATIONS[0]);
+      setEmail("");
+      setPhone("");
+      setPassword("");
+      setClassSubjects([]);
+      setOtpSent(false);
+      setOtpCode("");
+      setPhoneVerified(false);
+      setEmailSent(false);
+      setEmailCode("");
+      setEmailVerified(false);
+      setClaim(null);
+      setResultMessage(null);
+      setSearchError(null);
+      setVerifyError(null);
+      setResultError(null);
+    }
+  };
+
+  // ── Lookup ──────────────────────────────────────────────────────────────────
   const runLookup = useCallback(async () => {
     setSearchError(null);
     setResults(null);
@@ -146,7 +277,6 @@ export function SchoolRegistrationFlow() {
   }, [district, mode, name, state, udise]);
 
   // ── Verification helpers ────────────────────────────────────────────────────
-
   const handleSendOtp = async () => {
     setVerifyError(null);
     setOtpBusy(true);
@@ -210,7 +340,6 @@ export function SchoolRegistrationFlow() {
   };
 
   // ── Submit the claim ────────────────────────────────────────────────────────
-
   const submitClaim = async () => {
     if (!record) return;
     setVerifyError(null);
@@ -223,6 +352,7 @@ export function SchoolRegistrationFlow() {
         official_email: email.trim(),
         phone_number: phone.trim(),
         password,
+        class_subjects: classSubjects.length > 0 ? classSubjects : undefined,
       });
       setClaim(res.claim);
       setResultMessage(res.message);
@@ -258,6 +388,11 @@ export function SchoolRegistrationFlow() {
     setEntering(true);
     try {
       await activateSchoolClaim(claim.id);
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {
+        // ignore
+      }
       router.push("/dashboard");
     } catch (err) {
       setResultError(
@@ -268,7 +403,6 @@ export function SchoolRegistrationFlow() {
   };
 
   // ── Validation ──────────────────────────────────────────────────────────────
-
   const claimErrors = {
     fullName: fullName.trim().length < 2 ? "Enter your full name." : undefined,
     email: !/^\S+@\S+\.\S+$/.test(email.trim())
@@ -285,7 +419,22 @@ export function SchoolRegistrationFlow() {
 
   return (
     <div className="space-y-6">
-      <RegStepRail current={step} />
+      <div className="flex items-center justify-between gap-3">
+        <RegStepRail current={step} />
+      </div>
+
+      {step !== "find" && step !== "result" && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleResetRegistration}
+            className="text-xs text-text-tertiary hover:text-rose-500 flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reset and start over
+          </button>
+        </div>
+      )}
 
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
@@ -303,7 +452,7 @@ export function SchoolRegistrationFlow() {
                   icon={Search}
                   title="Find Your School"
                   description="We identify your school from its official record before anyone can claim it."
-                  action={<Pill tone="neutral">Step 1 of 5</Pill>}
+                  action={<Pill tone="neutral">Step 1 of 6</Pill>}
                 />
 
                 <div className="flex items-center gap-1 bg-surface-hover p-1 rounded-[var(--radius-md)] w-fit mb-5">
@@ -449,7 +598,7 @@ export function SchoolRegistrationFlow() {
                   icon={Building2}
                   title="Official School Record"
                   description="This is the record we hold for the school you selected."
-                  action={<Pill tone="neutral">Step 2 of 5</Pill>}
+                  action={<Pill tone="neutral">Step 2 of 6</Pill>}
                 />
                 <SchoolRecordCard record={record} />
 
@@ -490,8 +639,8 @@ export function SchoolRegistrationFlow() {
                 <PanelHeading
                   icon={UserCheck}
                   title="Administrator Verification"
-                  description={`Tell us who you are at ${record.school_name}. We verify these details in the next step.`}
-                  action={<Pill tone="neutral">Step 3 of 5</Pill>}
+                  description={`Tell us who you are at ${record.school_name}. We verify these details in the verification step.`}
+                  action={<Pill tone="neutral">Step 3 of 6</Pill>}
                 />
 
                 {claimError && (
@@ -598,16 +747,26 @@ export function SchoolRegistrationFlow() {
                   disabled={!claimValid}
                   onClick={() => {
                     setClaimError(null);
-                    setStep("verify");
+                    setStep("curriculum");
                   }}
                 >
-                  Continue to verification
+                  Continue to Class & Subjects
                 </Button>
               </div>
             </div>
           )}
 
-          {/* ── STEP 4: PHONE + EMAIL VERIFICATION ───────────────────────── */}
+          {/* ── STEP 4: CLASS-WISE SUBJECTS & PUBLISHERS ─────────────────── */}
+          {step === "curriculum" && record && (
+            <CurriculumStep
+              value={classSubjects}
+              onChange={setClassSubjects}
+              onBack={() => setStep("claim")}
+              onNext={() => setStep("verify")}
+            />
+          )}
+
+          {/* ── STEP 5: PHONE + EMAIL VERIFICATION ───────────────────────── */}
           {step === "verify" && record && (
             <div className="space-y-6">
               <Panel>
@@ -615,7 +774,7 @@ export function SchoolRegistrationFlow() {
                   icon={ShieldCheck}
                   title="Verify Your Identity"
                   description="Confirm you control the phone number and email address you supplied."
-                  action={<Pill tone="neutral">Step 4 of 5</Pill>}
+                  action={<Pill tone="neutral">Step 5 of 6</Pill>}
                 />
 
                 {verifyError && (
@@ -758,9 +917,9 @@ export function SchoolRegistrationFlow() {
                   variant="ghost"
                   size="sm"
                   type="button"
-                  onClick={() => setStep("claim")}
+                  onClick={() => setStep("curriculum")}
                 >
-                  Back
+                  Back to Class Subjects
                 </Button>
                 <Button
                   variant="primary"
@@ -774,14 +933,14 @@ export function SchoolRegistrationFlow() {
                       <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Submitting…
                     </>
                   ) : (
-                    "Submit claim"
+                    "Submit Registration Request"
                   )}
                 </Button>
               </div>
             </div>
           )}
 
-          {/* ── STEP 5: RESULT ───────────────────────────────────────────── */}
+          {/* ── STEP 6: RESULT / APPROVAL STATUS ─────────────────────────── */}
           {step === "result" && claim && (
             <ResultView
               claim={claim}
@@ -790,8 +949,10 @@ export function SchoolRegistrationFlow() {
               evidenceBusy={evidenceBusy}
               entering={entering}
               onEvidence={handleEvidence}
+              onClaimUpdate={setClaim}
               onEnterDashboard={() => void enterDashboard()}
               onBackToLogin={() => router.push("/login")}
+              onReset={handleResetRegistration}
             />
           )}
         </motion.div>
@@ -800,7 +961,7 @@ export function SchoolRegistrationFlow() {
   );
 }
 
-// ── Result / status screen ────────────────────────────────────────────────────
+// ── Result / live status screen with automatic polling ────────────────────────
 
 function ResultView({
   claim,
@@ -809,8 +970,10 @@ function ResultView({
   evidenceBusy,
   entering,
   onEvidence,
+  onClaimUpdate,
   onEnterDashboard,
   onBackToLogin,
+  onReset,
 }: {
   claim: ClaimStatusOut;
   message: string | null;
@@ -818,18 +981,33 @@ function ResultView({
   evidenceBusy: boolean;
   entering: boolean;
   onEvidence: (file: File) => void;
+  onClaimUpdate: (updated: ClaimStatusOut) => void;
   onEnterDashboard: () => void;
   onBackToLogin: () => void;
+  onReset: () => void;
 }) {
   const approved = claim.admin_access_granted;
   const rejected = claim.status === "rejected";
   const awaitingOwner = claim.route === "owner_approval" && claim.status === "pending";
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const fresh = await getSchoolClaim(claim.id);
+      onClaimUpdate(fresh);
+    } catch (err) {
+      console.error("Manual refresh error:", err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const authorityState: CheckState = approved
     ? "done"
     : rejected
-      ? "failed"
-      : "pending";
+    ? "failed"
+    : "pending";
 
   return (
     <div className="space-y-6">
@@ -838,15 +1016,32 @@ function ResultView({
           icon={approved ? Check : rejected ? X : ClipboardCheck}
           title={
             approved
-              ? "Verification Complete"
+              ? "Registration Approved & Verified!"
               : rejected
-                ? "Verification Failed"
-                : awaitingOwner
-                  ? "Approval Requested"
-                  : "Authority Verification Pending"
+              ? "Registration Rejected"
+              : awaitingOwner
+              ? "Approval Requested"
+              : "Registration Sent to Superadmin"
           }
           description={message ?? undefined}
-          action={<Pill tone="neutral">Step 5 of 5</Pill>}
+          action={
+            <div className="flex items-center gap-2">
+              {!approved && !rejected && (
+                <button
+                  type="button"
+                  onClick={handleManualRefresh}
+                  disabled={refreshing}
+                  className="flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline cursor-pointer"
+                >
+                  <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} />
+                  Check Status
+                </button>
+              )}
+              <Pill tone={approved ? "emerald" : rejected ? "rose" : "amber"}>
+                Step 6 of 6 · {approved ? "Approved" : rejected ? "Rejected" : "Submitted"}
+              </Pill>
+            </div>
+          }
         />
 
         <div className="space-y-5">
@@ -880,19 +1075,41 @@ function ResultView({
                 note: claim.official_email,
               },
               {
-                label: "Authority Verification",
+                label: "Superadmin Approval",
                 state: authorityState,
                 note:
                   claim.decision_reason ||
                   claim.authority_notes ||
-                  "Checking your authority to administer this school.",
+                  "Request submitted and queued for platform superadmin review.",
               },
             ]}
           />
 
+          {/* Curriculum summary badge if present */}
+          {claim.class_subjects && claim.class_subjects.length > 0 && (
+            <div className="rounded-[var(--radius-md)] border border-border-primary bg-surface/40 p-4 space-y-2">
+              <p className="text-xs font-bold text-text-primary flex items-center gap-1.5 font-[family-name:var(--font-display)]">
+                <BookOpen className="w-3.5 h-3.5 text-brand" />
+                Configured Class-wise Curriculum:
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {claim.class_subjects.map((cs, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-surface border border-border-primary text-text-secondary"
+                  >
+                    <strong>Class {cs.class_number}:</strong> {cs.publisher_name} (
+                    {cs.subjects.join(", ")})
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {approved && (
             <Banner tone="success" title="School Admin access granted">
-              Your authority has been verified and your school account is active.
+              Your authority and registration have been approved by the platform
+              administrator. Your school account is now fully active!
             </Banner>
           )}
 
@@ -915,12 +1132,12 @@ function ResultView({
 
           {!approved && !rejected && !awaitingOwner && (
             <>
-              <Banner tone="warning" title="Awaiting platform approval">
-                Your school has been identified successfully. Your registration
-                is now with the VidyaSetu team, who review every new school
-                before its administrator gets access. School management features
-                will become available once your request is approved.
+              <Banner tone="info" title="Request Sent to Super Admin">
+                Your registration and class curriculum details have been successfully
+                submitted to the VidyaSetu team. The platform administrator will review
+                and approve your request shortly.
               </Banner>
+
 
               <div className="rounded-[var(--radius-md)] border border-border-primary bg-surface/60 p-4">
                 <p className="text-xs font-bold text-text-primary font-[family-name:var(--font-display)]">
@@ -929,8 +1146,7 @@ function ResultView({
                 <p className="text-[11px] text-text-secondary mt-1 leading-relaxed">
                   Attach a recognition certificate, board affiliation letter,
                   state education authority document or an authorisation letter on
-                  school letterhead. A reviewer still checks it — uploading a
-                  document does not grant access on its own.
+                  school letterhead.
                 </p>
 
                 {claim.evidence_url ? (
@@ -977,9 +1193,21 @@ function ResultView({
       </Panel>
 
       <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <Button variant="ghost" size="sm" type="button" onClick={onBackToLogin}>
-          Back to sign in
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" type="button" onClick={onBackToLogin}>
+            Back to sign in
+          </Button>
+          {!approved && (
+            <button
+              type="button"
+              onClick={onReset}
+              className="text-xs text-text-tertiary hover:text-rose-500 transition-colors"
+            >
+              Start new registration
+            </button>
+          )}
+        </div>
+
         {approved && (
           <Button
             variant="primary"
@@ -987,10 +1215,11 @@ function ResultView({
             type="button"
             disabled={entering}
             onClick={onEnterDashboard}
+            className="animate-pulse"
           >
             {entering ? (
               <>
-                <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Opening…
+                <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Opening Dashboard…
               </>
             ) : (
               <>

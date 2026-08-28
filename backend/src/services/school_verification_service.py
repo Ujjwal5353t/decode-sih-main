@@ -19,6 +19,7 @@ Who approves depends on the route:
                     approved. That school's verified owner decides.
 """
 
+import json
 import re
 import uuid
 from datetime import datetime
@@ -30,7 +31,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from src.core.security import hash_password
+from src.models.publisher import Publisher, PublisherSubject
 from src.models.school import BranchCounter, School
+from src.models.school_subject import SchoolClassSubject
 from src.models.school_verification import (
     AuthorityStatus,
     ClaimRoute,
@@ -40,11 +43,16 @@ from src.models.school_verification import (
     SchoolVerificationEvent,
     SchoolVerificationStatus,
 )
+from src.schemas.school_verification import (
+    ClassSubjectPublisherItem,
+    PublisherWithSubjectsOut,
+)
 from src.services.email_verification_service import (
     is_email_verified,
     normalize_email,
 )
 from src.services.otp_service import is_phone_verified, normalize_phone
+
 
 # Designations that assert head-of-institution authority. Used only to decide
 # how much scrutiny a claim needs — never as proof of authority on its own.
@@ -117,13 +125,28 @@ async def get_verified_owner_school(
 ) -> Optional[School]:
     """The existing School account that already owns this UDISE code, if any."""
     code = (udise_code or "").strip().upper()
+    if not code:
+        return None
     result = await session.execute(
         select(School).where(
             func.upper(School.udise_code) == code,
             School.verification_status == SchoolVerificationStatus.VERIFIED,
         )
     )
-    return result.scalars().first()
+    school = result.scalars().first()
+    if school:
+        return school
+
+    record = await lookup_by_udise(code, session)
+    if record and record.official_email:
+        res = await session.execute(
+            select(School).where(
+                func.lower(School.email) == record.official_email.strip().lower(),
+                School.verification_status == SchoolVerificationStatus.VERIFIED,
+            )
+        )
+        return res.scalars().first()
+    return None
 
 
 # ── 3. Authority ──────────────────────────────────────────────────────────────
@@ -207,6 +230,7 @@ async def create_claim(
     official_email: str,
     phone_number: str,
     password: str,
+    class_subjects: Optional[list[ClassSubjectPublisherItem]] = None,
 ) -> tuple[SchoolAdminClaim, SchoolDirectory, Optional[School]]:
     """
     Create an administrator claim.
@@ -244,9 +268,60 @@ async def create_claim(
             detail="Password must be at least 8 characters.",
         )
 
+    # ── Save any new publishers and subjects to the database ──────────────────
+    class_subjects_json: Optional[str] = None
+    if class_subjects:
+        class_subjects_data = []
+        for item in class_subjects:
+            pub_name = (item.publisher_name or "").strip()
+            if not pub_name:
+                continue
+
+            valid_subjects = [s.strip() for s in item.subjects if s and s.strip()]
+
+            # Check / insert publisher
+            try:
+                pub_res = await session.execute(
+                    select(Publisher).where(func.lower(Publisher.name) == pub_name.lower())
+                )
+                pub = pub_res.scalar_one_or_none()
+                if not pub:
+                    pub = Publisher(name=pub_name)
+                    session.add(pub)
+                    await session.flush()
+
+                # Check / insert subjects under this publisher
+                for sub_name in valid_subjects:
+                    sub_res = await session.execute(
+                        select(PublisherSubject).where(
+                            PublisherSubject.publisher_id == pub.id,
+                            func.lower(PublisherSubject.subject_name) == sub_name.lower(),
+                        )
+                    )
+                    if not sub_res.scalar_one_or_none():
+                        session.add(
+                            PublisherSubject(
+                                publisher_id=pub.id,
+                                subject_name=sub_name,
+                            )
+                        )
+            except Exception as pub_err:
+                print(f"[create_claim] publisher persistence notice: {pub_err}")
+
+            if valid_subjects:
+                class_subjects_data.append({
+                    "class_number": item.class_number,
+                    "publisher_name": pub_name,
+                    "subjects": valid_subjects,
+                })
+
+        if class_subjects_data:
+            class_subjects_json = json.dumps(class_subjects_data)
+
     # ── Existing school protection ────────────────────────────────────────────
     owner_school = await get_verified_owner_school(record.udise_code, session)
     route = ClaimRoute.OWNER_APPROVAL if owner_school else ClaimRoute.FIRST_ADMIN
+
 
     # Never let the same person queue duplicate claims for the same school.
     duplicate = await session.execute(
@@ -273,9 +348,11 @@ async def create_claim(
         phone_verified=True,
         email_verified=True,
         password_hash=hash_password(password),
+        class_subjects_json=class_subjects_json,
         route=route,
         status=ClaimStatus.PENDING,
     )
+
 
     # Authority is only evaluated on the first-admin path. When a verified owner
     # exists, that owner is the authority and decides directly.
@@ -425,18 +502,44 @@ async def activate_claim(session: AsyncSession, claim: SchoolAdminClaim) -> Scho
         )
 
     # Existing school protection — reuse, never duplicate.
+    query_conditions = [func.upper(School.udise_code) == record.udise_code.upper()]
+    if claim.official_email:
+        query_conditions.append(func.lower(School.email) == claim.official_email.strip().lower())
+    if record.official_email:
+        query_conditions.append(func.lower(School.email) == record.official_email.strip().lower())
+
     existing = await session.execute(
-        select(School).where(func.upper(School.udise_code) == record.udise_code.upper())
+        select(School).where(or_(*query_conditions))
     )
     school = existing.scalars().first()
 
     if school:
         school.verification_status = SchoolVerificationStatus.VERIFIED
+        if not school.udise_code and record.udise_code:
+            school.udise_code = record.udise_code
+        if not school.district and record.district:
+            school.district = record.district
+        if not school.board and record.board:
+            school.board = record.board
+        if not school.management and record.management:
+            school.management = record.management
         if school.owner_claim_id is None:
             school.owner_claim_id = claim.id
+            if claim.password_hash:
+                school.password_hash = claim.password_hash
+        if claim.phone_number and not school.phone_number:
+            school.phone_number = claim.phone_number
+
         session.add(school)
         claim.school_id = school.id
         session.add(claim)
+
+        counter_res = await session.execute(
+            select(BranchCounter).where(BranchCounter.branch_name == school.branch_name)
+        )
+        if not counter_res.scalar_one_or_none():
+            session.add(BranchCounter(branch_name=school.branch_name, last_counter=0))
+
         await record_event(
             session, claim.id, "admin_attached_to_existing_school", str(school.id)
         )
@@ -465,8 +568,94 @@ async def activate_claim(session: AsyncSession, claim: SchoolAdminClaim) -> Scho
     claim.school_id = school.id
     session.add(claim)
 
+    # ── Populate class subjects from claim if present ─────────────────────────
+    if claim.class_subjects_json:
+        try:
+            entries = json.loads(claim.class_subjects_json)
+            for entry in entries:
+                class_num = entry.get("class_number")
+                pub_name = entry.get("publisher_name")
+                for sub in entry.get("subjects", []):
+                    # Check if already exists for this school
+                    ex_sub = await session.execute(
+                        select(SchoolClassSubject).where(
+                            SchoolClassSubject.school_id == school.id,
+                            SchoolClassSubject.class_number == class_num,
+                            func.lower(SchoolClassSubject.subject) == sub.strip().lower(),
+                        )
+                    )
+                    if not ex_sub.scalar_one_or_none():
+                        session.add(
+                            SchoolClassSubject(
+                                school_id=school.id,
+                                class_number=class_num,
+                                subject=sub.strip(),
+                                publisher_name=pub_name,
+                            )
+                        )
+            school.subjects_configured_at = datetime.utcnow()
+            session.add(school)
+            await record_event(
+                session, claim.id, "subjects_configured_from_claim", str(school.id)
+            )
+        except Exception as e:
+            print(f"[activate_claim] Warning: could not parse class_subjects_json: {e}")
+
     await record_event(session, claim.id, "school_account_created", str(school.id))
     return school
+
+
+async def get_all_publishers_with_subjects(
+    session: AsyncSession,
+) -> list[PublisherWithSubjectsOut]:
+    """Return all publishers with their registered subjects."""
+    from src.db.seed import PUBLISHER_SEED
+
+    try:
+        pub_res = await session.execute(
+            text("SELECT id, name FROM publishers ORDER BY name;")
+        )
+        publishers = pub_res.fetchall()
+
+        sub_res = await session.execute(
+            text("SELECT publisher_id, subject_name FROM publisher_subjects ORDER BY subject_name;")
+        )
+        subjects = sub_res.fetchall()
+
+        sub_map: dict[str, list[str]] = {}
+        for pid, sname in subjects:
+            sub_map.setdefault(str(pid), []).append(sname)
+
+        if publishers:
+            return [
+                PublisherWithSubjectsOut(
+                    id=p[0],
+                    name=p[1],
+                    subjects=sub_map.get(str(p[0]), []),
+                )
+                for p in publishers
+            ]
+    except Exception as e:
+        print(f"[get_all_publishers_with_subjects] fallback: {e}")
+        try:
+            await session.rollback()
+        except Exception:
+            pass
+
+    # Fallback to standard publishers list
+    return [
+        PublisherWithSubjectsOut(
+            id=uuid.uuid5(uuid.NAMESPACE_DNS, p["name"]),
+            name=p["name"],
+            subjects=p["subjects"],
+        )
+        for p in PUBLISHER_SEED
+    ]
+
+
+
+
+
 
 
 async def get_claim_or_404(
