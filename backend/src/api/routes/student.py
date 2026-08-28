@@ -9,6 +9,8 @@ POST /student/assignments/{assignment_id}/submit  — mark as submitted
 GET  /student/assignments/{assignment_id}/feedback — get teacher feedback
 GET  /student/lessons          — animated lessons for a class/subject (NCERT-grounded)
 GET  /student/lessons/{lesson_id} — one lesson with its full slide list
+POST /student/learning-events  — sync queued offline learning activity (idempotent)
+GET  /student/progress         — per-module learning progress, projected from those events
 """
 
 import uuid
@@ -20,12 +22,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_session
 from src.core.dependencies import get_current_student
 from src.models.student import Student
+from src.schemas.learning import (
+    LearningEventSyncRequest,
+    LearningEventSyncResponse,
+    StudentProgressOut,
+)
 from src.schemas.lesson import LessonListItemOut, LessonOut, LessonSlideOut
 from src.schemas.module import ModuleOut
 from src.schemas.quiz import SubjectPriorityOut
 from src.schemas.student import StudentProfile
 from src.schemas.teacher import AssignmentOut, FeedbackOut, SubmissionOut
-from src.services import lesson_service, module_service, quiz_service, teacher_service
+from src.services import (
+    learning_progress_service,
+    lesson_service,
+    module_service,
+    quiz_service,
+    teacher_service,
+)
 
 router = APIRouter(prefix="/student", tags=["Student Dashboard"])
 
@@ -211,3 +224,40 @@ async def get_student_lesson(
         chapter_title=lesson.chapter_title,
         slides=[LessonSlideOut.model_validate(s) for s in slides],
     )
+
+
+# ── Learning activity & progress ──────────────────────────────────────────────
+
+@router.post(
+    "/learning-events",
+    response_model=LearningEventSyncResponse,
+    summary="Sync queued learning-activity events (idempotent — safe to retry)",
+)
+async def sync_learning_events(
+    body: LearningEventSyncRequest,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    The offline queue's drain endpoint. Events are appended, never updated,
+    and de-duplicated on the device-generated client_event_id, so replaying
+    a batch after a failed or half-finished sync cannot double-count
+    anything.
+
+    Deliberately not gated on class setup or the diagnostic quiz: an event
+    that was recorded while offline must still be storable later, whatever
+    the student's account state has become in the meantime.
+    """
+    return await learning_progress_service.ingest_events(student, body.events, session)
+
+
+@router.get(
+    "/progress",
+    response_model=StudentProgressOut,
+    summary="This student's per-module learning progress",
+)
+async def get_student_learning_progress(
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    return await learning_progress_service.get_student_progress(student, session)

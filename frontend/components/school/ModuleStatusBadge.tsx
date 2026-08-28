@@ -17,9 +17,9 @@ const statusMap: Record<
   }
 > = {
   uploading: { label: "Uploading", tone: "brand", Icon: Loader2, spin: true },
-  pending: { label: "Processing", tone: "amber", Icon: Loader2, spin: true },
-  processing: { label: "Processing", tone: "amber", Icon: Loader2, spin: true },
-  done: { label: "Ready", tone: "emerald", Icon: CheckCircle },
+  pending: { label: "Processing OCR…", tone: "amber", Icon: Loader2, spin: true },
+  processing: { label: "Processing OCR…", tone: "amber", Icon: Loader2, spin: true },
+  done: { label: "OCR Complete", tone: "emerald", Icon: CheckCircle },
   failed: { label: "OCR Failed", tone: "rose", Icon: AlertCircle },
   na: { label: "Document only", tone: "neutral", Icon: FileText },
 };

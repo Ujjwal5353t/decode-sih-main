@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, AlertCircle, Layers, BookOpen, ChevronRight, Sparkles } from "lucide-react";
+import { ArrowLeft, AlertCircle, Layers, BookOpen, ChevronRight, Sparkles, CloudOff } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
-import { StudentProfile, LessonListItemOut, getLessons } from "@/lib/api";
+import { StudentProfile, LessonListItemOut } from "@/lib/api";
+import { loadLessons } from "@/lib/offline/contentCache";
+import { recordLearningEvent } from "@/lib/offline/learningEvents";
 
 export default function LearnPage() {
   const router = useRouter();
@@ -58,6 +60,7 @@ function LessonListFlow({ student }: { student: StudentProfile }) {
 
   const [lessons, setLessons] = useState<LessonListItemOut[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [stale, setStale] = useState<boolean>(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,8 +68,17 @@ function LessonListFlow({ student }: { student: StudentProfile }) {
     setError(null);
     (async () => {
       try {
-        const data = await getLessons(subjectFilter, student.class_number || undefined);
-        if (!cancelled) setLessons(data);
+        // Cached on this device once seen, so a learner who drops offline can
+        // still find their way back into a chapter.
+        const result = await loadLessons(
+          student.id,
+          subjectFilter,
+          student.class_number || undefined
+        );
+        if (!cancelled) {
+          setLessons(result.data);
+          setStale(result.stale);
+        }
       } catch (err: any) {
         if (!cancelled) setError(err.message || "Failed to load lessons.");
       }
@@ -74,7 +86,18 @@ function LessonListFlow({ student }: { student: StudentProfile }) {
     return () => {
       cancelled = true;
     };
-  }, [subjectFilter, student.class_number]);
+  }, [subjectFilter, student.class_number, student.id]);
+
+  // Arriving with a subject filter is the student opening that module.
+  useEffect(() => {
+    if (!subjectFilter || !student.class_number) return;
+    void recordLearningEvent({
+      studentId: student.id,
+      eventType: "MODULE_OPENED",
+      subject: subjectFilter,
+      classNumber: student.class_number,
+    });
+  }, [subjectFilter, student.id, student.class_number]);
 
   const groups: { subject: string; items: LessonListItemOut[] }[] = [];
   if (lessons) {
@@ -112,6 +135,13 @@ function LessonListFlow({ student }: { student: StudentProfile }) {
           <div className="mb-4 p-3 rounded bg-rose-500/10 text-rose-500 text-sm flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
+          </div>
+        )}
+
+        {stale && (
+          <div className="mb-4 p-3 rounded bg-amber-500/10 text-amber-600 text-xs flex items-center gap-2">
+            <CloudOff className="w-4 h-4 shrink-0" />
+            <span>You&apos;re offline — showing the lessons saved on this device.</span>
           </div>
         )}
 
