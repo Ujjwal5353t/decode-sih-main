@@ -10,7 +10,7 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: "dark",
+  theme: "light",
   toggleTheme: () => {},
 });
 
@@ -19,7 +19,7 @@ export function useTheme() {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("light");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   if (!mounted) {
     return (
-      <div data-theme="dark" suppressHydrationWarning>
+      <div data-theme="light" suppressHydrationWarning>
         {children}
       </div>
     );

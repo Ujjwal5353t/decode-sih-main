@@ -17,6 +17,7 @@ const inter = Inter({
   display: "swap",
 });
 
+
 export const metadata: Metadata = {
   title: "VidyaSetu — AI-Powered Inclusive Education Platform",
   description:
@@ -56,7 +57,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                const theme = localStorage.getItem('theme') || 'dark';
+                const theme = localStorage.getItem('theme') || 'light';
                 document.documentElement.setAttribute('data-theme', theme);
               } catch(e) {}
               try {

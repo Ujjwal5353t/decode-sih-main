@@ -1,25 +1,21 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   Search,
   X,
-  UserCheck,
   UserX,
   Sparkles,
-  BookOpen,
   Phone,
   Check,
-  Filter,
   ArrowUpDown,
   GraduationCap,
-  AlertCircle,
-  Clock,
-  Layers,
-  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { TeacherListItem } from "@/lib/api";
+import { EASE, QUICK } from "@/components/dashboard/console/motion";
+import { Chip, EmptyState, Segmented, inputClass } from "@/components/dashboard/console/primitives";
 
 export interface TeacherSearchModalProps {
   isOpen: boolean;
@@ -42,6 +38,13 @@ export interface TeacherSearchModalProps {
 type FilterType = "all" | "unassigned" | "assigned" | "specialist";
 type SortType = "name" | "fewest_classes" | "most_classes";
 
+/**
+ * The teacher-search-and-assign flyout opened from the School Admin's
+ * Teacher & Subject Allocation panel (see SchoolTeacherManagement in
+ * app/dashboard/page.tsx) — same console surface language, kept as its own
+ * component since the panel's chrome (target banner, search+filter bar,
+ * scrollable list, footer) doesn't fit the single-slot <Modal> primitive.
+ */
 export function TeacherSearchModal({
   isOpen,
   onClose,
@@ -164,59 +167,83 @@ export function TeacherSearchModal({
     onAssign(targetId, classNum, section, subject);
   };
 
+  const filterOptions: { value: FilterType; label: string }[] = [
+    { value: "all", label: `All (${counts.all})` },
+    { value: "unassigned", label: `Unassigned / Free (${counts.unassigned})` },
+    { value: "assigned", label: `Assigned (${counts.assigned})` },
+  ];
+  if (counts.specialist > 0) {
+    filterOptions.push({
+      value: "specialist",
+      label: `${subjectMeta.title} Teachers (${counts.specialist})`,
+    });
+  }
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-      <div className="glass rounded-[var(--radius-xl)] w-full max-w-2xl border border-border-primary shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={QUICK}
+        className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]"
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: 12, scale: 0.985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.99 }}
+        transition={{ duration: 0.24, ease: EASE }}
+        className="console-panel relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden shadow-[var(--shadow-lg)]"
+      >
         {/* Header */}
-        <div className="p-5 border-b border-border-primary/60 bg-surface/80">
+        <div className="border-b border-[var(--c-line)] bg-[var(--c-sunken)] p-5">
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="w-8 h-8 rounded-lg bg-brand/10 text-brand flex items-center justify-center border border-border-brand font-bold text-sm">
-                  <GraduationCap className="w-4 h-4" />
-                </span>
-                <div>
-                  <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
-                    Assign Subject Teacher
-                  </h3>
-                  <p className="text-xs text-text-secondary">
-                    Search and filter teachers by availability, workload, and specialization.
-                  </p>
-                </div>
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-brand/20 bg-brand/8 text-brand">
+                <GraduationCap className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-[13px] font-semibold text-text-primary font-[family-name:var(--font-display)]">
+                  Assign Subject Teacher
+                </h3>
+                <p className="text-xs text-text-secondary">
+                  Search and filter teachers by availability, workload, and specialization.
+                </p>
               </div>
             </div>
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface transition-colors cursor-pointer"
+              className="cursor-pointer rounded-md p-1 text-text-tertiary transition-colors hover:bg-[var(--c-panel)] hover:text-text-primary"
             >
-              <X className="w-5 h-5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
 
           {/* Target Allocation Banner & Quick Controls */}
-          <div className="mt-4 p-3 rounded-lg bg-surface/50 border border-border-primary flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-1.5 font-semibold text-text-primary">
-                <span className="text-text-tertiary">Target:</span>
-                <span className="px-2 py-0.5 rounded bg-brand/10 text-brand font-bold">
-                  Class {classNum}{section}
-                </span>
-                <span className="text-text-tertiary">•</span>
-                <span className={`px-2 py-0.5 rounded font-medium border ${subjectMeta.color}`}>
-                  {subjectMeta.title} {subjectMeta.subtitle ? `(${subjectMeta.subtitle})` : ""}
-                </span>
-              </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-panel)] p-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2 font-semibold text-text-primary">
+              <span className="text-text-tertiary">Target:</span>
+              <Chip tone="brand">
+                Class {classNum}
+                {section}
+              </Chip>
+              <span
+                className={`rounded border px-2 py-0.5 font-medium ${subjectMeta.color}`}
+              >
+                {subjectMeta.title} {subjectMeta.subtitle ? `(${subjectMeta.subtitle})` : ""}
+              </span>
             </div>
 
             {/* Optional dropdowns if user wants to change target on the fly */}
             {(onClassNumChange || onSectionChange || onSubjectChange) && (
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex flex-wrap items-center gap-2">
                 {onClassNumChange && (
                   <select
                     value={classNum}
                     onChange={(e) => onClassNumChange(Number(e.target.value))}
-                    className="px-2 py-1 bg-background text-text-primary rounded border border-border-primary outline-none focus:border-brand text-xs cursor-pointer"
+                    className={`${inputClass} w-auto py-1`}
                   >
                     {[1, 2, 3, 4, 5].map((c) => (
                       <option key={c} value={c}>Class {c}</option>
@@ -228,7 +255,7 @@ export function TeacherSearchModal({
                   <select
                     value={section}
                     onChange={(e) => onSectionChange(e.target.value)}
-                    className="px-2 py-1 bg-background text-text-primary rounded border border-border-primary outline-none focus:border-brand text-xs cursor-pointer"
+                    className={`${inputClass} w-auto py-1`}
                   >
                     {["A", "B", "C", "D"].map((s) => (
                       <option key={s} value={s}>Sec {s}</option>
@@ -240,7 +267,7 @@ export function TeacherSearchModal({
                   <select
                     value={subject}
                     onChange={(e) => onSubjectChange(e.target.value)}
-                    className="px-2 py-1 bg-background text-text-primary rounded border border-border-primary outline-none focus:border-brand text-xs max-w-[160px] truncate cursor-pointer"
+                    className={`${inputClass} w-auto max-w-[160px] truncate py-1`}
                   >
                     {availableSubjects.map((s) => (
                       <option key={s} value={s}>
@@ -255,92 +282,43 @@ export function TeacherSearchModal({
         </div>
 
         {/* Search & Filter Controls */}
-        <div className="p-4 border-b border-border-primary/40 bg-surface/30 space-y-3">
+        <div className="space-y-3 border-b border-[var(--c-line)] p-4">
           {/* Search Input Bar */}
           <div className="relative">
-            <Search className="w-4 h-4 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
             <input
               type="text"
               placeholder="Search teacher by name, phone number, or subject..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-9 py-2 bg-background text-text-primary text-xs rounded-lg border border-border-primary outline-none focus:border-brand placeholder:text-text-tertiary transition-all"
+              className={`${inputClass} py-2 pl-9 pr-9`}
               autoFocus
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary"
+                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-text-tertiary hover:text-text-primary"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
 
           {/* Filter Tabs and Sort Selector */}
           <div className="flex flex-wrap items-center justify-between gap-2">
-            {/* Filter Tabs */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setSelectedFilter("all")}
-                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                  selectedFilter === "all"
-                    ? "bg-brand text-white shadow-sm"
-                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
-                }`}
-              >
-                All ({counts.all})
-              </button>
+            <Segmented
+              idPrefix="teacher-search-filter"
+              value={selectedFilter}
+              onChange={(v) => setSelectedFilter(v)}
+              options={filterOptions}
+            />
 
-              <button
-                type="button"
-                onClick={() => setSelectedFilter("unassigned")}
-                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  selectedFilter === "unassigned"
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
-                }`}
-              >
-                <Sparkles className="w-3 h-3 text-emerald-400" />
-                <span>Unassigned / Free ({counts.unassigned})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedFilter("assigned")}
-                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                  selectedFilter === "assigned"
-                    ? "bg-brand text-white shadow-sm"
-                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
-                }`}
-              >
-                Assigned ({counts.assigned})
-              </button>
-
-              {counts.specialist > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedFilter("specialist")}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    selectedFilter === "specialist"
-                      ? "bg-sky-600 text-white shadow-sm"
-                      : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
-                  }`}
-                >
-                  <BookOpen className="w-3 h-3 text-sky-300" />
-                  <span>{subjectMeta.title} Teachers ({counts.specialist})</span>
-                </button>
-              )}
-            </div>
-
-            {/* Sort Sorter */}
             <div className="flex items-center gap-1.5 text-xs text-text-secondary">
-              <ArrowUpDown className="w-3.5 h-3.5 text-text-tertiary" />
+              <ArrowUpDown className="h-3.5 w-3.5 text-text-tertiary" />
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortType)}
-                className="px-2 py-1 bg-background text-text-primary rounded border border-border-primary outline-none focus:border-brand text-xs cursor-pointer"
+                className={`${inputClass} w-auto py-1`}
               >
                 <option value="fewest_classes">Fewest Classes First</option>
                 <option value="name">Name (A-Z)</option>
@@ -351,16 +329,12 @@ export function TeacherSearchModal({
         </div>
 
         {/* Teachers List */}
-        <div className="overflow-y-auto p-4 space-y-2.5 flex-1 divide-y divide-border-primary/20">
+        <div className="flex-1 space-y-2 overflow-y-auto p-4">
           {filteredTeachers.length === 0 ? (
-            <div className="py-12 text-center text-xs text-text-tertiary space-y-2">
-              <UserX className="w-8 h-8 mx-auto text-text-tertiary/40" />
-              <p className="font-semibold text-text-secondary text-sm">No teachers found</p>
-              <p className="max-w-xs mx-auto text-[11px]">
-                {searchQuery
-                  ? `No teachers matching "${searchQuery}". Try a different name or phone number.`
-                  : "No teachers found under this filter."}
-              </p>
+            <EmptyState icon={UserX} title="No teachers found">
+              {searchQuery
+                ? `No teachers matching "${searchQuery}". Try a different name or phone number.`
+                : "No teachers found under this filter."}
               {(searchQuery || selectedFilter !== "all") && (
                 <button
                   type="button"
@@ -368,12 +342,12 @@ export function TeacherSearchModal({
                     setSearchQuery("");
                     setSelectedFilter("all");
                   }}
-                  className="text-xs text-brand hover:underline font-semibold cursor-pointer pt-2"
+                  className="mt-3 block cursor-pointer text-xs font-semibold text-brand hover:underline"
                 >
-                  Reset search & filters
+                  Reset search &amp; filters
                 </button>
               )}
-            </div>
+            </EmptyState>
           ) : (
             filteredTeachers.map((teacher) => {
               const assignedClasses = teacher.assigned_classes || [];
@@ -397,22 +371,22 @@ export function TeacherSearchModal({
                 <div
                   key={teacher.id}
                   onClick={() => setSelectedTeacherId(teacher.id)}
-                  className={`pt-2.5 first:pt-0 pb-2.5 px-3.5 rounded-xl border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  className={`console-lift flex cursor-pointer flex-col gap-3 rounded-[var(--c-radius)] border px-3.5 py-3 transition-colors sm:flex-row sm:items-center sm:justify-between ${
                     isSelected
-                      ? "bg-brand/10 border-brand/50 shadow-sm"
-                      : "bg-surface/30 hover:bg-surface/70 border-border-primary/60"
+                      ? "border-brand/40 bg-brand/8"
+                      : "border-[var(--c-line)] bg-[var(--c-panel)] hover:bg-[var(--c-sunken)]"
                   }`}
                 >
                   {/* Left: Info & Avatar */}
-                  <div className="flex items-start gap-3 min-w-0">
+                  <div className="flex min-w-0 items-start gap-3">
                     {/* Avatar */}
                     <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 border transition-all ${
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--c-radius)] border text-xs font-bold transition-colors ${
                         isSelected
-                          ? "bg-brand text-white border-brand shadow-sm"
+                          ? "border-brand bg-brand text-white"
                           : classCount === 0
-                          ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
-                          : "bg-brand/10 text-brand border-border-brand"
+                          ? "border-emerald-500/25 bg-emerald-500/10 text-[var(--accent-emerald)]"
+                          : "border-brand/20 bg-brand/8 text-brand"
                       }`}
                     >
                       {teacher.name
@@ -425,49 +399,46 @@ export function TeacherSearchModal({
 
                     {/* Teacher Details */}
                     <div className="min-w-0 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-xs text-text-primary truncate">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="truncate text-xs font-semibold text-text-primary">
                           {teacher.name}
                         </span>
 
-                        <span className="text-[11px] text-text-tertiary font-mono flex items-center gap-1">
-                          <Phone className="w-2.5 h-2.5" />
+                        <span className="flex items-center gap-1 font-mono text-[11px] text-text-tertiary">
+                          <Phone className="h-2.5 w-2.5" />
                           {teacher.phone_number}
                         </span>
 
                         {classCount === 0 ? (
-                          <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center gap-1">
-                            <Sparkles className="w-2.5 h-2.5" /> Free (0 classes)
-                          </span>
+                          <Chip tone="emerald">
+                            <Sparkles className="h-2.5 w-2.5" /> Free (0 classes)
+                          </Chip>
                         ) : (
-                          <span className="px-2 py-0.2 rounded-full text-[10px] font-semibold bg-surface text-text-secondary border border-border-primary">
+                          <Chip tone="neutral">
                             {classCount} {classCount === 1 ? "class" : "classes"}
-                          </span>
+                          </Chip>
                         )}
 
                         {isSpecialist && !isCurrentAssignee && (
-                          <span className="px-2 py-0.2 rounded-full text-[10px] font-semibold bg-sky-500/10 text-sky-500 border border-sky-500/20">
-                            Teaches {subjectMeta.title}
-                          </span>
+                          <Chip tone="sky">Teaches {subjectMeta.title}</Chip>
                         )}
 
-                        {isCurrentAssignee && (
-                          <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                            Current Teacher
-                          </span>
-                        )}
+                        {isCurrentAssignee && <Chip tone="amber">Current Teacher</Chip>}
                       </div>
 
                       {/* Assigned Classes Preview */}
                       {classCount > 0 ? (
-                        <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                          <span className="text-[10px] text-text-tertiary font-medium">Assigned:</span>
+                        <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                          <span className="text-[10px] font-medium text-text-tertiary">
+                            Assigned:
+                          </span>
                           {assignedClasses.slice(0, 4).map((c, idx) => (
                             <span
                               key={c.id || idx}
-                              className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-surface text-text-secondary border border-border-primary/50"
+                              className="rounded border border-[var(--c-line)] bg-[var(--c-sunken)] px-1.5 py-0.5 text-[10px] font-medium text-text-secondary"
                             >
-                              {c.class_number}{c.section} ({parseSubjectMeta(c.subject || "").title})
+                              {c.class_number}
+                              {c.section} ({parseSubjectMeta(c.subject || "").title})
                             </span>
                           ))}
                           {assignedClasses.length > 4 && (
@@ -477,7 +448,7 @@ export function TeacherSearchModal({
                           )}
                         </div>
                       ) : (
-                        <p className="text-[10px] text-text-tertiary italic">
+                        <p className="text-[10px] italic text-text-tertiary">
                           No classes assigned yet • Available for full allocation
                         </p>
                       )}
@@ -485,7 +456,7 @@ export function TeacherSearchModal({
                   </div>
 
                   {/* Right: Quick Action */}
-                  <div className="shrink-0 flex items-center gap-2 self-end sm:self-center">
+                  <div className="flex shrink-0 items-center gap-2 self-end sm:self-center">
                     <Button
                       variant={isSelected ? "primary" : "outline"}
                       size="sm"
@@ -494,11 +465,11 @@ export function TeacherSearchModal({
                         e.stopPropagation();
                         handleConfirmAssignment(teacher.id);
                       }}
-                      className="text-xs px-3 py-1.5 h-auto font-semibold"
+                      className="h-auto px-3 py-1.5 text-xs"
                     >
                       {isCurrentAssignee ? (
                         <span className="flex items-center gap-1 text-text-tertiary">
-                          <Check className="w-3.5 h-3.5" /> Assigned
+                          <Check className="h-3.5 w-3.5" /> Assigned
                         </span>
                       ) : isAssigning && isSelected ? (
                         "Assigning..."
@@ -514,18 +485,24 @@ export function TeacherSearchModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-border-primary/60 bg-surface/80 flex items-center justify-between gap-3">
-          <div className="text-xs text-text-secondary truncate">
+        <div className="flex items-center justify-between gap-3 border-t border-[var(--c-line)] bg-[var(--c-sunken)] p-4">
+          <div className="truncate text-xs text-text-secondary">
             {selectedTeacherId ? (
               <span>
-                Selected: <strong className="text-text-primary">{teachers.find((t) => t.id === selectedTeacherId)?.name || "Teacher"}</strong>
+                Selected:{" "}
+                <strong className="text-text-primary">
+                  {teachers.find((t) => t.id === selectedTeacherId)?.name || "Teacher"}
+                </strong>
               </span>
             ) : (
-              <span className="text-text-tertiary">Select a teacher above to assign to Class {classNum}{section} ({subjectMeta.title})</span>
+              <span className="text-text-tertiary">
+                Select a teacher above to assign to Class {classNum}
+                {section} ({subjectMeta.title})
+              </span>
             )}
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
@@ -548,7 +525,7 @@ export function TeacherSearchModal({
             </Button>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
