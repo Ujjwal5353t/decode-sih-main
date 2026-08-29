@@ -10,6 +10,7 @@ import { DashboardSidebar } from "@/components/dashboard/Sidebar";
 import { ModuleUploadWizard } from "@/components/school/module-upload/ModuleUploadWizard";
 import { CLASS_OPTIONS } from "@/components/school/module-upload/primitives";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { getRolePermissions, type RolePermissionsResponse, type SchoolProfile } from "@/lib/api";
 
 function LoadingScreen({ message }: { message: string }) {
@@ -27,6 +28,7 @@ function ModuleUploadContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, role, loading, logout } = useAuth();
+  const { t } = useTranslation();
   const [permissions, setPermissions] = useState<RolePermissionsResponse | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
 
@@ -49,7 +51,7 @@ function ModuleUploadContent() {
   }, [role]);
 
   if (loading || !user || role !== "school" || !permissions) {
-    return <LoadingScreen message="Loading module upload..." />;
+    return <LoadingScreen message={t("dashboard.common.loading")} />;
   }
 
   const school = user as SchoolProfile;
@@ -93,15 +95,12 @@ function ModuleUploadContent() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="truncate text-[15px] font-semibold tracking-[-0.01em] text-text-primary font-[family-name:var(--font-display)]">
-                  Curriculum Modules
+                  {t("dashboard.nav.curriculum")}
                 </h1>
                 <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-brand/10 text-brand border border-border-brand">
-                  Class {initialClass}
+                  {t("dashboard.student.class")} {initialClass}
                 </span>
               </div>
-              <p className="text-xs text-text-secondary truncate hidden sm:block">
-                Upload, update, and manage PDF and image OCR modules for Classes 1 to 5
-              </p>
             </div>
           </div>
 
@@ -120,7 +119,7 @@ function ModuleUploadContent() {
               className="text-text-secondary hover:text-text-primary text-xs px-2.5 sm:px-3"
             >
               <ArrowLeft className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Back to Modules</span>
+              <span className="hidden sm:inline">{t("dashboard.modules")}</span>
             </Button>
           </div>
         </header>
@@ -129,22 +128,21 @@ function ModuleUploadContent() {
           <div>
             <nav className="flex items-center gap-1.5 text-[11px] text-text-tertiary mb-2">
               <Link href="/dashboard" className="hover:text-brand transition-colors">
-                Dashboard
+                {t("nav.dashboard")}
               </Link>
               <span>/</span>
               <Link href="/dashboard" className="hover:text-brand transition-colors">
-                Curriculum Modules
+                {t("dashboard.nav.curriculum")}
               </Link>
               <span>/</span>
-              <span className="text-text-secondary font-semibold">Upload Module</span>
+              <span className="text-text-secondary font-semibold">{t("school.uploadSyllabus")}</span>
             </nav>
 
             <h2 className="text-xl font-bold text-text-primary font-[family-name:var(--font-display)]">
-              Upload Learning Module
+              {t("school.uploadSyllabus")}
             </h2>
             <p className="text-sm text-text-secondary mt-1">
-              Add a book, chapter or worksheet to {school.school_name} — {school.branch_name}.
-              Text is extracted on the server so the content can power AI quizzes and adaptive lessons.
+              {school.school_name} — {school.branch_name}
             </p>
           </div>
 

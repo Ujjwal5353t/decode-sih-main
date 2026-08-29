@@ -30,9 +30,8 @@ import src.models  # noqa: F401  (side-effect import for all tables including pu
 async def lifespan(app: FastAPI):
     """Application lifespan — runs on startup and shutdown."""
     # ── Startup ────────────────────────────────────────────────────────────────
-    if settings.AUTO_CREATE_TABLES:
-        print("[startup] Creating database tables...")
-        await init_db()
+    print("[startup] Syncing database schema and migrations...")
+    await init_db()
     if settings.AUTO_SEED:
         print("[startup] Running seed data...")
         async with AsyncSessionFactory() as session:

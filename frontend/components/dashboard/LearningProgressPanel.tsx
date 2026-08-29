@@ -22,6 +22,7 @@ import {
   subscribeToLearningQueue,
 } from "@/lib/offline/learningEvents";
 import { useLearningSync } from "@/hooks/useLearningSync";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const EVENT_LABELS: Record<string, string> = {
   MODULE_OPENED: "Opened",
@@ -61,6 +62,7 @@ function ProgressBar({ percent }: { percent: number }) {
 }
 
 function StatusChip({ status }: { status: ModuleProgressOut["status"] }) {
+  const { t } = useTranslation();
   const styles =
     status === "completed"
       ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
@@ -69,10 +71,10 @@ function StatusChip({ status }: { status: ModuleProgressOut["status"] }) {
       : "bg-surface text-text-tertiary border-border-primary";
   const label =
     status === "completed"
-      ? "Completed"
+      ? t("learningProgress.completed")
       : status === "in_progress"
-      ? "In Progress"
-      : "Not Started";
+      ? t("learningProgress.inProgress")
+      : t("learningProgress.notStarted");
   return (
     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${styles}`}>
       {label}
@@ -89,6 +91,7 @@ function StatusChip({ status }: { status: ModuleProgressOut["status"] }) {
  * here immediately and stays consistent once it syncs.
  */
 export function LearningProgressPanel({ student }: { student: StudentProfile }) {
+  const { t } = useTranslation();
   const [progress, setProgress] = useState<StudentProgressOut | null>(null);
   const [stale, setStale] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
@@ -135,18 +138,14 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
   }
 
   if (!progress) {
-    // Never loaded and nothing cached on this device yet. Say so once rather
-    // than leaving a gap the student cannot explain.
     if (!error) return null;
     return (
       <div className="glass rounded-[var(--radius-md)] p-4 border border-border-primary text-xs text-text-secondary">
-        Your learning progress isn&apos;t available right now. {error}
+        {error}
       </div>
     );
   }
 
-  // Nothing to show for a class with no lessons published yet — stay quiet
-  // rather than adding an empty card to the dashboard.
   if (progress.total_modules === 0) return null;
 
   const inProgress = progress.modules
@@ -167,16 +166,23 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <Play className="w-4 h-4 text-brand shrink-0" />
-                <h2 className="text-sm font-bold text-text-primary">Continue Learning</h2>
+                <h2 className="text-sm font-bold text-text-primary">
+                  {t("learningProgress.continueLearning")}
+                </h2>
               </div>
               <p className="text-base font-bold text-text-primary mt-2 truncate">
                 {continueModule.current_lesson_title || continueModule.title}
               </p>
               <p className="text-xs text-text-secondary mt-0.5">
                 {continueModule.subject} ·{" "}
-                {continueModule.completed_lessons} of {continueModule.total_lessons} lessons done
+                {t("learningProgress.lessonsDone", {
+                  done: continueModule.completed_lessons,
+                  total: continueModule.total_lessons,
+                })}
                 {continueModule.last_activity_at
-                  ? ` · last studied ${relativeTime(continueModule.last_activity_at)}`
+                  ? ` · ${t("learningProgress.lastStudied", {
+                      time: relativeTime(continueModule.last_activity_at),
+                    })}`
                   : ""}
               </p>
               <div className="mt-3 max-w-sm">
@@ -186,7 +192,9 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
 
             <Link href={continueHref} className="shrink-0">
               <Button variant="primary" size="sm">
-                {continueModule.status === "not_started" ? "Start Learning" : "Continue"}
+                {continueModule.status === "not_started"
+                  ? t("learningProgress.startLearning")
+                  : t("learningProgress.continue")}
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </Link>
@@ -198,7 +206,7 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
           <div className="flex items-center justify-between text-text-tertiary text-xs">
-            <span>Overall Progress</span>
+            <span>{t("learningProgress.overallProgress")}</span>
             <TrendingUp className="w-4 h-4 text-brand" />
           </div>
           <div className="text-2xl font-bold text-text-primary">
@@ -211,20 +219,20 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
 
         <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
           <div className="flex items-center justify-between text-text-tertiary text-xs">
-            <span>Modules Completed</span>
+            <span>{t("learningProgress.modulesCompleted")}</span>
             <CheckCircle className="w-4 h-4 text-emerald-500" />
           </div>
           <div className="text-2xl font-bold text-text-primary">
             {progress.modules_completed}
           </div>
           <span className="text-[11px] text-text-secondary">
-            of {progress.total_modules} in your class
+            {t("learningProgress.ofModulesInClass", { total: progress.total_modules })}
           </span>
         </div>
 
         <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
           <div className="flex items-center justify-between text-text-tertiary text-xs">
-            <span>In Progress</span>
+            <span>{t("learningProgress.inProgress")}</span>
             <BookOpen className="w-4 h-4 text-purple-500" />
           </div>
           <div className="text-2xl font-bold text-text-primary">
@@ -232,8 +240,10 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
           </div>
           <span className="text-[11px] text-text-secondary">
             {progress.last_activity_at
-              ? `Last active ${relativeTime(progress.last_activity_at)}`
-              : "Not started yet"}
+              ? t("learningProgress.lastActive", {
+                  time: relativeTime(progress.last_activity_at),
+                })
+              : t("learningProgress.notStartedYet")}
           </span>
         </div>
       </div>
@@ -245,12 +255,10 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
             <CloudOff className="w-4 h-4 text-amber-500 shrink-0" />
             <span className="text-xs text-text-secondary">
               {pendingCount > 0
-                ? `${pendingCount} learning ${
-                    pendingCount === 1 ? "activity" : "activities"
-                  } saved on this device, waiting to sync.`
+                ? t("learningProgress.savedActivitiesWaiting", { count: pendingCount })
                 : !isOnline
-                ? "You're offline — your learning is being saved on this device."
-                : "Showing your last saved progress."}
+                ? t("learningProgress.offlineNotice")
+                : t("learningProgress.showingLastSaved")}
             </span>
           </div>
           <button
@@ -259,7 +267,7 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
             className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            Sync now
+            {t("learningProgress.syncNow")}
           </button>
         </div>
       )}
@@ -268,7 +276,7 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
       <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-4">
         <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
           <BookOpen className="w-4 h-4 text-brand" />
-          <span>Module Progress</span>
+          <span>{t("learningProgress.moduleProgress")}</span>
         </h3>
 
         <div className="space-y-3.5">

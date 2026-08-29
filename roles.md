@@ -20,10 +20,10 @@ combination confirmed to authenticate) — not copied from an old note.
 ## 2. School Admin (Branch Administrator)
 
 - **Role**: `school`
-- **School Name**: `LPS Karkarduma`
-- **Branch Name**: `LPS Karkarduma Branch`
-- **Student Prefix**: `LKD`
-- **Email**: `school@lps.edu`
+- **School Name**: `abc Public School`
+- **Branch Name**: `south Delhi`
+- **Student Prefix**: `abc`
+- **Email**: `test@abc.in`
 - **Password**: `123456789`
 - **Capabilities**:
   - Manage class curriculum modules (PDF, Image-to-PDF OCR, NCERT books).
@@ -35,11 +35,11 @@ combination confirmed to authenticate) — not copied from an old note.
 ## 3. Teacher
 
 - **Role**: `teacher`
-- **Name**: `Dr. Rajesh Sharma`
-- **Phone Number**: `9876543210`
-- **School Name**: `LPS Karkarduma`
-- **Branch Name**: `LPS Karkarduma Branch`
-- **Password**: `Password123!`
+- **Name**: `Dr. AARTI SHUKLA`
+- **Phone Number**: `9999999996`
+- **School Name**: `ABC PUBLIC SCHOOL`
+- **Branch Name**: `South delhi branch`
+- **Password**: `123456789`
 - **Assigned Class**: `Class 4, Section A` (`4A`)
 - **Capabilities**:
   - View students enrolled in assigned classes.

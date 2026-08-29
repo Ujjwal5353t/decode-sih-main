@@ -10,6 +10,7 @@ import {
   type OwnerClaimListItem,
 } from "@/lib/api";
 import { Banner, Panel, PanelHeading, Pill } from "../module-upload/primitives";
+import { useTranslation } from "@/hooks/useTranslation";
 
 type Busy = { id: string; action: "approve" | "reject" } | null;
 
@@ -18,6 +19,7 @@ type Busy = { id: string; action: "approve" | "reject" } | null;
  * administer their school. Rendered as the "admin-requests" dashboard tab.
  */
 export function AdminRequestsPanel() {
+  const { t } = useTranslation();
   const [requests, setRequests] = useState<OwnerClaimListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,8 +87,8 @@ export function AdminRequestsPanel() {
       <Panel>
         <PanelHeading
           icon={ShieldCheck}
-          title="Administrator Requests"
-          description="People who have verified their identity and are requesting administrator access to your school."
+          title={t("dashboard.nav.adminRequests")}
+          description={t("dashboard.descriptions.admin-requests")}
           action={
             pending.length > 0 ? (
               <Pill tone="amber">

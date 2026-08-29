@@ -18,6 +18,8 @@ import {
   Th,
 } from "@/components/dashboard/console/primitives";
 
+import { useTranslation } from "@/hooks/useTranslation";
+
 function percentColor(percent: number): string {
   if (percent >= 100) return "text-emerald-500";
   if (percent >= 50) return "text-brand";
@@ -27,7 +29,6 @@ function percentColor(percent: number): string {
 
 function relativeTime(iso: string | null): string {
   if (!iso) return "—";
-  // Backend timestamps are naive UTC; "Z" makes the browser read them as such.
   const then = new Date(iso.endsWith("Z") ? iso : `${iso}Z`).getTime();
   const minutes = Math.round((Date.now() - then) / 60000);
   if (!Number.isFinite(minutes)) return "—";
@@ -39,18 +40,6 @@ function relativeTime(iso: string | null): string {
   return days === 1 ? "yesterday" : `${days}d ago`;
 }
 
-/**
- * Learning-module progress for one class section — the Student | subject |
- * Overall table.
- *
- * The class number and section are just what the teacher is currently
- * looking at; the server independently verifies the teacher is assigned to
- * them and reads the roster from the teacher's own branch, so nothing here
- * grants access on its own.
- *
- * Rows reflect what has synced. A student learning offline right now simply
- * shows their last synced position — never a blank or a guess.
- */
 export function ClassLearningProgress({
   classNumber,
   section,
@@ -58,8 +47,7 @@ export function ClassLearningProgress({
   classNumber: number;
   section: string;
 }) {
-  // Keyed by the class being viewed, so switching classes reads as loading
-  // without an extra state flag to reset.
+  const { t } = useTranslation();
   const viewKey = `${classNumber}|${section}`;
   const [result, setResult] = useState<{
     key: string;
@@ -95,9 +83,13 @@ export function ClassLearningProgress({
     <Panel flush className="overflow-hidden">
       <PanelHead
         icon={TrendingUp}
-        title="Learning Module Progress"
+        title={t("learningProgress.moduleProgress")}
         actions={
-          progress ? <Chip tone="brand">{progress.students.length} Student(s)</Chip> : undefined
+          progress ? (
+            <Chip tone="brand">
+              {progress.students.length} {t("dashboard.students")}
+            </Chip>
+          ) : undefined
         }
       />
 
@@ -110,18 +102,20 @@ export function ClassLearningProgress({
       ) : !progress || progress.subjects.length === 0 ? (
         <EmptyState
           icon={TrendingUp}
-          title={`No learning modules have been published for Class ${classNumber} yet, so there is no module progress to report.`}
+          title={`${t("teacherDashboard.noModulesFoundFor")} ${t("teacherDashboard.classPrefix")} ${classNumber}.`}
         />
       ) : (
         <Table>
           <thead>
             <tr>
-              <Th>Student</Th>
-              {progress.subjects.map((subject) => (
-                <Th key={subject}>{subject}</Th>
-              ))}
-              <Th>Overall</Th>
-              <Th>Last Active</Th>
+              <Th>{t("dashboard.student.studentPrefix")}</Th>
+              {progress.subjects.map((subject) => {
+                const subKey = `schoolAdmin.subjects.${subject.toLowerCase()}`;
+                const translatedSub = t(subKey as any);
+                return <Th key={subject}>{translatedSub && translatedSub !== subKey ? translatedSub : subject}</Th>;
+              })}
+              <Th>{t("learningProgress.overallProgress")}</Th>
+              <Th>{t("dashboard.recentActivity")}</Th>
             </tr>
           </thead>
           <Stagger as="tbody" className="divide-y divide-[var(--c-line)]">
@@ -162,7 +156,7 @@ export function ClassLearningProgress({
                     />
                   </div>
                   <span className="mt-1 block text-[10px] text-text-tertiary">
-                    {row.modules_completed} done · {row.modules_in_progress} in progress
+                    {row.modules_completed} {t("learningProgress.completed")} · {row.modules_in_progress} {t("learningProgress.inProgress")}
                   </span>
                 </Td>
 

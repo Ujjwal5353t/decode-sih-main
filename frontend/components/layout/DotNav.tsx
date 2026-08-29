@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useActiveSection } from "@/hooks/useActiveSection";
 import { SECTION_LABELS, type SectionId } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const DOT_SECTIONS: SectionId[] = [
   "hero",           // Home
@@ -16,8 +17,15 @@ const DOT_SECTIONS: SectionId[] = [
 ];
 
 export function DotNav() {
+  const { t } = useTranslation();
   const active = useActiveSection();
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  const getSectionLabel = (id: SectionId) => {
+    const key = `dotNav.${id}`;
+    const translated = t(key as any);
+    return translated && translated !== key ? translated : SECTION_LABELS[id];
+  };
 
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
@@ -34,6 +42,7 @@ export function DotNav() {
       {DOT_SECTIONS.map((id) => {
         const isActive = id === active;
         const isHovered = hoveredId === id;
+        const label = getSectionLabel(id);
 
         return (
           <div key={id} className="relative flex items-center">
@@ -52,7 +61,7 @@ export function DotNav() {
                              tracking-wide uppercase glass-card text-text-secondary
                              font-[family-name:var(--font-display)]"
                   >
-                    {SECTION_LABELS[id]}
+                    {label}
                   </span>
                 </motion.div>
               )}
@@ -71,7 +80,7 @@ export function DotNav() {
               className="relative flex items-center justify-center w-6 h-6 cursor-pointer
                        group touch-manipulation outline-none focus:outline-none focus-visible:outline-none
                        border-none ring-0 focus:ring-0 focus-visible:ring-0 shadow-none rounded-full"
-              aria-label={`Jump to ${SECTION_LABELS[id]}`}
+              aria-label={`Jump to ${label}`}
               aria-current={isActive ? "true" : undefined}
             >
               {/* Outer ring */}

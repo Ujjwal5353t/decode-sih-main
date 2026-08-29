@@ -1,52 +1,16 @@
 "use client";
 
 import { motion, useScroll, useTransform, useInView } from "framer-motion";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { ArrowRight, Play, WifiOff, Globe, Shield, Sparkles, GraduationCap, Brain } from "lucide-react";
 import Image from "next/image";
-
-const trustBadges = [
-  { icon: WifiOff, label: "Offline First" },
-  { icon: Globe, label: "7+ Languages" },
-  { icon: Shield, label: "WCAG Accessible" },
-  { icon: GraduationCap, label: "Trusted by Schools" },
-];
-
-const floatingCards = [
-  {
-    icon: Brain,
-    label: "Adaptive Learning",
-    sublabel: "AI-powered",
-    position: "top-[8%] -right-[2%]",
-    delay: 0.6,
-  },
-  {
-    icon: Globe,
-    label: "7+ Languages",
-    sublabel: "Regional support",
-    position: "bottom-[28%] -right-[8%]",
-    delay: 0.9,
-  },
-  {
-    icon: WifiOff,
-    label: "Offline Ready",
-    sublabel: "No internet needed",
-    position: "bottom-[6%] right-[15%]",
-    delay: 1.2,
-  },
-];
-
-const statBadge = {
-  value: "98%",
-  label: "Lesson Completion",
-  position: "top-[30%] -left-[5%]",
-  delay: 0.8,
-};
+import { useTranslation } from "@/hooks/useTranslation";
 
 export function Hero() {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(contentRef, { once: true });
+  const { t, language } = useTranslation();
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -56,12 +20,51 @@ export function Hero() {
   const y = useTransform(scrollYProgress, [0, 1], [0, 100]);
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
+  // Dynamic trust badges & cards based on active translation
+  const trustBadges = useMemo(() => [
+    { icon: WifiOff, label: t("hero.trustBadges.offlineFirst") },
+    { icon: Globe, label: t("hero.trustBadges.languages") },
+    { icon: Shield, label: t("hero.trustBadges.wcag") },
+    { icon: GraduationCap, label: t("hero.trustBadges.trustedBySchools") },
+  ], [t, language]);
+
+  const floatingCards = useMemo(() => [
+    {
+      icon: Brain,
+      label: t("hero.cards.adaptiveLearning"),
+      sublabel: t("hero.cards.aiPowered"),
+      position: "top-[8%] -right-[2%]",
+      delay: 0.6,
+    },
+    {
+      icon: Globe,
+      label: t("hero.cards.languages"),
+      sublabel: t("hero.cards.regionalSupport"),
+      position: "bottom-[28%] -right-[8%]",
+      delay: 0.9,
+    },
+    {
+      icon: WifiOff,
+      label: t("hero.cards.offlineReady"),
+      sublabel: t("hero.cards.noInternet"),
+      position: "bottom-[6%] right-[15%]",
+      delay: 1.2,
+    },
+  ], [t, language]);
+
+  const statBadge = useMemo(() => ({
+    value: "98%",
+    label: t("hero.cards.lessonCompletion"),
+    position: "top-[30%] -left-[5%]",
+    delay: 0.8,
+  }), [t, language]);
+
   // Animated subtitle rotation
-  const subPhrases = [
-    "In Their Language",
-    "At Their Pace",
-    "On Their Terms",
-  ];
+  const subPhrases = useMemo(() => [
+    t("hero.subPhrases.0"),
+    t("hero.subPhrases.1"),
+    t("hero.subPhrases.2"),
+  ], [t, language]);
   const [phraseIndex, setPhraseIndex] = useState(0);
 
   useEffect(() => {
@@ -148,21 +151,18 @@ export function Hero() {
     >
       {/* ── Background layers ── */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-        {/* Top-left blue radial glow */}
         <div
           className="absolute -top-[20%] -left-[10%] w-[800px] h-[800px]"
           style={{
             background: "radial-gradient(circle, rgba(37, 99, 235, 0.08), transparent 70%)",
           }}
         />
-        {/* Center-right secondary glow */}
         <div
           className="absolute top-[20%] right-[10%] w-[600px] h-[600px]"
           style={{
             background: "radial-gradient(circle, rgba(14, 165, 233, 0.05), transparent 70%)",
           }}
         />
-        {/* Subtle grid pattern */}
         <div
           className="absolute inset-0"
           style={{
@@ -213,7 +213,7 @@ export function Hero() {
                     style={{ backgroundColor: "var(--brand-primary)" }}
                   />
                 </span>
-                Inclusive Education · AI Powered · Offline Ready
+                {t("hero.badge")}
               </span>
             </motion.div>
 
@@ -229,40 +229,57 @@ export function Hero() {
                 animate={isInView ? "visible" : "hidden"}
                 className="inline-block"
               >
-                <motion.span variants={wordVariants} className="inline-block">
-                  Learning
-                </motion.span>{" "}
-                <motion.span variants={wordVariants} className="inline-block">
-                  Built
-                </motion.span>{" "}
-                <motion.span variants={wordVariants} className="inline-block">
-                  Around
-                </motion.span>{" "}
+                {t("hero.headlineWord1") && (
+                  <motion.span variants={wordVariants} className="inline-block">
+                    {t("hero.headlineWord1")}
+                  </motion.span>
+                )}{" "}
+                {t("hero.headlineWord2") && (
+                  <motion.span variants={wordVariants} className="inline-block">
+                    {t("hero.headlineWord2")}
+                  </motion.span>
+                )}{" "}
+                {t("hero.headlineWord3") && (
+                  <motion.span variants={wordVariants} className="inline-block">
+                    {t("hero.headlineWord3")}
+                  </motion.span>
+                )}{" "}
                 <motion.span variants={highlightWordVariants} className="inline-block">
-                  <span className="gradient-text-hero">Every Child</span>,
+                  <span className="gradient-text-hero">{t("hero.headlineHighlight")}</span>
+                  {language === "en" ? "," : ""}
                 </motion.span>{" "}
-                <motion.span variants={wordVariants} className="inline-block">
-                  Not
-                </motion.span>{" "}
-                <motion.span variants={wordVariants} className="inline-block">
-                  the
-                </motion.span>{" "}
-                <motion.span variants={wordVariants} className="inline-block">
-                  Other
-                </motion.span>{" "}
-                <motion.span variants={wordVariants} className="inline-block">
-                  Way
-                </motion.span>{" "}
-                <motion.span variants={wordVariants} className="inline-block">
-                  Around.
-                </motion.span>
+                {t("hero.headlineWord4") && (
+                  <motion.span variants={wordVariants} className="inline-block">
+                    {t("hero.headlineWord4")}
+                  </motion.span>
+                )}{" "}
+                {t("hero.headlineWord5") && (
+                  <motion.span variants={wordVariants} className="inline-block">
+                    {t("hero.headlineWord5")}
+                  </motion.span>
+                )}{" "}
+                {t("hero.headlineWord6") && (
+                  <motion.span variants={wordVariants} className="inline-block">
+                    {t("hero.headlineWord6")}
+                  </motion.span>
+                )}{" "}
+                {t("hero.headlineWord7") && (
+                  <motion.span variants={wordVariants} className="inline-block">
+                    {t("hero.headlineWord7")}
+                  </motion.span>
+                )}{" "}
+                {t("hero.headlineWord8") && (
+                  <motion.span variants={wordVariants} className="inline-block">
+                    {t("hero.headlineWord8")}
+                  </motion.span>
+                )}
               </motion.span>
             </motion.h1>
 
             {/* Rotating sub-phrase */}
             <motion.div variants={childVariants} className="h-8 mb-5 flex items-center overflow-hidden">
               <motion.span
-                key={phraseIndex}
+                key={`${language}-${phraseIndex}`}
                 initial={{ opacity: 0, y: 12, filter: "blur(4px)" }}
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                 exit={{ opacity: 0, y: -12, filter: "blur(4px)" }}
@@ -278,9 +295,7 @@ export function Hero() {
               variants={childVariants}
               className="text-text-secondary text-base sm:text-lg leading-relaxed mb-8 max-w-lg"
             >
-              Inclusive Education AI adapts to every learner with personalized
-              lessons, regional languages, offline access, and accessibility
-              tools — ensuring every student learns confidently.
+              {t("hero.description")}
             </motion.p>
 
             {/* CTAs */}
@@ -295,8 +310,8 @@ export function Hero() {
                            hover:shadow-[0_8px_32px_rgba(37,99,235,0.35)]"
                 style={{ background: "var(--gradient-brand)" }}
               >
-                Start Learning Free
-                <ArrowRight className="w-4 h-4" />
+                {t("hero.startLearning")}
+                <ArrowRight className="w-4 h-4 rtl-flip" />
               </motion.a>
               <motion.a
                 href="#how-it-works"
@@ -309,7 +324,7 @@ export function Hero() {
                 style={{ borderColor: "var(--border-primary)" }}
               >
                 <Play className="w-4 h-4 text-brand" />
-                Watch Demo
+                {t("hero.watchDemo")}
               </motion.a>
             </motion.div>
 
@@ -341,7 +356,6 @@ export function Hero() {
             className="relative flex items-center justify-center lg:justify-end"
           >
             <div className="relative w-[320px] h-[320px] sm:w-[380px] sm:h-[380px] lg:w-[440px] lg:h-[440px]">
-              {/* ── Decorative rings ── */}
               <motion.div
                 className="absolute inset-[-12%] rounded-full border border-[var(--border-brand)]"
                 animate={{ rotate: 360 }}
@@ -377,7 +391,6 @@ export function Hero() {
                 }}
               />
 
-              {/* ── Child Image ── */}
               <div className="absolute inset-[10%] rounded-full overflow-hidden shadow-[var(--shadow-xl)]">
                 <Image
                   src="/child-hero.png"
@@ -389,7 +402,6 @@ export function Hero() {
                 />
               </div>
 
-              {/* ── Floating Glass Cards ── */}
               {floatingCards.map((card) => {
                 const Icon = card.icon;
                 return (
@@ -434,7 +446,6 @@ export function Hero() {
                 );
               })}
 
-              {/* ── Stat Badge ── */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={isInView ? { opacity: 1, scale: 1 } : {}}

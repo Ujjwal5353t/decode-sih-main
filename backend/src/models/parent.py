@@ -24,6 +24,7 @@ class Parent(SQLModel, table=True):
     email: Optional[str] = Field(default=None, index=True, max_length=255)
     phone_number: Optional[str] = Field(default=None, index=True, max_length=20)
     password_hash: str
+    preferred_language: str = Field(default="en", max_length=10)
     created_at: datetime = Field(default_factory=_utcnow)
 
 

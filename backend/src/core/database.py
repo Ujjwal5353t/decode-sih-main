@@ -75,11 +75,18 @@ async def init_db() -> None:
         await conn.execute(
             text("ALTER TABLE students ALTER COLUMN email DROP NOT NULL;")
         )
+        # Migration: ensure preferred_language column exists on students and parents
+        await conn.execute(
+            text("ALTER TABLE students ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(10) DEFAULT 'en';")
+        )
         await conn.execute(
             text("ALTER TABLE parents ADD COLUMN IF NOT EXISTS phone_number VARCHAR(20);")
         )
         await conn.execute(
             text("ALTER TABLE parents ADD COLUMN IF NOT EXISTS full_name VARCHAR(150);")
+        )
+        await conn.execute(
+            text("ALTER TABLE parents ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(10) DEFAULT 'en';")
         )
         await conn.execute(
             text("ALTER TABLE parents ALTER COLUMN email DROP NOT NULL;")
@@ -227,6 +234,41 @@ async def init_db() -> None:
                 """
             )
         )
+        # Ensure all columns exist on learning_events if the table pre-dated them
+        await conn.execute(
+            text("ALTER TABLE learning_events ADD COLUMN IF NOT EXISTS client_event_id VARCHAR(80);")
+        )
+        await conn.execute(
+            text("ALTER TABLE learning_events ADD COLUMN IF NOT EXISTS student_id UUID;")
+        )
+        await conn.execute(
+            text("ALTER TABLE learning_events ADD COLUMN IF NOT EXISTS event_type VARCHAR(30);")
+        )
+        await conn.execute(
+            text("ALTER TABLE learning_events ADD COLUMN IF NOT EXISTS module_key VARCHAR(160);")
+        )
+        await conn.execute(
+            text("ALTER TABLE learning_events ADD COLUMN IF NOT EXISTS subject VARCHAR(100);")
+        )
+        await conn.execute(
+            text("ALTER TABLE learning_events ADD COLUMN IF NOT EXISTS class_number INTEGER;")
+        )
+        await conn.execute(
+            text("ALTER TABLE learning_events ADD COLUMN IF NOT EXISTS lesson_id UUID;")
+        )
+        await conn.execute(
+            text("ALTER TABLE learning_events ADD COLUMN IF NOT EXISTS occurred_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW();")
+        )
+        await conn.execute(
+            text("ALTER TABLE learning_events ADD COLUMN IF NOT EXISTS received_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW();")
+        )
+        await conn.execute(
+            text("ALTER TABLE learning_events ADD COLUMN IF NOT EXISTS duration_ms INTEGER;")
+        )
+        await conn.execute(
+            text("ALTER TABLE learning_events ADD COLUMN IF NOT EXISTS detail JSON;")
+        )
+
         # The idempotency guarantee the offline sync queue relies on: a
         # re-sent event can never become a second row.
         await conn.execute(

@@ -17,6 +17,7 @@ class StudentProfile(BaseModel):
     enrollment_type: str = "school"
     class_number: Optional[int]
     section: Optional[str]
+    preferred_language: str = "en"
     created_at: datetime
 
     model_config = {"from_attributes": True}

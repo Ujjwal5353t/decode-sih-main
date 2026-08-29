@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, AlertCircle, Layers, BookOpen, ChevronRight, Sparkles, CloudOff } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { StudentProfile, LessonListItemOut } from "@/lib/api";
 import { loadLessons } from "@/lib/offline/contentCache";
 import { recordLearningEvent } from "@/lib/offline/learningEvents";
@@ -14,6 +15,7 @@ import { recordLearningEvent } from "@/lib/offline/learningEvents";
 export default function LearnPage() {
   const router = useRouter();
   const { user, role, loading } = useAuth();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!loading && (!user || !role)) {
@@ -26,7 +28,7 @@ export default function LearnPage() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-3 border-brand border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm font-medium text-text-secondary">Loading...</p>
+          <p className="text-sm font-medium text-text-secondary">{t("dashboard.common.loading")}</p>
         </div>
       </div>
     );
@@ -37,13 +39,13 @@ export default function LearnPage() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="glass rounded-[var(--radius-lg)] p-8 border border-border-primary text-center max-w-md">
           <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-3" />
-          <h1 className="text-base font-bold text-text-primary">Students Only</h1>
+          <h1 className="text-base font-bold text-text-primary">{t("diagnosticQuiz.studentsOnly")}</h1>
           <p className="text-sm text-text-secondary mt-1">
-            Animated lessons are only available on student accounts.
+            {t("diagnosticQuiz.studentsOnlyDesc")}
           </p>
           <Link href="/dashboard">
             <Button variant="secondary" size="sm" className="mt-4">
-              Back to Dashboard
+              {t("diagnosticQuiz.backToDashboard")}
             </Button>
           </Link>
         </div>
@@ -55,6 +57,7 @@ export default function LearnPage() {
 }
 
 function LessonListFlow({ student }: { student: StudentProfile }) {
+  const { t } = useTranslation();
   const searchParams = useSearchParams();
   const subjectFilter = searchParams.get("subject") || undefined;
 
@@ -68,8 +71,6 @@ function LessonListFlow({ student }: { student: StudentProfile }) {
     setError(null);
     (async () => {
       try {
-        // Cached on this device once seen, so a learner who drops offline can
-        // still find their way back into a chapter.
         const result = await loadLessons(
           student.id,
           subjectFilter,
@@ -88,7 +89,6 @@ function LessonListFlow({ student }: { student: StudentProfile }) {
     };
   }, [subjectFilter, student.class_number, student.id]);
 
-  // Arriving with a subject filter is the student opening that module.
   useEffect(() => {
     if (!subjectFilter || !student.class_number) return;
     void recordLearningEvent({
@@ -121,11 +121,11 @@ function LessonListFlow({ student }: { student: StudentProfile }) {
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors">
             <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm font-medium">Back to Dashboard</span>
+            <span className="text-sm font-medium">{t("diagnosticQuiz.backToDashboard")}</span>
           </Link>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand/10 border border-border-brand text-xs font-semibold text-brand">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>{subjectFilter ? `${subjectFilter} Lessons` : "Animated Lessons"}</span>
+            <span>{subjectFilter ? `${subjectFilter}` : t("lessons.title")}</span>
           </div>
         </div>
       </header>
@@ -141,7 +141,7 @@ function LessonListFlow({ student }: { student: StudentProfile }) {
         {stale && (
           <div className="mb-4 p-3 rounded bg-amber-500/10 text-amber-600 text-xs flex items-center gap-2">
             <CloudOff className="w-4 h-4 shrink-0" />
-            <span>You&apos;re offline — showing the lessons saved on this device.</span>
+            <span>{t("learningProgress.offlineNotice")}</span>
           </div>
         )}
 
@@ -152,11 +152,9 @@ function LessonListFlow({ student }: { student: StudentProfile }) {
         ) : groups.length === 0 ? (
           <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
             <BookOpen className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-            <h3 className="text-sm font-semibold text-text-primary">No lessons available yet</h3>
+            <h3 className="text-sm font-semibold text-text-primary">{t("dashboard.common.noRecords")}</h3>
             <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
-              {subjectFilter
-                ? `No animated lessons have been generated for ${subjectFilter} yet.`
-                : "No animated lessons have been generated for your class yet."}
+              {t("lessons.subtitle")}
             </p>
           </div>
         ) : (
@@ -181,17 +179,17 @@ function LessonListFlow({ student }: { student: StudentProfile }) {
                       >
                         <div className="flex items-center justify-between mb-2">
                           <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                            Chapter {lesson.chapter_number}
+                            {t("lessons.slide")} {lesson.chapter_number}
                           </span>
                           <span className="text-[10px] text-text-tertiary">
-                            {lesson.slide_count} slide{lesson.slide_count === 1 ? "" : "s"}
+                            {lesson.slide_count} {t("lessons.slide")}
                           </span>
                         </div>
                         <h3 className="text-sm font-bold text-text-primary">{lesson.chapter_title}</h3>
                         <div className="mt-4 pt-3 border-t border-border-primary/50 flex items-center justify-between">
-                          <span className="text-[11px] text-text-tertiary">Class {lesson.class_number}</span>
+                          <span className="text-[11px] text-text-tertiary">{t("dashboard.student.class")} {lesson.class_number}</span>
                           <span className="inline-flex items-center gap-1 text-xs text-brand font-semibold">
-                            Start lesson <ChevronRight className="w-3.5 h-3.5" />
+                            {t("lessons.startLesson")} <ChevronRight className="w-3.5 h-3.5" />
                           </span>
                         </div>
                       </Link>
