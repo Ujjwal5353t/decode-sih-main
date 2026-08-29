@@ -282,45 +282,62 @@ async function fetchApi<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-  // Sliding window token update check from backend header
-  const refreshedToken = response.headers.get("x-access-token") || response.headers.get("X-Access-Token");
-  if (refreshedToken) {
-    const currentRole = getStoredRole();
-    if (currentRole) {
-      setStoredAuth(refreshedToken, currentRole);
-    }
-  }
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+      signal: options.signal || controller.signal,
+    });
+    clearTimeout(timeoutId);
 
-  if (!response.ok) {
-    let errorMessage = "An unexpected error occurred.";
-    try {
-      const errorData = await response.json();
-      if (typeof errorData.detail === "string") {
-        errorMessage = errorData.detail;
-      } else if (Array.isArray(errorData.detail)) {
-        errorMessage = errorData.detail.map((e: any) => e.msg).join(", ");
+    // Sliding window token update check from backend header
+    const refreshedToken = response.headers.get("x-access-token") || response.headers.get("X-Access-Token");
+    if (refreshedToken) {
+      const currentRole = getStoredRole();
+      if (currentRole) {
+        setStoredAuth(refreshedToken, currentRole);
       }
-    } catch {
-      errorMessage = response.statusText || errorMessage;
     }
-    // Carry the status so callers can tell "the server rejected you" from
-    // "the request never got there" — the offline paths depend on that
-    // distinction (a fetch that fails outright throws before this point).
-    const error = new Error(errorMessage) as ApiError;
-    error.status = response.status;
-    throw error;
-  }
 
-  if (response.status === 204) {
-    return {} as T;
-  }
+    if (!response.ok) {
+      let errorMessage = "An unexpected error occurred.";
+      try {
+        const errorData = await response.json();
+        if (typeof errorData.detail === "string") {
+          errorMessage = errorData.detail;
+        } else if (Array.isArray(errorData.detail)) {
+          errorMessage = errorData.detail.map((e: any) => e.msg).join(", ");
+        }
+      } catch {
+        errorMessage = response.statusText || errorMessage;
+      }
+      const error = new Error(errorMessage) as ApiError;
+      error.status = response.status;
+      throw error;
+    }
 
-  return response.json();
+    if (response.status === 204) {
+      return {} as T;
+    }
+
+    return response.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      const error = new Error("Server request timed out after 15 seconds. Please check if the backend server is running.") as ApiError;
+      error.status = 504;
+      throw error;
+    }
+    if (err instanceof TypeError && (err.message.includes("fetch") || err.message.includes("NetworkError"))) {
+      const error = new Error("Unable to connect to backend server. Please check if the backend is running on http://localhost:8000.") as ApiError;
+      error.status = 503;
+      throw error;
+    }
+    throw err;
+  }
 }
 
 // ── OTP Endpoints ─────────────────────────────────────────────────────────────
@@ -727,9 +744,62 @@ export interface SubmissionOut {
   student_email: string | null;
   score: number | null;
   max_score: number | null;
+  percentage?: number | null;
+  is_passed?: boolean | null;
+  total_attempts?: number;
+  status?: string;
+  response_pdf_url?: string | null;
   attempted_at: string;
   last_attempted_at: string;
 }
+
+export interface QuizAnswerInput {
+  question_id: string;
+  question_text: string;
+  selected_option_index: number;
+  correct_option_index: number;
+  chapter_title?: string | null;
+  explanation?: string | null;
+}
+
+export interface AssignmentAttemptOut {
+  id: string;
+  assignment_id: string;
+  student_id: string;
+  student_unique_number: string;
+  attempt_number: number;
+  score: number | null;
+  max_score: number;
+  percentage: number | null;
+  is_passed: boolean | null;
+  status: string;
+  answers_json: string | null;
+  response_pdf_url: string | null;
+  teacher_feedback: string | null;
+  ai_feedback: string | null;
+  ai_feedback_status: string;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface SubmitQuizAttemptResult {
+  attempt: AssignmentAttemptOut;
+  score: number;
+  max_score: number;
+  percentage: number;
+  is_passed: boolean;
+  status: string;
+  ai_feedback: string | null;
+  message: string;
+}
+
+export interface StudentTestResultSummaryOut {
+  assignment: AssignmentOut;
+  submission: SubmissionOut | null;
+  attempts: AssignmentAttemptOut[];
+  teacher_feedback: FeedbackOut | null;
+}
+
 
 export interface FeedbackOut {
   id: string;
@@ -1712,3 +1782,58 @@ export async function getClassLearningProgress(
     `/teacher/classes/${class_number}/${section}/progress`
   );
 }
+
+export async function getAssignmentQuizForStudent(assignmentId: string): Promise<AssignmentQuizPreviewOut> {
+  return fetchApi<AssignmentQuizPreviewOut>(`/student/assignments/${assignmentId}/quiz`);
+}
+
+export async function submitAssignmentQuiz(
+  assignmentId: string,
+  answers: QuizAnswerInput[]
+): Promise<SubmitQuizAttemptResult> {
+  return fetchApi<SubmitQuizAttemptResult>(`/student/assignments/${assignmentId}/submit-quiz`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answers }),
+  });
+}
+
+export async function uploadAssignmentResponsePdf(
+  assignmentId: string,
+  formData: FormData
+): Promise<SubmissionOut> {
+  const token = getStoredToken();
+  const res = await fetch(`${API_BASE_URL}/student/assignments/${assignmentId}/upload-response`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: "Upload failed." }));
+    throw new Error(errorData.detail || `Upload failed with status ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getStudentAssignmentAttempts(assignmentId: string): Promise<AssignmentAttemptOut[]> {
+  return fetchApi<AssignmentAttemptOut[]>(`/student/assignments/${assignmentId}/attempts`);
+}
+
+export async function getStudentTestResults(): Promise<StudentTestResultSummaryOut[]> {
+  return fetchApi<StudentTestResultSummaryOut[]>("/student/test-results");
+}
+
+export async function getChildTestResults(studentUniqueNumber: string): Promise<StudentTestResultSummaryOut[]> {
+  return fetchApi<StudentTestResultSummaryOut[]>(`/parent/children/${studentUniqueNumber}/test-results`);
+}
+
+export async function getTeacherStudentAttempts(
+  assignmentId: string,
+  studentId: string
+): Promise<AssignmentAttemptOut[]> {
+  return fetchApi<AssignmentAttemptOut[]>(
+    `/teacher/assignments/${assignmentId}/students/${studentId}/attempts`
+  );
+}
+

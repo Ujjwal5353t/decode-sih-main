@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -69,11 +69,17 @@ const rolesConfig: {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loginOTP, loading, error, clearError } = useAuth();
+  const { user, login, loginOTP, loading, error, clearError } = useAuth();
   const [selectedRole, setSelectedRole] = useState<LoginRole>("student");
   const [studentLoginType, setStudentLoginType] = useState<StudentLoginType>("self");
   const [authMode, setAuthMode] = useState<LoginAuthMode>("password");
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      router.push("/dashboard");
+    }
+  }, [user, router]);
 
   // Form states
   const [identifier, setIdentifier] = useState("");
@@ -81,6 +87,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [branchName, setBranchName] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // OTP Login States
   const [otpSent, setOtpSent] = useState(false);
@@ -142,6 +149,7 @@ export default function LoginPage() {
       }
 
       try {
+        setIsSubmitting(true);
         await loginOTP(
           selectedRole,
           targetPhone,
@@ -151,6 +159,8 @@ export default function LoginPage() {
         router.push("/dashboard");
       } catch (err: any) {
         // Error set by auth provider
+      } finally {
+        setIsSubmitting(false);
       }
       return;
     }
@@ -163,13 +173,17 @@ export default function LoginPage() {
         return;
       }
       try {
+        setIsSubmitting(true);
         await login("teacher", {
           phone_number: targetPhone,
           branch_name: branchName.trim(),
           password,
         });
         router.push("/dashboard");
-      } catch (err: any) {}
+      } catch (err: any) {
+      } finally {
+        setIsSubmitting(false);
+      }
       return;
     }
 
@@ -187,6 +201,7 @@ export default function LoginPage() {
     }
 
     try {
+      setIsSubmitting(true);
       if (selectedRole === "student") {
         await login("student", {
           branch_name: studentLoginType === "school" ? branchName.trim() : undefined,
@@ -210,6 +225,8 @@ export default function LoginPage() {
       router.push("/dashboard");
     } catch (err: any) {
       // Error is handled in auth context
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -535,9 +552,9 @@ export default function LoginPage() {
                 variant="primary"
                 size="lg"
                 className="w-full mt-2"
-                disabled={loading || (authMode === "otp" && (!otpSent || otpCode.length < 4))}
+                disabled={isSubmitting || (authMode === "otp" && (!otpSent || otpCode.length < 4))}
               >
-                {loading ? (
+                {isSubmitting ? (
                   <span className="flex items-center gap-2">
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Signing in...

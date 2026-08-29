@@ -18,6 +18,7 @@ from src.schemas.auth import AddChildRequest
 from src.schemas.parent import ChildLinkOut, ParentProfile
 from src.schemas.quiz import GapReportOut
 from src.schemas.student import StudentProfile
+from src.schemas.teacher import StudentTestResultSummaryOut
 from src.services import parent_service, quiz_service
 
 router = APIRouter(prefix="/parent", tags=["Parent Dashboard"])
@@ -87,3 +88,35 @@ async def get_child_quiz_result(
         )
     report = await quiz_service.compute_gap_report(attempt, session)
     return GapReportOut(**report)
+
+
+@router.get(
+    "/children/{student_unique_number}/test-results",
+    response_model=list[StudentTestResultSummaryOut],
+    summary="Get a specific child's full test attempt history, scores, pass/fail status, teacher feedback, and AI advice",
+)
+async def get_child_test_results(
+    student_unique_number: str,
+    parent: Parent = Depends(get_current_parent),
+    session: AsyncSession = Depends(get_session),
+):
+    from src.schemas.teacher import AssignmentOut, AssignmentAttemptOut, FeedbackOut, SubmissionOut
+    from src.services import teacher_service
+    student = await parent_service.get_owned_student(parent, student_unique_number, session)
+    raw_results = await teacher_service.get_student_all_test_results(student, session)
+    
+    out = []
+    for item in raw_results:
+        sub = item["submission"]
+        sub_out = SubmissionOut.model_validate(sub) if sub else None
+        fb = item["teacher_feedback"]
+        fb_out = FeedbackOut.model_validate(fb) if fb else None
+
+        out.append(StudentTestResultSummaryOut(
+            assignment=AssignmentOut.model_validate(item["assignment"]),
+            submission=sub_out,
+            attempts=[AssignmentAttemptOut.model_validate(a) for a in item["attempts"]],
+            teacher_feedback=fb_out,
+        ))
+    return out
+

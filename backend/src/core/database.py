@@ -212,6 +212,58 @@ async def init_db() -> None:
         await conn.execute(
             text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS chapter_numbers TEXT;")
         )
+        await conn.execute(
+            text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS time_limit_minutes INTEGER DEFAULT 15;")
+        )
+        await conn.execute(
+            text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS pass_percentage DOUBLE PRECISION DEFAULT 60.0;")
+        )
+
+        # Migration: add scoring & multi-attempt columns to assignment_submissions
+        await conn.execute(
+            text("ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS percentage DOUBLE PRECISION;")
+        )
+        await conn.execute(
+            text("ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS is_passed BOOLEAN;")
+        )
+        await conn.execute(
+            text("ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS total_attempts INTEGER DEFAULT 1;")
+        )
+        await conn.execute(
+            text("ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'pending';")
+        )
+        await conn.execute(
+            text("ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS response_pdf_url TEXT;")
+        )
+
+        # Migration: ensure assignment_attempts table exists
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS assignment_attempts (
+                    id UUID PRIMARY KEY,
+                    assignment_id UUID NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+                    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+                    student_unique_number VARCHAR(20) NOT NULL,
+                    attempt_number INTEGER DEFAULT 1,
+                    score DOUBLE PRECISION,
+                    max_score DOUBLE PRECISION DEFAULT 100.0,
+                    percentage DOUBLE PRECISION,
+                    is_passed BOOLEAN,
+                    status VARCHAR(20) DEFAULT 'submitted',
+                    answers_json TEXT,
+                    response_pdf_url TEXT,
+                    teacher_feedback TEXT,
+                    ai_feedback TEXT,
+                    ai_feedback_status VARCHAR(20) DEFAULT 'pending',
+                    started_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+                    completed_at TIMESTAMP WITHOUT TIME ZONE
+                );
+                """
+            )
+        )
+
+
 
         # Migration: append-only learning-activity event log (see
         # src/models/learning.py). Created here as well as via create_all so

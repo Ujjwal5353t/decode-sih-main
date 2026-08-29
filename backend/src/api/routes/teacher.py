@@ -27,11 +27,11 @@ from src.core.database import get_session
 from src.core.dependencies import get_current_teacher
 from src.models.teacher import Teacher
 from src.schemas.teacher import (
+    AssignmentAttemptOut,
     AssignmentCreateQuizRequest,
     AssignmentOut,
     AssignmentQuizPreviewOut,
     AssignmentUpdateRequest,
-    AssignmentQuizPreviewOut,
     FeedbackOut,
     FeedbackRequest,
     SetScoreRequest,
@@ -348,11 +348,33 @@ async def get_submissions(
             student_email=student.email if student else None,
             score=sub.score,
             max_score=sub.max_score,
+            percentage=sub.percentage,
+            is_passed=sub.is_passed,
+            total_attempts=sub.total_attempts,
+            status=sub.status,
+            response_pdf_url=sub.response_pdf_url,
             attempted_at=sub.attempted_at,
             last_attempted_at=sub.last_attempted_at,
         )
         result.append(out)
     return result
+
+
+@router.get(
+    "/assignments/{assignment_id}/students/{student_id}/attempts",
+    response_model=list[AssignmentAttemptOut],
+    summary="Get multi-attempt history of a student for an assignment",
+)
+async def get_student_attempts_for_teacher(
+    assignment_id: uuid.UUID,
+    student_id: uuid.UUID,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    from src.schemas.teacher import AssignmentAttemptOut
+    await teacher_service._get_assignment_or_403(assignment_id, teacher, session)
+    attempts = await teacher_service.get_student_assignment_attempts(assignment_id, student_id, session)
+    return [AssignmentAttemptOut.model_validate(att) for att in attempts]
 
 
 @router.patch(
@@ -380,9 +402,15 @@ async def set_score(
         student_email=student.email if student else None,
         score=sub.score,
         max_score=sub.max_score,
+        percentage=sub.percentage,
+        is_passed=sub.is_passed,
+        total_attempts=sub.total_attempts,
+        status=sub.status,
+        response_pdf_url=sub.response_pdf_url,
         attempted_at=sub.attempted_at,
         last_attempted_at=sub.last_attempted_at,
     )
+
 
 
 # ── Feedback ───────────────────────────────────────────────────────────────────

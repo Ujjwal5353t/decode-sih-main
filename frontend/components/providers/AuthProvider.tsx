@@ -105,15 +105,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
       setLoading(true);
-      const storedToken = getStoredToken();
-      const storedRole = getStoredRole();
+      try {
+        const storedToken = getStoredToken();
+        const storedRole = getStoredRole();
 
-      if (storedToken && storedRole) {
-        setToken(storedToken);
-        setRole(storedRole);
-        await fetchProfileForRole(storedRole);
+        if (storedToken && storedRole) {
+          setToken(storedToken);
+          setRole(storedRole);
+          await fetchProfileForRole(storedRole);
+        }
+      } catch (e) {
+        console.error("Auth initialization error:", e);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     initAuth();
