@@ -31,6 +31,7 @@ from src.schemas.teacher import (
     AssignmentOut,
     AssignmentQuizPreviewOut,
     AssignmentUpdateRequest,
+    AssignmentQuizPreviewOut,
     FeedbackOut,
     FeedbackRequest,
     SetScoreRequest,
@@ -142,8 +143,9 @@ async def get_class_modules(
     teacher: Teacher = Depends(get_current_teacher),
     session: AsyncSession = Depends(get_session),
 ):
-    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session)
-    return await module_service.get_class_modules(teacher.branch_name, class_number, session, subject=subject)
+    tca = await teacher_service.verify_teacher_class_access(teacher, class_number, section, session, subject=subject)
+    target_subject = subject or (tca.subject if tca and tca.subject and tca.subject.lower() != "general" else None)
+    return await module_service.get_class_modules(teacher.branch_name, class_number, session, subject=target_subject)
 
 
 @router.get(

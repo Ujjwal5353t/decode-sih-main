@@ -802,10 +802,8 @@ export async function getTeacherClassModules(
   section: string,
   subject?: string
 ): Promise<ModuleOut[]> {
-  const url = subject
-    ? `/teacher/classes/${class_number}/${section}/modules?subject=${encodeURIComponent(subject)}`
-    : `/teacher/classes/${class_number}/${section}/modules`;
-  return fetchApi<ModuleOut[]>(url);
+  const query = subject ? `?subject=${encodeURIComponent(subject)}` : "";
+  return fetchApi<ModuleOut[]>(`/teacher/classes/${class_number}/${section}/modules${query}`);
 }
 
 export async function getTeacherAssignments(
@@ -849,6 +847,17 @@ export interface ChapterOut {
   sample_content?: string | null;
 }
 
+export interface QuizQuestionPreview {
+  id: string;
+  question_number: number;
+  chapter_title: string;
+  question_text: string;
+  options: string[];
+  correct_option_index: number;
+  correct_answer: string;
+  explanation?: string | null;
+}
+
 export interface AssignmentQuizPreviewOut {
   assignment_id: string;
   title: string;
@@ -858,17 +867,15 @@ export interface AssignmentQuizPreviewOut {
   assignment_type: string;
   chapters: string[];
   total_questions: number;
-  questions: any[];
+  questions: QuizQuestionPreview[];
 }
 
 export async function getTeacherClassChapters(
   class_number: number,
   subject?: string
 ): Promise<ChapterOut[]> {
-  const url = subject
-    ? `/teacher/classes/${class_number}/chapters?subject=${encodeURIComponent(subject)}`
-    : `/teacher/classes/${class_number}/chapters`;
-  return fetchApi<ChapterOut[]>(url);
+  const query = subject ? `?subject=${encodeURIComponent(subject)}` : "";
+  return fetchApi<ChapterOut[]>(`/teacher/classes/${class_number}/chapters${query}`);
 }
 
 export async function createAiQuizAssignment(
@@ -878,7 +885,7 @@ export async function createAiQuizAssignment(
     title: string;
     subject?: string | null;
     description?: string | null;
-    module_ids: string[];
+    module_ids?: string[];
     chapter_numbers?: number[];
     deadline_days?: number | null;
   }

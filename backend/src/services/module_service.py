@@ -45,13 +45,49 @@ async def get_class_modules(
     stmt = select(Module).where(
         Module.branch_name == branch_name,
         Module.class_number == class_number,
-    )
-    if subject and subject.strip() and subject.strip().lower() not in ("general", "all", "none", "null"):
-        stmt = stmt.where(Module.subject.ilike(f"%{subject.strip()}%"))  # type: ignore[attr-defined]
-
-    stmt = stmt.order_by(Module.created_at)
+    ).order_by(Module.created_at)
     result = await session.execute(stmt)
-    return list(result.scalars().all())
+    modules = list(result.scalars().all())
+
+    # If no branch-specific module exists yet for this class, auto-link NCERT books as school modules!
+    if not modules:
+        ncert_res = await session.execute(
+            select(NCERTBook).where(NCERTBook.class_number == class_number)
+        )
+        ncert_books = list(ncert_res.scalars().all())
+
+        new_modules = []
+        for book in ncert_books:
+            sub_slug = (book.subject or "general").lower().replace(" ", "-")
+            mod = Module(
+                branch_name=branch_name,
+                class_number=book.class_number,
+                subject=book.subject,
+                title=book.title,
+                description=book.description or f"NCERT {book.subject} Textbook for Class {book.class_number}",
+                source_type=SourceType.NCERT,
+                file_url=book.file_url or f"/ncert/class-{book.class_number}-{sub_slug}.pdf",
+                ncert_book_id=book.id,
+                ocr_status=OcrStatus.DONE,
+            )
+            session.add(mod)
+            new_modules.append(mod)
+
+        if new_modules:
+            await session.commit()
+            for m in new_modules:
+                await session.refresh(m)
+            modules = new_modules
+
+    # Filter by subject if specified and not 'General'
+    if subject and subject.strip().lower() not in ("general", "all", "none", ""):
+        clean_sub = subject.strip().lower()
+        modules = [
+            m for m in modules
+            if not m.subject or clean_sub in m.subject.strip().lower() or m.subject.strip().lower() in clean_sub or m.subject.strip().lower() == "general"
+        ]
+
+    return modules
 
 
 async def add_pdf_module(
@@ -201,15 +237,19 @@ async def add_ncert_module(
             )
             session.add(branch_chunk)
     else:
-        # Fallback: ingest initial text for the NCERT module
-        book_desc = ncert_book.description or ncert_book.title
-        initial_text = f"Chapter 1: Overview\n\n{book_desc}"
+        # Fallback: check if hand-authored chapter text exists in NCERT_CHAPTER_TEXT
+        from src.db.ncert_content import NCERT_CHAPTER_TEXT
+        full_text = NCERT_CHAPTER_TEXT.get((ncert_book.subject, ncert_book.class_number))
+        if not full_text:
+            book_desc = ncert_book.description or ncert_book.title
+            full_text = f"Chapter 1: Overview\n\n{book_desc}"
+
         await ingest_module_text(
             session=session,
             branch_name=branch_name,
             class_number=class_number,
             subject=ncert_book.subject,
-            text=initial_text,
+            text=full_text,
             module_id=module.id,
             ncert_book_id=ncert_book.id,
             module_title=module.title,

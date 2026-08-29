@@ -205,9 +205,12 @@ async def init_db() -> None:
         await conn.execute(
             text("DELETE FROM teacher_class_assignments WHERE subject IS NULL OR subject = '';")
         )
-        # Migration: add subject column to assignments
+        # Migration: add subject and chapter_numbers columns to assignments
         await conn.execute(
             text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS subject VARCHAR(100);")
+        )
+        await conn.execute(
+            text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS chapter_numbers TEXT;")
         )
 
         # Migration: append-only learning-activity event log (see

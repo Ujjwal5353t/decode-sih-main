@@ -35,6 +35,7 @@ from src.schemas.teacher import (
     AssignmentCreatePdfRequest,
     AssignmentQuizPreviewOut,
     AssignmentUpdateRequest,
+    AssignmentQuizPreviewOut,
 )
 from src.utils.file_utils import delete_cloudinary_asset
 
@@ -239,6 +240,10 @@ async def create_quiz_assignment(
     session: AsyncSession,
 ) -> Assignment:
     await verify_teacher_class_access(teacher, class_number, section.upper(), session, subject=data.subject)
+    
+    mod_ids_str = json.dumps(data.module_ids) if data.module_ids else None
+    chap_nums_str = json.dumps(data.chapter_numbers) if data.chapter_numbers else None
+
     asgn = Assignment(
         teacher_id=teacher.id,
         branch_name=teacher.branch_name,
@@ -248,7 +253,8 @@ async def create_quiz_assignment(
         title=data.title,
         description=data.description,
         assignment_type="ai_quiz",
-        module_ids=json.dumps(data.module_ids),
+        module_ids=mod_ids_str,
+        chapter_numbers=chap_nums_str,
         deadline_at=_deadline_from_days(data.deadline_days),
     )
     session.add(asgn)
@@ -633,18 +639,30 @@ async def verify_teacher_class_access(
         TeacherClassAssignment.class_number == class_number,
         TeacherClassAssignment.section == section.upper(),
     )
-    if subject:
-        stmt = stmt.where(func.lower(TeacherClassAssignment.subject) == subject.strip().lower())
-
     result = await session.execute(stmt)
-    tca = result.scalars().first()
-    if not tca:
-        sub_msg = f" for '{subject}'" if subject else ""
+    assignments = list(result.scalars().all())
+    if not assignments:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"You are not assigned to Class {class_number}{section.upper()}{sub_msg}.",
+            detail=f"You are not assigned to Class {class_number}{section.upper()}.",
         )
-    return tca
+
+    if subject and subject.strip().lower() not in ("general", "all", "none", "null", ""):
+        match = next(
+            (
+                a for a in assignments
+                if a.subject and (a.subject.strip().lower() == subject.strip().lower() or a.subject.strip().lower() == "general")
+            ),
+            None,
+        )
+        if not match:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You are not assigned to Class {class_number}{section.upper()} for '{subject}'.",
+            )
+        return match
+
+    return assignments[0]
 
 
 async def _get_assignment_or_403(
@@ -665,22 +683,26 @@ async def _get_class_assignments(
     branch_name: str, class_number: int, section: str, session: AsyncSession
 ) -> list[Assignment]:
     result = await session.execute(
-        select(Assignment).where(
+        select(Assignment)
+        .where(
             Assignment.branch_name == branch_name,
             Assignment.class_number == class_number,
-            Assignment.section == section,
-        ).order_by(Assignment.created_at.desc())
+            Assignment.section == section.upper(),
+        )
+        .order_by(Assignment.created_at.desc())
     )
     return list(result.scalars().all())
 
 
 async def get_assignment_quiz_preview(
-    assignment_id: uuid.UUID, teacher: Teacher, session: AsyncSession
+    assignment_id: uuid.UUID,
+    teacher: Teacher,
+    session: AsyncSession,
 ) -> AssignmentQuizPreviewOut:
     asgn = await _get_assignment_or_403(assignment_id, teacher, session)
 
     chapter_nums = []
-    if hasattr(asgn, "chapter_numbers") and asgn.chapter_numbers:
+    if getattr(asgn, "chapter_numbers", None):
         try:
             chapter_nums = json.loads(asgn.chapter_numbers)
         except Exception:

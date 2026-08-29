@@ -34,13 +34,24 @@ combination confirmed to authenticate) — not copied from an old note.
 
 ## 3. Teacher
 
+### Primary Demo Teacher 1: Dr. Rajesh Sharma
 - **Role**: `teacher`
-- **Name**: `Dr. AARTI SHUKLA`
-- **Phone Number**: `9999999996`
-- **School Name**: `ABC PUBLIC SCHOOL`
-- **Branch Name**: `South delhi branch`
-- **Password**: `123456789`
-- **Assigned Class**: `Class 4, Section A` (`4A`)
+- **Name**: `Dr. Rajesh Sharma`
+- **Phone Number**: `9876543210`
+- **School Name**: `LPS Karkarduma`
+- **Branch Name**: `LPS Karkarduma Branch`
+- **Password**: `Password123!`
+- **Assigned Class**: `Class 4, Section A` (`4A`) — `Mathematics`
+
+### Primary Demo Teacher 2: Ujjwal Yadav
+- **Role**: `teacher`
+- **Name**: `ujjwal yadav`
+- **Phone Number**: `9876543211`
+- **School Name**: `LPS Karkarduma`
+- **Branch Name**: `LPS Karkarduma Branch`
+- **Password**: `Password123!`
+- **Assigned Class**: `Class 3, Section A` (`3A`) — `Mathematics`
+
 - **Capabilities**:
   - View students enrolled in assigned classes.
   - Upload manual PDF assignments (max 5 MB) with deadlines.

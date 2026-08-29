@@ -673,7 +673,7 @@ async def seed_publishers(session: AsyncSession) -> None:
                     PublisherSubject.subject_name == sub_name,
                 )
             )
-            if not sub_res.scalar_one_or_none():
+            if not sub_res.scalars().first():
                 session.add(
                     PublisherSubject(
                         publisher_id=pub.id,
