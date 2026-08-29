@@ -50,7 +50,6 @@ import {
   ConsoleMotion,
   EASE,
   Item,
-  QUICK,
   Reveal,
   Stagger,
 } from "@/components/dashboard/console/motion";
@@ -58,25 +57,34 @@ import {
   Chip,
   Code,
   EmptyState,
-  Fact,
   Field,
   FieldLabel,
-  IdentityBar,
   Loading,
   Meter,
-  MetaDot,
   Modal,
   Notice,
   Panel,
   PanelHead,
   SectionHead,
   Segmented,
-  StatRow,
   Table,
   Td,
   Th,
   inputClass,
 } from "@/components/dashboard/console/primitives";
+import { Hero, HeroFact } from "@/components/dashboard/console/hero";
+import {
+  BarList,
+  ChartLegend,
+  DonutChart,
+  type Segment,
+} from "@/components/dashboard/console/charts";
+import {
+  ClassroomIllustration,
+  ParentChildIllustration,
+  SchoolIllustration,
+  StudentIllustration,
+} from "@/components/dashboard/console/illustrations";
 import { DeleteModuleDialog } from "@/components/school/DeleteModuleDialog";
 import { TeacherSearchModal } from "@/components/school/TeacherSearchModal";
 import { AdminRequestsPanel } from "@/components/school/registration/AdminRequestsPanel";
@@ -156,6 +164,18 @@ import {
 } from "@/lib/api";
 
 
+
+/**
+ * Score-band colour, shared by the roster rail and the score-distribution
+ * chart so a student's colour means the same thing in both places. Uses the
+ * same 70 / 40 thresholds the existing Meter tones already used.
+ */
+function scoreColor(score: number | null): string {
+  if (score === null) return "var(--c-line-strong)";
+  if (score >= 70) return "var(--accent-emerald)";
+  if (score >= 40) return "var(--accent-amber)";
+  return "var(--accent-rose)";
+}
 
 function formatPdfUrl(url: string | null | undefined): string | undefined {
   if (!url) return undefined;
@@ -359,14 +379,14 @@ export default function DashboardPage() {
         <header
           className={
             isConsole
-              ? "sticky top-0 z-30 flex items-center justify-between border-b border-[var(--c-line)] bg-[var(--c-panel)] px-4 py-3 sm:px-6"
+              ? "sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[var(--c-line)] bg-[var(--c-panel)]/95 backdrop-blur-md px-4 sm:px-6 shadow-2xs"
               : "sticky top-0 z-30 glass border-b border-border-primary px-4 sm:px-6 py-3.5 flex items-center justify-between"
           }
         >
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-3.5 min-w-0">
             <button
               onClick={() => setMobileSidebarOpen(true)}
-              className="p-2 rounded-[var(--radius-sm)] text-text-secondary hover:text-text-primary hover:bg-surface lg:hidden cursor-pointer"
+              className="p-2 rounded-xl text-text-secondary hover:text-text-primary hover:bg-[var(--c-sunken)] lg:hidden cursor-pointer"
               aria-label={t("nav.openMenu")}
             >
               <Menu className="w-5 h-5" />
@@ -377,14 +397,14 @@ export default function DashboardPage() {
                 <h1
                   className={
                     isConsole
-                      ? "truncate text-[15px] font-semibold tracking-[-0.01em] text-text-primary font-[family-name:var(--font-display)]"
+                      ? "truncate text-[15px] font-bold tracking-tight text-text-primary font-[family-name:var(--font-display)]"
                       : "text-base sm:text-lg font-bold text-text-primary truncate"
                   }
                 >
                   {getPageTitle()}
                 </h1>
                 {activePermissionItem?.badge && (
-                  <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-brand/10 text-brand border border-border-brand">
+                  <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-brand/10 text-brand border border-brand/20">
                     {activePermissionItem.badge}
                   </span>
                 )}
@@ -396,8 +416,16 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Quick Live Status Indicator */}
+            {role === "school" && (
+              <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Branch Active</span>
+              </div>
+            )}
+
             {/* Role Badge */}
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/10 border border-border-brand text-xs font-semibold text-brand uppercase tracking-wider">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/10 border border-border-brand text-xs font-bold text-brand uppercase tracking-wider">
               {role === "student" && <GraduationCap className="w-3.5 h-3.5" />}
               {role === "school" && <Building2 className="w-3.5 h-3.5" />}
               {role === "parent" && <Users className="w-3.5 h-3.5" />}
@@ -416,10 +444,10 @@ export default function DashboardPage() {
                 logout();
                 router.push("/login");
               }}
-              className="text-text-secondary hover:text-rose-500 text-xs px-2.5 sm:px-3"
+              className="rounded-xl text-text-secondary hover:text-rose-500 hover:bg-rose-500/10 text-xs px-2.5 sm:px-3"
             >
-              <LogOut className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">{t("dashboard.topbar.signOut")}</span>
+              <LogOut className="w-4 h-4 sm:mr-1.5 text-rose-500" />
+              <span className="hidden sm:inline font-semibold">{t("dashboard.topbar.signOut")}</span>
             </Button>
           </div>
         </header>
@@ -552,146 +580,237 @@ function StudentDashboardView({
       {/* TAB: OVERVIEW */}
       {activeTab === "overview" && (
         <div className="space-y-6">
-          <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary relative overflow-hidden">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold text-text-primary">
-                    {t("dashboard.student.welcomePrefix")} {student.full_name || `${t("dashboard.student.studentPrefix")}${student.unique_number}`}
-                  </h1>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono bg-brand/10 text-brand border border-border-brand">
-                    {student.unique_number}
+          {/* ── 1. Hero: Vibrant Learner Welcome Banner ──────────────────── */}
+          <Hero
+            variant="vibrant"
+            eyebrow={
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-xs backdrop-blur-md">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{isSelfEnrolled ? t("dashboard.student.selfEnrolledBadge") : t("dashboard.student.schoolEnrolledBadge")}</span>
+                <span className="opacity-40">•</span>
+                <span className="font-mono font-bold underline">{student.unique_number}</span>
+              </span>
+            }
+            title={`${t("dashboard.student.welcomePrefix")} ${student.full_name || `${t("dashboard.student.studentPrefix")}${student.unique_number}`}!`}
+            subtitle={
+              <p>
+                {isSelfEnrolled ? (
+                  <span className="font-semibold text-white">
+                    {t("dashboard.student.selfEnrolledTag")}
                   </span>
-                </div>
-                <p className="text-sm text-text-secondary mt-1">
-                  {isSelfEnrolled ? (
-                    <span className="font-semibold text-brand">{t("dashboard.student.selfEnrolledTag")}</span>
-                  ) : (
-                    <span>{student.school_name} — {student.branch_name} ({student.state})</span>
-                  )}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="px-3.5 py-1.5 rounded-full bg-surface border border-border-primary text-xs flex items-center gap-2">
-                  {isSelfEnrolled ? (
-                    <span className="text-brand font-bold flex items-center gap-1">
-                      <BookOpen className="w-3.5 h-3.5" /> {t("dashboard.student.selfEnrolledBadge")}
-                    </span>
-                  ) : (
-                    <span className="text-text-primary font-bold flex items-center gap-1">
-                      <Building2 className="w-3.5 h-3.5 text-brand" /> {t("dashboard.student.schoolEnrolledBadge")}
-                    </span>
-                  )}
-                </div>
-
-                <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
-                  <span className="text-text-tertiary block">
-                    {isSelfEnrolled ? t("dashboard.student.class") : t("dashboard.student.classAndSection")}
+                ) : (
+                  <span>
+                    {student.school_name} — {student.branch_name} ({student.state})
                   </span>
-                  <span className="font-semibold text-text-primary">
-                    {student.class_number
+                )}
+              </p>
+            }
+            illustration={<StudentIllustration className="h-[180px] w-[285px] drop-shadow-xl" />}
+            facts={
+              <>
+                <HeroFact
+                  label={isSelfEnrolled ? t("dashboard.student.class") : t("dashboard.student.classAndSection")}
+                  value={
+                    student.class_number
                       ? isSelfEnrolled
                         ? `${t("dashboard.student.class")} ${student.class_number}`
                         : `${t("dashboard.student.class")} ${student.class_number} - Section ${student.section}`
-                      : t("dashboard.student.notConfigured")}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+                      : t("dashboard.student.notConfigured")
+                  }
+                  hint={isSelfEnrolled ? "NCERT Curriculum" : "Assigned section"}
+                  variant="vibrant"
+                />
+                <HeroFact
+                  label={t("dashboard.student.availableModules")}
+                  value={
+                    <AnimatedNumber value={isSelfEnrolled ? ncertBooks.length : modules.length} />
+                  }
+                  hint={isSelfEnrolled ? "NCERT Official Books" : "School Branch Syllabus"}
+                  variant="vibrant"
+                />
+                <HeroFact
+                  label="Student ID"
+                  value={<span className="font-mono">{student.unique_number}</span>}
+                  hint={isSelfEnrolled ? t("dashboard.student.selfEnrolledBadge") : t("dashboard.student.schoolEnrolledBadge")}
+                  variant="vibrant"
+                />
+              </>
+            }
+          />
 
           {needsSetup && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass rounded-[var(--radius-lg)] p-6 border border-brand/30 bg-brand/5"
             >
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-[var(--radius-sm)] bg-brand text-white flex items-center justify-center shrink-0">
-                  <BookOpen className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <h2 className="text-base font-bold text-text-primary">
-                    {isSelfEnrolled ? t("dashboard.student.selectClassTitle") : t("dashboard.student.setupClassTitle")}
-                  </h2>
-                  <p className="text-xs text-text-secondary mt-0.5">
-                    {isSelfEnrolled
-                      ? t("dashboard.student.selectClassDesc")
-                      : t("dashboard.student.setupClassDesc")}
-                  </p>
+              <Panel
+                flush
+                className="relative overflow-hidden rounded-[18px] border border-brand/25 bg-brand/[0.04] p-5 shadow-xs"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                    <BookOpen className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
+                      {isSelfEnrolled ? t("dashboard.student.selectClassTitle") : t("dashboard.student.setupClassTitle")}
+                    </h4>
+                    <p className="mt-1 text-xs text-text-secondary">
+                      {isSelfEnrolled
+                        ? t("dashboard.student.selectClassDesc")
+                        : t("dashboard.student.setupClassDesc")}
+                    </p>
 
-                  {errorMsg && (
-                    <div className="mt-3 p-2.5 rounded bg-rose-500/10 text-rose-500 text-xs flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>{errorMsg}</span>
-                    </div>
-                  )}
+                    {errorMsg && (
+                      <div className="mt-3 flex items-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 p-2.5 text-xs text-rose-500">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <span>{errorMsg}</span>
+                      </div>
+                    )}
 
-                  <form onSubmit={handleSetupSubmit} className="mt-4 flex flex-wrap items-center gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-text-secondary mb-1">{t("dashboard.student.class")}</label>
-                      <select
-                        value={selectedClass}
-                        onChange={(e) => setSelectedClass(Number(e.target.value))}
-                        className="px-3 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none"
-                      >
-                        {[1, 2, 3, 4, 5].map((num) => (
-                          <option key={num} value={num}>
-                            {t("dashboard.student.class")} {num}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {!isSelfEnrolled && (
+                    <form
+                      onSubmit={handleSetupSubmit}
+                      className="mt-4 flex flex-wrap items-center gap-4"
+                    >
                       <div>
-                        <label className="block text-xs font-medium text-text-secondary mb-1">{t("dashboard.student.section")}</label>
+                        <label className="mb-1 block text-xs font-medium text-text-secondary">
+                          {t("dashboard.student.class")}
+                        </label>
                         <select
-                          value={selectedSection}
-                          onChange={(e) => setSelectedSection(e.target.value)}
-                          className="px-3 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none"
+                          value={selectedClass}
+                          onChange={(e) => setSelectedClass(Number(e.target.value))}
+                          className={`${inputClass} w-auto`}
                         >
-                          {["A", "B", "C", "D"].map((sec) => (
-                            <option key={sec} value={sec}>
-                              {t("dashboard.student.section")} {sec}
+                          {[1, 2, 3, 4, 5].map((num) => (
+                            <option key={num} value={num}>
+                              {t("dashboard.student.class")} {num}
                             </option>
                           ))}
                         </select>
                       </div>
-                    )}
 
-                    <div className="self-end">
-                      <Button type="submit" variant="primary" size="sm" disabled={isSettingUp}>
-                        {isSettingUp
-                          ? t("actions.loading")
-                          : isSelfEnrolled
-                          ? t("dashboard.student.saveClass")
-                          : t("dashboard.student.saveClassAndSection")}
-                      </Button>
-                    </div>
-                  </form>
+                      {!isSelfEnrolled && (
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-text-secondary">
+                            {t("dashboard.student.section")}
+                          </label>
+                          <select
+                            value={selectedSection}
+                            onChange={(e) => setSelectedSection(e.target.value)}
+                            className={`${inputClass} w-auto`}
+                          >
+                            {["A", "B", "C", "D"].map((sec) => (
+                              <option key={sec} value={sec}>
+                                {t("dashboard.student.section")} {sec}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div className="self-end">
+                        <Button type="submit" variant="primary" size="sm" disabled={isSettingUp}>
+                          {isSettingUp
+                            ? t("actions.loading")
+                            : isSelfEnrolled
+                            ? t("dashboard.student.saveClass")
+                            : t("dashboard.student.saveClassAndSection")}
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
-              </div>
+              </Panel>
             </motion.div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
-              <span className="text-xs text-text-tertiary block">{t("dashboard.student.availableModules")}</span>
-              <span className="text-2xl font-bold text-text-primary block">
-                {isSelfEnrolled ? ncertBooks.length : modules.length}
-              </span>
-              <span className="text-[11px] text-brand block">
-                {isSelfEnrolled ? "NCERT Official Books" : "School Branch Syllabus"}
-              </span>
-            </div>
+          {/* ── 2. Metric Cards Row ──────────────────────────────────────── */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Panel
+              flush
+              className="relative flex flex-col justify-between overflow-hidden rounded-[18px] border border-[var(--c-line)] p-5 shadow-xs"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                    <Layers className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
+                      {t("dashboard.student.availableModules")}
+                    </h4>
+                    <div className="text-xs font-semibold text-text-primary">
+                      {isSelfEnrolled ? t("dashboard.student.ncertBooks") : "School Branch Syllabus"}
+                    </div>
+                  </div>
+                </div>
+                <span className="rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-[10px] font-extrabold uppercase text-brand">
+                  {isSelfEnrolled ? "NCERT" : "School"}
+                </span>
+              </div>
 
-            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
-              <span className="text-xs text-text-tertiary block">Learning Format</span>
-              <span className="text-2xl font-bold text-text-primary block">Interactive AI</span>
-              <span className="text-[11px] text-emerald-500 block">PDF Reader & AI Diagnostic Quizzes</span>
-            </div>
+              <div className="my-4">
+                <div className="text-3xl font-extrabold tracking-tight text-text-primary font-[family-name:var(--font-display)]">
+                  <AnimatedNumber value={isSelfEnrolled ? ncertBooks.length : modules.length} />
+                </div>
+                <p className="mt-1 text-xs text-text-secondary">
+                  {isSelfEnrolled ? "NCERT Official Books" : "School Branch Syllabus"}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-[var(--c-line)] pt-3 text-xs text-text-tertiary">
+                <span>
+                  {student.class_number ? `Class ${student.class_number}` : "Class not set"}
+                </span>
+                <span className="font-semibold text-text-secondary">
+                  {isSelfEnrolled ? "Self Enrolled" : "School Enrolled"}
+                </span>
+              </div>
+            </Panel>
+
+            <Panel
+              flush
+              className="relative flex flex-col justify-between overflow-hidden rounded-[18px] border border-[var(--c-line)] p-5 shadow-xs"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
+                      Learning Format
+                    </h4>
+                    <div className="text-xs font-semibold text-text-primary">Interactive AI</div>
+                  </div>
+                </div>
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-extrabold uppercase ${
+                    quizStatus?.completed
+                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600"
+                      : "border-amber-500/20 bg-amber-500/10 text-amber-600"
+                  }`}
+                >
+                  {quizStatus?.completed ? "Assessed" : "Pending"}
+                </span>
+              </div>
+
+              <div className="my-4">
+                <div className="text-3xl font-extrabold tracking-tight text-text-primary font-[family-name:var(--font-display)]">
+                  Interactive AI
+                </div>
+                <p className="mt-1 text-xs text-emerald-500">
+                  PDF Reader &amp; AI Diagnostic Quizzes
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-[var(--c-line)] pt-3 text-xs text-text-tertiary">
+                <span>Diagnostic Assessment</span>
+                <span className="font-semibold text-text-secondary">
+                  {quizStatus?.completed ? "Completed" : "Pending"}
+                </span>
+              </div>
+            </Panel>
           </div>
 
           {/* Learning progress — hidden only when we positively know the
@@ -1060,6 +1179,10 @@ function SchoolDashboardView({
   const [moduleToDelete, setModuleToDelete] = useState<ModuleOut | null>(null);
   const [quizSummaries, setQuizSummaries] = useState<StudentQuizSummaryOut[]>([]);
   const [loadingQuizSummaries, setLoadingQuizSummaries] = useState<boolean>(false);
+  // Branch-wide, unlike the per-class state above — reuses the same
+  // getSchoolTeachers() call the Teacher Management tab already makes, just
+  // for the Overview's "Teachers" summary figure.
+  const [teacherCount, setTeacherCount] = useState<number | null>(null);
 
   const fetchNcertBooks = () => {
     setLoadingNcert(true);
@@ -1118,11 +1241,64 @@ function SchoolDashboardView({
     }
   }, [selectedClass, activeTab, completionNonce]);
 
+  // Branch-wide, so it only needs fetching once per Overview visit — not on
+  // every selectedClass change like the per-class data above.
+  useEffect(() => {
+    if (activeTab !== "overview") return;
+    getSchoolTeachers()
+      .then((res) => setTeacherCount(res.length))
+      .catch((err) => console.log("School teacher count fetch note:", err.message));
+  }, [activeTab]);
+
   /** Live job status wins over the record fetched with the list. */
   const statusOf = (mod: ModuleOut): ModuleDisplayStatus =>
     jobFor(mod.id)?.status ?? mod.ocr_status ?? "na";
 
   const classSubjects = schoolSubjects.filter((s) => s.class_number === selectedClass);
+  const diagnosticCompletedCount = quizSummaries.filter((s) => s.completed).length;
+  const diagnosticCompletionPct =
+    quizSummaries.length > 0
+      ? Math.round((diagnosticCompletedCount / quizSummaries.length) * 100)
+      : 0;
+
+  // Chart inputs, all folded from quizSummaries — the same rows the roster
+  // below renders. Nothing here reaches for data that isn't already on screen.
+  const diagnosticSegments: Segment[] = [
+    {
+      label: "Completed",
+      value: diagnosticCompletedCount,
+      color: "var(--accent-emerald)",
+    },
+    {
+      label: "Not completed yet",
+      value: quizSummaries.length - diagnosticCompletedCount,
+      color: "var(--c-line-strong)",
+    },
+  ];
+
+  const scoredSummaries = quizSummaries.filter(
+    (s) => s.completed && s.overall_score !== null
+  );
+  const scoreBands = [
+    {
+      label: "70% and above",
+      value: scoredSummaries.filter((s) => (s.overall_score ?? 0) >= 70).length,
+      color: "var(--accent-emerald)",
+    },
+    {
+      label: "40% to 69%",
+      value: scoredSummaries.filter(
+        (s) => (s.overall_score ?? 0) >= 40 && (s.overall_score ?? 0) < 70
+      ).length,
+      color: "var(--accent-amber)",
+    },
+    {
+      label: "Below 40%",
+      value: scoredSummaries.filter((s) => (s.overall_score ?? 0) < 40).length,
+      color: "var(--accent-rose)",
+    },
+  ];
+
   const unassignedModules = modules.filter(
     (m) =>
       !classSubjects.some(
@@ -1137,80 +1313,325 @@ function SchoolDashboardView({
         {/* TAB: OVERVIEW */}
         {activeTab === "overview" && (
           <div className="space-y-6">
-            <IdentityBar
-              monogram={school.student_prefix}
-              title={school.school_name}
-              badge={<Chip tone="brand">{school.branch_name}</Chip>}
-              meta={
-                <>
+            {/* ── 1. Hero: Vibrant Institutional Welcome Banner ───────────── */}
+            <Hero
+              variant="vibrant"
+              eyebrow={
+                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-white text-xs font-semibold border border-white/20 shadow-xs">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>{school.branch_name} Branch</span>
+                  <span className="opacity-40">•</span>
                   <span>
-                    Prefix:{" "}
-                    <span className="font-mono font-semibold text-brand">
-                      {school.student_prefix}
-                    </span>
+                    Prefix: <span className="font-mono underline font-bold">{school.student_prefix}</span>
                   </span>
-                  <MetaDot />
-                  <span>{school.email}</span>
-                  <MetaDot />
-                  <span>{school.state}</span>
+                </span>
+              }
+              title={`Welcome back, ${school.school_name}!`}
+              subtitle={
+                <p>
+                  Institutional oversight for <span className="text-white font-semibold">{school.state || "National"}</span> branch.
+                  Manage academic syllabus modules, review student diagnostic assessments, and track learning progress across Classes 1–5.
+                </p>
+              }
+              illustration={<SchoolIllustration className="h-[180px] w-[285px] drop-shadow-xl" />}
+              facts={
+                <>
+                  <HeroFact
+                    label="Teachers"
+                    value={teacherCount !== null ? <AnimatedNumber value={teacherCount} /> : "—"}
+                    hint="Registered in branch"
+                    variant="vibrant"
+                  />
+                  <HeroFact
+                    label="Students"
+                    value={<AnimatedNumber value={quizSummaries.length} />}
+                    hint={`Class ${selectedClass} roster`}
+                    variant="vibrant"
+                  />
+                  <HeroFact
+                    label="Curriculum Modules"
+                    value={<AnimatedNumber value={modules.length} />}
+                    hint={`${classSubjects.length} subject${
+                      classSubjects.length === 1 ? "" : "s"
+                    } configured`}
+                    variant="vibrant"
+                  />
+                  <HeroFact
+                    label="Syllabus Coverage"
+                    value="Classes 1–5"
+                    hint="Active curriculum"
+                    variant="vibrant"
+                  />
                 </>
               }
-              aside={<Fact label="Registered Branch">{school.branch_name}</Fact>}
             />
 
-            <StatRow
-              stats={[
-                {
-                  label: "Institution Prefix",
-                  icon: Building2,
-                  value: <span className="font-mono text-brand">{school.student_prefix}</span>,
-                  hint: "Student ID auto-prefix",
-                },
-                {
-                  label: "Curriculum Grades",
-                  icon: Layers,
-                  value: "Classes 1–5",
-                  hint: "Active Syllabus",
-                  hintTone: "emerald",
-                },
-                {
-                  label: "Branch Location",
-                  icon: Building2,
-                  value: school.state || "India",
-                  hint: school.email,
-                },
-              ]}
-            />
+            {/* ── 2. Top Metric Cards Row (EduSpot & SkillSet Inspired) ─────────── */}
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+              {/* Card 1: Diagnostic Assessment Goal */}
+              <Panel flush className="p-5 rounded-[18px] border border-[var(--c-line)] shadow-xs relative overflow-hidden flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                      <Target className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
+                        Diagnostic Goal
+                      </h4>
+                      <div className="text-xs font-semibold text-text-primary">
+                        Class {selectedClass} Assessment
+                      </div>
+                    </div>
+                  </div>
+                  <span
+                    className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                      diagnosticCompletionPct >= 70
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                        : diagnosticCompletionPct > 0
+                        ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                        : "bg-slate-500/10 text-slate-500 border-slate-500/20"
+                    }`}
+                  >
+                    {diagnosticCompletionPct >= 70
+                      ? "High Completion"
+                      : diagnosticCompletionPct > 0
+                      ? "In Progress"
+                      : "Pending"}
+                  </span>
+                </div>
 
-            {/* Class Diagnostic Quiz Roster — class teacher view of each student's result */}
-            <div>
-              <SectionHead icon={Target} title={`Class ${selectedClass} Diagnostic Results`} />
+                <div className="my-4 flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="text-3xl font-extrabold text-text-primary tracking-tight font-[family-name:var(--font-display)]">
+                      {diagnosticCompletionPct}%
+                    </div>
+                    <p className="text-xs text-text-secondary">
+                      {diagnosticCompletedCount} of {quizSummaries.length} students assessed
+                    </p>
+                  </div>
+                  <div className="shrink-0">
+                    <DonutChart
+                      size={76}
+                      thickness={9}
+                      segments={diagnosticSegments}
+                      centerLabel={`${diagnosticCompletionPct}%`}
+                    />
+                  </div>
+                </div>
 
-              <Panel flush className="overflow-hidden">
-                {loadingQuizSummaries ? (
-                  <Loading />
-                ) : quizSummaries.length > 0 ? (
-                  <Stagger className="divide-y divide-[var(--c-line)]">
-                    {quizSummaries.map((s) => (
-                      <Item key={s.student_unique_number} className="console-row px-5 py-4">
-                        <div className="flex flex-wrap items-center justify-between gap-4">
-                          <div className="flex min-w-0 items-center gap-2.5">
-                            <Code>{s.student_unique_number}</Code>
-                            <span className="truncate text-xs text-text-secondary">
-                              {s.student_email}
+                <div className="pt-3 border-t border-[var(--c-line)] flex items-center justify-between text-xs text-text-tertiary">
+                  <span>Class {selectedClass} Cohort</span>
+                  <span className="font-semibold text-text-secondary">
+                    {quizSummaries.length - diagnosticCompletedCount} remaining
+                  </span>
+                </div>
+              </Panel>
+
+              {/* Card 2: Performance Mastery & Score Bands */}
+              <Panel flush className="p-5 rounded-[18px] border border-[var(--c-line)] shadow-xs relative overflow-hidden flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-xl bg-blue-500/10 text-brand flex items-center justify-center">
+                      <Award className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
+                        Performance Health
+                      </h4>
+                      <div className="text-xs font-semibold text-text-primary">
+                        Score Distribution
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-text-tertiary">
+                    {scoredSummaries.length} Scored
+                  </span>
+                </div>
+
+                <div className="my-4 space-y-2.5">
+                  {scoredSummaries.length > 0 ? (
+                    <BarList data={scoreBands} max={scoredSummaries.length} valueSuffix="" />
+                  ) : (
+                    <div className="py-3 text-center text-xs text-text-tertiary italic">
+                      Diagnostic scores appear as students complete tests.
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-3 border-t border-[var(--c-line)] flex items-center justify-between text-xs text-text-tertiary">
+                  <span>Mastery Benchmark</span>
+                  <span className="font-semibold text-emerald-600">
+                    {scoredSummaries.filter((s) => (s.overall_score ?? 0) >= 70).length} at 70%+
+                  </span>
+                </div>
+              </Panel>
+
+              {/* Card 3: Class Subject Matrix & Syllabus */}
+              <Panel flush className="p-5 rounded-[18px] border border-[var(--c-line)] shadow-xs relative overflow-hidden flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-xl bg-violet-500/10 text-violet-600 flex items-center justify-center">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
+                        Curriculum Matrix
+                      </h4>
+                      <div className="text-xs font-semibold text-text-primary">
+                        Class {selectedClass} Syllabus
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold bg-brand/10 text-brand px-2 py-0.5 rounded-full border border-brand/20">
+                    {modules.length} Modules
+                  </span>
+                </div>
+
+                <div className="my-3">
+                  {classSubjects.length > 0 ? (
+                    <div className="max-h-[104px] space-y-1.5 overflow-y-auto pr-1">
+                      {classSubjects.map((sub) => {
+                        const count = modules.filter(
+                          (m) =>
+                            (m.subject || "").trim().toLowerCase() ===
+                            sub.subject.trim().toLowerCase()
+                        ).length;
+                        return (
+                          <div
+                            key={sub.id || sub.subject}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-[var(--c-line)] bg-[var(--c-sunken)] px-2.5 py-1.5"
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate text-xs font-medium text-text-primary">
+                                {sub.subject}
+                              </div>
+                              {sub.publisher_name && (
+                                <div className="truncate text-[10px] text-text-tertiary">
+                                  {sub.publisher_name}
+                                </div>
+                              )}
+                            </div>
+                            <span className="grid h-5 min-w-[20px] shrink-0 place-items-center rounded-full bg-brand/15 px-1 text-[10px] font-bold text-brand">
+                              {count}
                             </span>
                           </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-3 text-center text-xs text-text-tertiary italic">
+                      No subjects configured yet for Class {selectedClass}.
+                    </div>
+                  )}
+                </div>
 
+                <div className="pt-3 border-t border-[var(--c-line)] flex items-center justify-between text-xs text-text-tertiary">
+                  <span>NCERT & School Uploads</span>
+                  <button
+                    onClick={() => {
+                      const tabBtn = document.querySelector('[id*="modules"]') as HTMLElement;
+                      if (tabBtn) tabBtn.click();
+                      else router.push("/dashboard?tab=modules");
+                    }}
+                    className="font-bold text-brand hover:underline cursor-pointer"
+                  >
+                    View All →
+                  </button>
+                </div>
+              </Panel>
+            </div>
+
+            {/* ── 3. Cohort roster — full width, since its analytics now live
+                   in the three cards above rather than being repeated in a
+                   duplicate sidebar rail. ──────────────────────────────── */}
+            <Panel flush className="overflow-hidden rounded-[20px] border border-[var(--c-line)] shadow-xs">
+              <PanelHead
+                icon={Target}
+                title={`Class ${selectedClass} Diagnostic Results`}
+                description="Student gap-identification outcomes and AI summaries for the selected class."
+                actions={
+                  <div className="flex items-center gap-2">
+                    <span className="hidden text-xs font-semibold text-text-tertiary sm:inline">
+                      Select Class:
+                    </span>
+                    <Segmented
+                      idPrefix="school-overview-class"
+                      value={selectedClass}
+                      onChange={(cls) => setSelectedClass(cls)}
+                      options={[1, 2, 3, 4, 5].map((cls) => ({
+                        value: cls,
+                        label: `Class ${cls}`,
+                      }))}
+                    />
+                  </div>
+                }
+              />
+
+              {loadingQuizSummaries ? (
+                <Loading label={`Loading Class ${selectedClass} diagnostic results…`} />
+              ) : quizSummaries.length > 0 ? (
+                <Stagger className="divide-y divide-[var(--c-line)]">
+                  {quizSummaries.map((s) => (
+                    <Item
+                      key={s.student_unique_number}
+                      className="console-row px-5 py-4 transition-colors hover:bg-[var(--c-sunken)]/60"
+                    >
+                      {/* Fixed measure columns rather than a single flex row, so
+                          scores stay aligned down the page at full width. */}
+                      <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_150px_260px] lg:items-center lg:gap-6">
+                        {/* Identity */}
+                        <div className="flex min-w-0 items-center gap-3.5">
+                          <div
+                            className="h-10 w-10 shrink-0 rounded-xl border flex items-center justify-center font-mono text-xs font-bold"
+                            style={{
+                              borderColor: s.completed
+                                ? `color-mix(in srgb, ${scoreColor(s.overall_score)} 35%, transparent)`
+                                : "var(--c-line)",
+                              background: s.completed
+                                ? `color-mix(in srgb, ${scoreColor(s.overall_score)} 12%, transparent)`
+                                : "var(--c-sunken)",
+                              color: s.completed ? scoreColor(s.overall_score) : "var(--text-tertiary)",
+                            }}
+                          >
+                            {s.student_unique_number.slice(-3) || "STD"}
+                          </div>
+
+                          <div className="min-w-0">
+                            <Code className="text-xs font-bold text-text-primary">
+                              {s.student_unique_number}
+                            </Code>
+                            <div className="mt-1 truncate text-xs text-text-secondary">
+                              {s.student_email}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status */}
+                        <div>
                           {s.completed ? (
-                            <div className="flex items-center gap-3">
-                              {s.gaps_found > 0 && (
-                                <Chip tone="amber">
-                                  {s.gaps_found} gap{s.gaps_found === 1 ? "" : "s"}
-                                </Chip>
-                              )}
-                              {s.overall_score !== null && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
+                              <CheckCircle className="h-3 w-3" /> Assessed
+                            </span>
+                          ) : (
+                            <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600">
+                              Awaiting Test
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Outcome */}
+                        {s.completed ? (
+                          <div className="flex items-center justify-start gap-3.5 lg:justify-end">
+                            {s.gaps_found > 0 && (
+                              <Chip tone="amber" className="shrink-0 text-xs font-semibold">
+                                {s.gaps_found} gap{s.gaps_found === 1 ? "" : "s"} found
+                              </Chip>
+                            )}
+                            {s.overall_score !== null && (
+                              <div className="flex items-center gap-2">
                                 <Meter
-                                  className="w-24"
+                                  className="h-2.5 w-24 rounded-full"
                                   value={s.overall_score}
                                   tone={
                                     s.overall_score >= 70
@@ -1220,39 +1641,46 @@ function SchoolDashboardView({
                                       : "rose"
                                   }
                                 />
-                              )}
-                              <span className="console-num w-12 text-right text-sm font-semibold text-text-primary font-[family-name:var(--font-display)]">
-                                {s.overall_score !== null ? `${s.overall_score}%` : "—"}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-xs italic text-text-tertiary">
-                              Not completed yet
-                            </span>
-                          )}
-                        </div>
+                                <span className="console-num w-12 text-right text-sm font-bold text-text-primary font-[family-name:var(--font-display)]">
+                                  {s.overall_score}%
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs italic text-text-tertiary lg:text-right">
+                            Diagnostic in progress
+                          </span>
+                        )}
+                      </div>
 
-                        {s.ai_summary_status === "ready" && s.ai_summary && (
-                          <p className="mt-3 border-t border-[var(--c-line)] pt-3 text-xs leading-relaxed text-text-secondary">
+                      {s.ai_summary_status === "ready" && s.ai_summary && (
+                        <div className="mt-3.5 flex items-start gap-2.5 rounded-xl border border-brand/15 bg-brand/[0.04] p-3 text-xs leading-relaxed text-text-secondary">
+                          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                          <div>
+                            <span className="mr-1 font-bold text-text-primary">
+                              AI Diagnostic Insight:
+                            </span>
                             {s.ai_summary}
-                          </p>
-                        )}
-                        {s.completed && s.ai_summary_status === "pending" && (
-                          <p className="mt-2 text-[10px] italic text-text-tertiary">
-                            Summary generating...
-                          </p>
-                        )}
-                      </Item>
-                    ))}
-                  </Stagger>
-                ) : (
-                  <EmptyState icon={Target} title={`No Students in Class ${selectedClass} Yet`}>
-                    Once students register under this branch and set their class, their diagnostic
-                    quiz results will appear here.
-                  </EmptyState>
-                )}
-              </Panel>
-            </div>
+                          </div>
+                        </div>
+                      )}
+                      {s.completed && s.ai_summary_status === "pending" && (
+                        <p className="mt-2 flex items-center gap-1.5 text-[10px] italic text-text-tertiary">
+                          <Loader2 className="h-3 w-3 animate-spin text-brand" />
+                          Analyzing learning gaps and generating summary...
+                        </p>
+                      )}
+                    </Item>
+                  ))}
+                </Stagger>
+              ) : (
+                <EmptyState icon={Target} title={`No Students in Class ${selectedClass} Yet`}>
+                  Once students register under this branch and select Class {selectedClass}, their
+                  diagnostic quiz results and AI gap summaries will appear here.
+                </EmptyState>
+              )}
+            </Panel>
           </div>
         )}
 
@@ -1292,20 +1720,13 @@ function SchoolDashboardView({
             {/* SECTION A: NCERT BOOKS */}
             {curriculumSection === "ncert" && (
               <div className="space-y-4">
-                {ncertActionMsg && (
-                  <div className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-xs text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 shrink-0" />
+                <AnimatePresence>
+                  {ncertActionMsg && (
+                    <Notice tone="emerald" icon={CheckCircle} onDismiss={() => setNcertActionMsg(null)}>
                       {ncertActionMsg}
-                    </span>
-                    <button
-                      onClick={() => setNcertActionMsg(null)}
-                      className="cursor-pointer text-emerald-500 hover:text-emerald-400"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                )}
+                    </Notice>
+                  )}
+                </AnimatePresence>
 
                 {loadingNcert ? (
                   <Panel flush>
@@ -1779,48 +2200,51 @@ function ParentDashboardView({
         {/* TAB: OVERVIEW */}
         {activeTab === "overview" && (
           <div className="space-y-6">
-            <IdentityBar
-              icon={Users}
-              title={t("parentDashboard.welcome", { name: parent.full_name || t("parentDashboard.parentFallback") })}
-              meta={
-                <>
+            {/* ── 1. Hero: Vibrant Guardian Welcome Banner ─────────────────── */}
+            <Hero
+              variant="vibrant"
+              eyebrow={
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-xs backdrop-blur-md">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span>{t("parentDashboard.guardianAccount")}</span>
-                  <span className="font-mono font-medium text-text-primary">
+                  <span className="opacity-40">•</span>
+                  <span className="font-mono font-bold underline">
                     {parent.phone_number || parent.email || t("parentDashboard.registeredGuardian")}
                   </span>
+                </span>
+              }
+              title={t("parentDashboard.welcome", { name: parent.full_name || t("parentDashboard.parentFallback") })}
+              subtitle={
+                <p>
+                  Follow every ward&apos;s learning in one place — school and NCERT modules,
+                  diagnostic results, and direct remarks from their teachers.
+                </p>
+              }
+              illustration={
+                <ParentChildIllustration className="h-[180px] w-[285px] drop-shadow-xl" />
+              }
+              facts={
+                <>
+                  <HeroFact
+                    label={t("parentDashboard.monitoredWards")}
+                    value={<AnimatedNumber value={childrenList.length} />}
+                    hint={t("parentDashboard.registeredStudents")}
+                    variant="vibrant"
+                  />
+                  <HeroFact
+                    label={t("parentDashboard.progressTracking")}
+                    value={t("parentDashboard.activeStatus")}
+                    hint={t("parentDashboard.syncingModules")}
+                    variant="vibrant"
+                  />
+                  <HeroFact
+                    label={t("parentDashboard.guardianFeedback")}
+                    value={t("parentDashboard.connectedStatus")}
+                    hint={t("parentDashboard.directTeacherRemarks")}
+                    variant="vibrant"
+                  />
                 </>
               }
-              aside={
-                <Fact label={t("parentDashboard.linkedWards")}>
-                  <span className="text-brand">{t("parentDashboard.childrenCount", { count: childrenList.length })}</span>
-                </Fact>
-              }
-            />
-
-            {/* Quick Metrics */}
-            <StatRow
-              stats={[
-                {
-                  label: t("parentDashboard.monitoredWards"),
-                  icon: Users,
-                  value: <AnimatedNumber value={childrenList.length} />,
-                  hint: t("parentDashboard.registeredStudents"),
-                  hintTone: "brand",
-                },
-                {
-                  label: t("parentDashboard.progressTracking"),
-                  icon: RefreshCw,
-                  value: <span className="text-emerald-500">{t("parentDashboard.activeStatus")}</span>,
-                  hint: t("parentDashboard.syncingModules"),
-                },
-                {
-                  label: t("parentDashboard.guardianFeedback"),
-                  icon: MessageSquare,
-                  value: <span className="text-violet-500">{t("parentDashboard.connectedStatus")}</span>,
-                  hint: t("parentDashboard.directTeacherRemarks"),
-                  hintTone: "violet",
-                },
-              ]}
             />
 
             {/* Wards Overview Section */}
@@ -1838,59 +2262,80 @@ function ParentDashboardView({
               />
 
               {loadingChildren ? (
-                <Panel flush>
+                <Panel flush className="rounded-[20px] border border-[var(--c-line)] shadow-xs">
                   <Loading />
                 </Panel>
               ) : childrenList.length > 0 ? (
-                <Stagger className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {childrenList.map((child) => (
-                    <Item key={child.id}>
-                      <Panel flush className="console-lift flex h-full flex-col overflow-hidden">
-                        <div className="flex items-center gap-3 px-5 py-4">
-                          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--c-radius)] border border-brand/20 bg-brand/8 text-brand">
-                            <GraduationCap className="h-5 w-5" />
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="truncate text-sm font-semibold leading-tight text-text-primary font-[family-name:var(--font-display)]">
-                              {child.full_name || t("parentDashboard.studentPrefix", { id: child.student_unique_number })}
-                            </h3>
-                            <div className="mt-1">
-                              <Code>{child.student_unique_number}</Code>
+                <Stagger className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  {childrenList.map((child) => {
+                    const isSelf =
+                      child.enrollment_type === "self" || child.branch_name === "SELF";
+                    return (
+                      <Item key={child.id}>
+                        {/* Same card anatomy as the admin metric cards: icon-tile
+                            header with a status pill, a body, then a hairline
+                            footer carrying the secondary facts. */}
+                        <Panel
+                          flush
+                          className="console-lift flex h-full flex-col justify-between overflow-hidden rounded-[18px] border border-[var(--c-line)] p-5 shadow-xs"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-brand/20 bg-brand/10 text-sm font-bold text-brand font-[family-name:var(--font-display)]">
+                                {(child.full_name || child.student_unique_number)
+                                  .slice(0, 2)
+                                  .toUpperCase()}
+                              </span>
+                              <div className="min-w-0">
+                                <h3 className="truncate text-sm font-bold leading-tight text-text-primary font-[family-name:var(--font-display)]">
+                                  {child.full_name || t("parentDashboard.studentPrefix", { id: child.student_unique_number })}
+                                </h3>
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                  <Code>{child.student_unique_number}</Code>
+                                  <Chip tone={isSelf ? "violet" : "brand"}>
+                                    {isSelf ? t("parentDashboard.selfEnrolled") : t("parentDashboard.schoolEnrolled")}
+                                  </Chip>
+                                </div>
+                              </div>
                             </div>
+
+                            <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              {t("parentDashboard.monitoringStatus")}
+                            </span>
                           </div>
-                        </div>
 
-                        <div className="flex-1 divide-y divide-[var(--c-line)] border-t border-[var(--c-line)] px-5 py-2">
-                          <Field label={t("parentDashboard.classSection")}>
-                            {child.class_number
-                              ? child.enrollment_type === "self" || child.branch_name === "SELF"
-                                ? t("parentDashboard.classSelf", { classNumber: child.class_number })
-                                : t("parentDashboard.classSectionVal", { classNumber: child.class_number, section: child.section || "A" })
-                              : t("parentDashboard.classNotSet")}
-                          </Field>
+                          <div className="my-4 divide-y divide-[var(--c-line)]">
+                            <Field label={t("parentDashboard.classSection")}>
+                              {child.class_number
+                                ? isSelf
+                                  ? t("parentDashboard.classSelf", { classNumber: child.class_number })
+                                  : t("parentDashboard.classSectionVal", { classNumber: child.class_number, section: child.section || "A" })
+                                : t("parentDashboard.classNotSet")}
+                            </Field>
+                            <Field label={t("parentDashboard.schoolBranch")}>
+                              {isSelf
+                                ? t("parentDashboard.selfEducated")
+                                : t("parentDashboard.schoolBranchVal", {
+                                    school: child.school_name || "School",
+                                    branch: child.branch_name || "Branch",
+                                  })}
+                            </Field>
+                          </div>
 
-                          <Field label={t("parentDashboard.schoolBranch")}>
-                            {child.enrollment_type === "self" || child.branch_name === "SELF"
-                              ? t("parentDashboard.selfEducated")
-                              : t("parentDashboard.schoolBranchVal", { school: child.school_name || "School", branch: child.branch_name || "Branch" })}
-                          </Field>
-                        </div>
-
-                        <div className="flex items-center justify-between border-t border-[var(--c-line)] bg-[var(--c-sunken)] px-5 py-2.5 text-[11px] text-text-tertiary">
-                          <span className="console-num">
-                            {t("parentDashboard.linkedDate", { date: new Date(child.created_at).toLocaleDateString() })}
-                          </span>
-                          <span className="flex items-center gap-1.5 font-medium text-emerald-500">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                            {t("parentDashboard.monitoringStatus")}
-                          </span>
-                        </div>
-                      </Panel>
-                    </Item>
-                  ))}
+                          <div className="flex items-center justify-between border-t border-[var(--c-line)] pt-3 text-xs text-text-tertiary">
+                            <span>Linked:</span>
+                            <span className="console-num font-semibold text-text-secondary">
+                              {t("parentDashboard.linkedDate", { date: new Date(child.created_at).toLocaleDateString() })}
+                            </span>
+                          </div>
+                        </Panel>
+                      </Item>
+                    );
+                  })}
                 </Stagger>
               ) : (
-                <Panel flush>
+                <Panel flush className="rounded-[20px] border border-[var(--c-line)] shadow-xs">
                   <EmptyState icon={Users} title={t("parentDashboard.noWardsTitle")}>
                     {t("parentDashboard.noWardsDesc")}
                   </EmptyState>
@@ -2301,6 +2746,31 @@ function TeacherDashboardView({
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
   // Fetch Assigned Classes on Mount
+  // Chart inputs folded from the arrays this view already fetches — no extra
+  // requests, no derived values that aren't visible elsewhere on the page.
+  const assignmentSegments: Segment[] = [
+    {
+      label: "Active",
+      value: assignments.filter((a) => !a.is_locked).length,
+      color: "var(--accent-emerald)",
+    },
+    {
+      label: "Locked",
+      value: assignments.filter((a) => a.is_locked).length,
+      color: "var(--accent-rose)",
+    },
+  ];
+
+  const moduleSubjectBands = Object.entries(
+    classModules.reduce<Record<string, number>>((acc, m) => {
+      const subject = (m.subject || "General").trim();
+      acc[subject] = (acc[subject] || 0) + 1;
+      return acc;
+    }, {})
+  )
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, value]) => ({ label, value }));
+
   const fetchClasses = () => {
     setLoading(true);
     getTeacherClasses()
@@ -2523,56 +2993,217 @@ function TeacherDashboardView({
 
             {/* TAB: OVERVIEW */}
             {activeTab === "overview" && selectedClass && (
-              <div className="space-y-4">
-                <IdentityBar
-                  icon={UserCog}
-                  title={teacher.name}
-                  badge={<Chip tone="brand">{t("teacherDashboard.educatorBadge")}</Chip>}
-                  meta={
-                    <>
-                      <span>
-                        {t("teacherDashboard.school")}{" "}
-                        <span className="font-medium text-text-primary">
-                          {teacher.school_name}
-                        </span>
+              <div className="space-y-6">
+                {/* ── 1. Hero: Vibrant Educator Welcome Banner ───────────── */}
+                <Hero
+                  variant="vibrant"
+                  eyebrow={
+                    <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-xs backdrop-blur-md">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>{t("teacherDashboard.educatorBadge")}</span>
+                      <span className="opacity-40">•</span>
+                      <span className="font-mono font-bold underline">
+                        {teacher.branch_name}
                       </span>
-                      <MetaDot />
-                      <span>
-                        {t("teacherDashboard.branch")}{" "}
-                        <span className="font-mono font-semibold text-brand">{teacher.branch_name}</span>
-                      </span>
-                    </>
+                    </span>
                   }
-                  aside={
-                    <Fact label={t("teacherDashboard.currentClass")}>
-                      <span className="text-brand">{t("teacherDashboard.classPrefix")} {selectedClass.label}</span>
-                    </Fact>
+                  title={`Welcome back, ${teacher.name}!`}
+                  subtitle={
+                    <p>
+                      {teacher.school_name} · Currently viewing{" "}
+                      <span className="font-semibold text-white">
+                        Class {selectedClass.label}
+                      </span>
+                      . Manage assignments, review class rosters, and generate adaptive AI quizzes
+                      from your curriculum modules.
+                    </p>
+                  }
+                  illustration={
+                    <ClassroomIllustration className="h-[180px] w-[285px] drop-shadow-xl" />
+                  }
+                  facts={
+                    <>
+                      <HeroFact
+                        label={t("teacherDashboard.enrolledStudents")}
+                        value={<AnimatedNumber value={students.length} />}
+                        hint={`${t("teacherDashboard.classPrefix")} ${selectedClass.label}`}
+                        variant="vibrant"
+                      />
+                      <HeroFact
+                        label={t("teacherDashboard.activeAssignments")}
+                        value={<AnimatedNumber value={assignments.length} />}
+                        hint={t("teacherDashboard.pdfAndAiQuizzes")}
+                        variant="vibrant"
+                      />
+                      <HeroFact
+                        label={t("teacherDashboard.curriculumModules")}
+                        value={<AnimatedNumber value={classModules.length} />}
+                        hint={t("teacherDashboard.availableForAiQuiz")}
+                        variant="vibrant"
+                      />
+                      <HeroFact
+                        label="Assigned Classes"
+                        value={<AnimatedNumber value={assignedClasses.length} />}
+                        hint="Across this branch"
+                        variant="vibrant"
+                      />
+                    </>
                   }
                 />
 
-                {/* Quick Summary Cards */}
-                <StatRow
-                  stats={[
-                    {
-                      label: t("teacherDashboard.enrolledStudents"),
-                      icon: Users,
-                      value: <AnimatedNumber value={students.length} />,
-                      hint: `${t("teacherDashboard.classPrefix")} ${selectedClass.label}`,
-                    },
-                    {
-                      label: t("teacherDashboard.activeAssignments"),
-                      icon: FileText,
-                      value: <AnimatedNumber value={assignments.length} />,
-                      hint: t("teacherDashboard.pdfAndAiQuizzes"),
-                    },
-                    {
-                      label: t("teacherDashboard.curriculumModules"),
-                      icon: Layers,
-                      value: <AnimatedNumber value={classModules.length} />,
-                      hint: t("teacherDashboard.availableForAiQuiz"),
-                    },
-                  ]}
-                />
+                {/* ── 2. Metric Cards Row ─────────────────────────────────── */}
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                  {/* Card 1: Assignment Status */}
+                  <Panel
+                    flush
+                    className="relative flex flex-col justify-between overflow-hidden rounded-[18px] border border-[var(--c-line)] p-5 shadow-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                          <FileText className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
+                            Assignment Status
+                          </h4>
+                          <div className="text-xs font-semibold text-text-primary">
+                            Class {selectedClass.label} Workload
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold text-text-tertiary">
+                        {assignments.length} Total
+                      </span>
+                    </div>
+
+                    {assignments.length > 0 ? (
+                      <>
+                        <div className="my-4 flex items-center justify-between gap-4">
+                          <ChartLegend className="min-w-0 flex-1" segments={assignmentSegments} />
+                          <div className="shrink-0">
+                            <DonutChart
+                              size={76}
+                              thickness={9}
+                              segments={assignmentSegments}
+                              centerLabel={assignments.length}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-[var(--c-line)] pt-3 text-xs text-text-tertiary">
+                          <span>Active vs Locked</span>
+                          <span className="font-semibold text-emerald-600">
+                            {assignments.filter((a) => !a.is_locked).length} open
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="py-6 text-center text-xs italic text-text-tertiary">
+                        Create a PDF assignment or an AI quiz to see its status here.
+                      </div>
+                    )}
+                  </Panel>
+
+                  {/* Card 2: Modules by Subject */}
+                  <Panel
+                    flush
+                    className="relative flex flex-col justify-between overflow-hidden rounded-[18px] border border-[var(--c-line)] p-5 shadow-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
+                          <BookOpen className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
+                            Modules by Subject
+                          </h4>
+                          <div className="text-xs font-semibold text-text-primary">
+                            Class {selectedClass.label} Curriculum
+                          </div>
+                        </div>
+                      </div>
+                      <span className="rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-[10px] font-bold text-brand">
+                        {classModules.length} Modules
+                      </span>
+                    </div>
+
+                    <div className="my-4">
+                      {moduleSubjectBands.length > 0 ? (
+                        <BarList data={moduleSubjectBands} />
+                      ) : (
+                        <div className="py-3 text-center text-xs italic text-text-tertiary">
+                          Modules uploaded for this class will be grouped by subject here.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-[var(--c-line)] pt-3 text-xs text-text-tertiary">
+                      <span>Available for AI Quiz</span>
+                      <span className="font-semibold text-text-secondary">
+                        {moduleSubjectBands.length} subject
+                        {moduleSubjectBands.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  </Panel>
+                </div>
+
+                {/* ── 3. Class roster, full width ─────────────────────────── */}
+                <Panel
+                  flush
+                  className="overflow-hidden rounded-[20px] border border-[var(--c-line)] shadow-xs"
+                >
+                  <PanelHead
+                    icon={Users}
+                    title={`Class ${selectedClass.label} Roster`}
+                    description="Students currently enrolled in the selected class section."
+                    actions={<Chip tone="brand">{students.length} Student(s)</Chip>}
+                  />
+                  {loadingStudents ? (
+                    <Loading />
+                  ) : students.length > 0 ? (
+                    <Stagger className="divide-y divide-[var(--c-line)]">
+                      {students.slice(0, 8).map((s) => (
+                        <Item
+                          key={s.id}
+                          className="console-row px-5 py-4 transition-colors hover:bg-[var(--c-sunken)]/60"
+                        >
+                          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_170px_150px] lg:items-center lg:gap-6">
+                            <div className="flex min-w-0 items-center gap-3.5">
+                              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-brand/20 bg-brand/10 text-xs font-bold text-brand">
+                                {(s.full_name || s.unique_number).slice(0, 2).toUpperCase()}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="truncate text-xs font-semibold text-text-primary">
+                                  {s.full_name || s.email}
+                                </div>
+                                <div className="mt-1">
+                                  <Code>{s.unique_number}</Code>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <span className="rounded-full border border-[var(--c-line)] bg-[var(--c-sunken)] px-2 py-0.5 text-[10px] font-semibold capitalize text-text-secondary">
+                                {s.enrollment_type}
+                              </span>
+                            </div>
+
+                            <span className="console-num text-[11px] text-text-tertiary lg:text-right">
+                              {new Date(s.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </Item>
+                      ))}
+                    </Stagger>
+                  ) : (
+                    <EmptyState
+                      icon={Users}
+                      title={`No students enrolled in Class ${selectedClass.label} yet.`}
+                    />
+                  )}
+                </Panel>
               </div>
             )}
 
@@ -4289,526 +4920,438 @@ function SchoolTeacherManagement() {
   const totalCount = currentClassSubjects.length;
 
   return (
-    <div className="glass rounded-[var(--radius-xl)] p-6 border border-border-primary space-y-6">
-      {/* Header & Sub-navigation */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border-primary/50">
-        <div>
-          <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
-            <UserCog className="w-5 h-5 text-brand" />
-            <span>{t("schoolAdmin.allocation.title")}</span>
-          </h3>
-          <p className="text-xs text-text-secondary mt-0.5">
-            {t("schoolAdmin.allocation.subtitle")}
-          </p>
-        </div>
+    <ConsoleMotion>
+      <Panel flush className="overflow-hidden">
+        <PanelHead
+          icon={UserCog}
+          title={t("schoolAdmin.allocation.title")}
+          description={t("schoolAdmin.allocation.subtitle")}
+          actions={
+            <>
+              <Segmented
+                idPrefix="teacher-alloc-view"
+                value={viewMode}
+                onChange={(v) => setViewMode(v)}
+                options={[
+                  { value: "hierarchy", label: t("schoolAdmin.allocation.matrixTab") },
+                  { value: "directory", label: t("schoolAdmin.allocation.directoryTab", { count: teachers.length }) },
+                ]}
+              />
 
-        <div className="flex items-center gap-3">
-          {/* Clean Segmented Tab Switcher */}
-          <div className="inline-flex items-center p-1 bg-surface rounded-lg border border-border-primary text-xs">
-            <button
-              onClick={() => setViewMode("hierarchy")}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
-                viewMode === "hierarchy"
-                  ? "bg-brand text-white shadow-sm font-semibold"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              {t("schoolAdmin.allocation.matrixTab")}
-            </button>
-            <button
-              onClick={() => setViewMode("directory")}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
-                viewMode === "directory"
-                  ? "bg-brand text-white shadow-sm font-semibold"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              {t("schoolAdmin.allocation.directoryTab", { count: teachers.length })}
-            </button>
-          </div>
-
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => {
-              setModalClassNum(selectedClassNum);
-              setModalSection(selectedSection);
-              setModalSubject(currentClassSubjects[0] || "Mathematics");
-              setModalInitialTeacherId("");
-              setShowTeacherModal(true);
-            }}
-            disabled={teachers.length === 0}
-            className="text-xs shrink-0 font-semibold"
-          >
-            <Plus className="w-3.5 h-3.5 mr-1" />
-            {t("schoolAdmin.allocation.assignTeacherBtn")}
-          </Button>
-        </div>
-      </div>
-
-      {/* Status Alerts */}
-      {msg && (
-        <div
-          className={`p-3 rounded-[var(--radius-md)] text-xs font-semibold flex items-center justify-between gap-2 animate-in fade-in duration-200 ${
-            msg.type === "success"
-              ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-              : "bg-rose-500/10 text-rose-500 border border-rose-500/20"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {msg.type === "success" ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-            <span>{msg.text}</span>
-          </div>
-          <button onClick={() => setMsg(null)} className="hover:opacity-75 cursor-pointer">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="py-12 flex justify-center">
-          <div className="w-8 h-8 border-3 border-brand border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : teachers.length === 0 ? (
-        <div className="p-8 text-center text-text-tertiary text-xs glass rounded-lg border border-border-primary space-y-2">
-          <UserCog className="w-8 h-8 mx-auto text-text-tertiary/40" />
-          <p className="font-semibold text-text-secondary text-sm">{t("schoolAdmin.allocation.noTeachers")}</p>
-          <p className="text-xs text-text-tertiary max-w-sm mx-auto">
-            {t("schoolAdmin.allocation.noTeachersDesc")}
-          </p>
-        </div>
-      ) : viewMode === "hierarchy" ? (
-        /* ═════════════════════════════════════════════════════════════════════
-           CLASS SUBJECT MATRIX VIEW (Clean Professional Roster Table)
-           ═════════════════════════════════════════════════════════════════════ */
-        <div className="space-y-4">
-          {/* Filter Bar: Clean Dropdowns & Progress Metric */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-surface/50 rounded-lg border border-border-primary">
-            <div className="flex items-center gap-4 flex-wrap">
-              {/* Class Selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-text-tertiary">{t("schoolAdmin.allocation.classLabel")}</span>
-                <select
-                  value={selectedClassNum}
-                  onChange={(e) => setSelectedClassNum(Number(e.target.value))}
-                  className="px-2.5 py-1 bg-background text-text-primary text-xs font-medium rounded-md border border-border-primary outline-none focus:border-brand cursor-pointer"
-                >
-                  {[1, 2, 3, 4, 5].map((cls) => (
-                    <option key={cls} value={cls}>
-                      {t("schoolAdmin.allocation.classOption", { cls })}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Section Selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-text-tertiary">{t("schoolAdmin.allocation.sectionLabel")}</span>
-                <select
-                  value={selectedSection}
-                  onChange={(e) => setSelectedSection(e.target.value)}
-                  className="px-2.5 py-1 bg-background text-text-primary text-xs font-medium rounded-md border border-border-primary outline-none focus:border-brand cursor-pointer"
-                >
-                  {["A", "B", "C", "D"].map((sec) => (
-                    <option key={sec} value={sec}>
-                      {t("schoolAdmin.allocation.sectionOption", { sec })}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Live Staffing Metric */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-text-secondary">
-                {t("schoolAdmin.allocation.staffingStatus")}
-              </span>
-              <span
-                className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                  assignedCount === totalCount
-                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                    : assignedCount > 0
-                    ? "bg-sky-500/10 text-sky-500 border border-sky-500/20"
-                    : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
-                }`}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setModalClassNum(selectedClassNum);
+                  setModalSection(selectedSection);
+                  setModalSubject(currentClassSubjects[0] || "Mathematics");
+                  setModalInitialTeacherId("");
+                  setShowTeacherModal(true);
+                }}
+                disabled={teachers.length === 0}
+                className="shrink-0 text-xs"
               >
-                {t("schoolAdmin.allocation.subjectsAssignedCount", { assigned: assignedCount, total: totalCount })}
-              </span>
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                {t("schoolAdmin.allocation.assignTeacherBtn")}
+              </Button>
+            </>
+          }
+        />
+
+        {/* Status Alerts */}
+        <AnimatePresence>
+          {msg && (
+            <div className="px-5 pt-4">
+              <Notice
+                tone={msg.type === "success" ? "emerald" : "rose"}
+                icon={msg.type === "success" ? Check : AlertCircle}
+                onDismiss={() => setMsg(null)}
+              >
+                {msg.text}
+              </Notice>
             </div>
-          </div>
+          )}
+        </AnimatePresence>
 
-          {/* Subjects Table */}
-          <div className="overflow-hidden rounded-lg border border-border-primary">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-surface/80 text-text-tertiary font-semibold uppercase text-[10px] tracking-wider border-b border-border-primary">
-                <tr>
-                  <th className="py-3 px-4">{t("schoolAdmin.allocation.table.subject")}</th>
-                  <th className="py-3 px-4">{t("schoolAdmin.allocation.table.status")}</th>
-                  <th className="py-3 px-4">{t("schoolAdmin.allocation.table.assignedTeacher")}</th>
-                  <th className="py-3 px-4 text-right">{t("schoolAdmin.allocation.table.action")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-primary/40 bg-surface/20">
-                {currentClassSubjects.map((rawSubj) => {
-                  const meta = parseSubjectMeta(rawSubj);
-                  const assignedInfo = getAssignedTeacherForSubject(
-                    selectedClassNum,
-                    selectedSection,
-                    rawSubj
-                  );
-                  const hasTeacher = !!assignedInfo;
+        {loading ? (
+          <Loading />
+        ) : teachers.length === 0 ? (
+          <EmptyState icon={UserCog} title={t("schoolAdmin.allocation.noTeachers")}>
+            {t("schoolAdmin.allocation.noTeachersDesc")}
+          </EmptyState>
+        ) : viewMode === "hierarchy" ? (
+          /* ═══════════════════════════════════════════════════════════════════
+             CLASS SUBJECT MATRIX VIEW
+             ═══════════════════════════════════════════════════════════════════ */
+          <div className="p-5 pt-4">
+            {/* Filter Bar: Class/Section selectors & staffing metric */}
+            <div className="flex flex-col gap-3 rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-text-tertiary">{t("schoolAdmin.allocation.classLabel")}</span>
+                  <select
+                    value={selectedClassNum}
+                    onChange={(e) => setSelectedClassNum(Number(e.target.value))}
+                    className={`${inputClass} w-auto py-1.5 font-medium`}
+                  >
+                    {[1, 2, 3, 4, 5].map((cls) => (
+                      <option key={cls} value={cls}>
+                        {t("schoolAdmin.allocation.classOption", { cls })}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                  return (
-                    <tr
-                      key={rawSubj}
-                      className="hover:bg-surface/60 transition-colors"
-                    >
-                      {/* Subject Name & Subtitle */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className={`w-7 h-7 rounded-md flex items-center justify-center font-bold text-xs border ${meta.color}`}
-                          >
-                            {meta.title.slice(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-text-primary text-xs">
-                              {meta.title}
-                            </div>
-                            {meta.subtitle && (
-                              <div className="text-[10px] text-text-tertiary mt-0.5">
-                                {meta.subtitle}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-text-tertiary">{t("schoolAdmin.allocation.sectionLabel")}</span>
+                  <select
+                    value={selectedSection}
+                    onChange={(e) => setSelectedSection(e.target.value)}
+                    className={`${inputClass} w-auto py-1.5 font-medium`}
+                  >
+                    {["A", "B", "C", "D"].map((sec) => (
+                      <option key={sec} value={sec}>
+                        {t("schoolAdmin.allocation.sectionOption", { sec })}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-                      {/* Status */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {hasTeacher ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-500 font-medium">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            {t("schoolAdmin.allocation.assigned")}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-xs text-amber-500 font-medium">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                            {t("schoolAdmin.allocation.unassigned")}
-                          </span>
-                        )}
-                      </td>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-text-secondary">{t("schoolAdmin.allocation.staffingStatus")}</span>
+                <Chip tone={assignedCount === totalCount ? "emerald" : assignedCount > 0 ? "sky" : "amber"}>
+                  {t("schoolAdmin.allocation.subjectsAssignedCount", { assigned: assignedCount, total: totalCount })}
+                </Chip>
+              </div>
+            </div>
 
-                      {/* Assigned Teacher or Search & Select Trigger */}
-                      <td className="py-3.5 px-4">
-                        {hasTeacher ? (
+            {/* Subjects Table */}
+            <div className="mt-4 overflow-hidden rounded-[var(--c-radius)] border border-[var(--c-line)]">
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>{t("schoolAdmin.allocation.table.subject")}</Th>
+                    <Th>{t("schoolAdmin.allocation.table.status")}</Th>
+                    <Th>{t("schoolAdmin.allocation.table.assignedTeacher")}</Th>
+                    <Th className="text-right">{t("schoolAdmin.allocation.table.action")}</Th>
+                  </tr>
+                </thead>
+                <Stagger as="tbody" className="divide-y divide-[var(--c-line)]">
+                  {currentClassSubjects.map((rawSubj) => {
+                    const meta = parseSubjectMeta(rawSubj);
+                    const assignedInfo = getAssignedTeacherForSubject(
+                      selectedClassNum,
+                      selectedSection,
+                      rawSubj
+                    );
+                    const hasTeacher = !!assignedInfo;
+
+                    return (
+                      <Item as="tr" key={rawSubj} className="console-row">
+                        {/* Subject Name & Subtitle */}
+                        <Td>
                           <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-full bg-brand/10 text-brand font-bold text-xs flex items-center justify-center border border-border-brand shrink-0">
-                              {assignedInfo.teacher.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .slice(0, 2)
-                                .join("")
-                                .toUpperCase()}
+                            <div
+                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border text-xs font-bold ${meta.color}`}
+                            >
+                              {meta.title.slice(0, 2).toUpperCase()}
                             </div>
                             <div>
-                              <div className="font-semibold text-text-primary text-xs flex items-center gap-2">
-                                <span>{assignedInfo.teacher.name}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setModalClassNum(selectedClassNum);
-                                    setModalSection(selectedSection);
-                                    setModalSubject(rawSubj);
-                                    setModalInitialTeacherId(assignedInfo.teacher.id);
-                                    setShowTeacherModal(true);
-                                  }}
-                                  className="text-[10px] text-brand hover:underline font-medium cursor-pointer"
-                                  title="Change assigned teacher"
-                                >
-                                  {t("schoolAdmin.allocation.change")}
-                                </button>
+                              <div className="text-xs font-semibold text-text-primary">
+                                {meta.title}
                               </div>
-                              <div className="text-[10px] text-text-tertiary font-mono">
-                                {assignedInfo.teacher.phone_number}
-                              </div>
+                              {meta.subtitle && (
+                                <div className="mt-0.5 text-[10px] text-text-tertiary">
+                                  {meta.subtitle}
+                                </div>
+                              )}
                             </div>
                           </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setModalClassNum(selectedClassNum);
-                              setModalSection(selectedSection);
-                              setModalSubject(rawSubj);
-                              setModalInitialTeacherId("");
-                              setShowTeacherModal(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface hover:bg-surface/80 text-brand border border-dashed border-border-brand transition-all cursor-pointer shadow-sm hover:shadow"
-                          >
-                            <Search className="w-3.5 h-3.5" />
-                            <span>{t("schoolAdmin.allocation.selectTeacher")}</span>
-                          </button>
-                        )}
-                      </td>
+                        </Td>
 
-                      {/* Action */}
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                        {hasTeacher ? (
-                          <div className="flex items-center justify-end gap-1">
+                        {/* Status */}
+                        <Td>
+                          <Chip tone={hasTeacher ? "emerald" : "amber"}>
+                            {hasTeacher ? t("schoolAdmin.allocation.assigned") : t("schoolAdmin.allocation.unassigned")}
+                          </Chip>
+                        </Td>
+
+                        {/* Assigned Teacher or Search & Select Trigger */}
+                        <Td>
+                          {hasTeacher ? (
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand/20 bg-brand/8 text-xs font-bold text-brand">
+                                {assignedInfo.teacher.name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .slice(0, 2)
+                                  .join("")
+                                  .toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 text-xs font-semibold text-text-primary">
+                                  <span>{assignedInfo.teacher.name}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setModalClassNum(selectedClassNum);
+                                      setModalSection(selectedSection);
+                                      setModalSubject(rawSubj);
+                                      setModalInitialTeacherId(assignedInfo.teacher.id);
+                                      setShowTeacherModal(true);
+                                    }}
+                                    className="cursor-pointer text-[10px] font-medium text-brand hover:underline"
+                                    title="Change assigned teacher"
+                                  >
+                                    ({t("schoolAdmin.allocation.change")})
+                                  </button>
+                                </div>
+                                <div className="font-mono text-[10px] text-text-tertiary">
+                                  {assignedInfo.teacher.phone_number}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
                             <button
                               type="button"
                               onClick={() => {
                                 setModalClassNum(selectedClassNum);
                                 setModalSection(selectedSection);
                                 setModalSubject(rawSubj);
-                                setModalInitialTeacherId(assignedInfo.teacher.id);
+                                setModalInitialTeacherId("");
                                 setShowTeacherModal(true);
                               }}
-                              className="text-xs text-text-secondary hover:text-brand hover:bg-brand/10 px-2 py-1 rounded transition-colors font-medium cursor-pointer"
-                              title="Change teacher for this subject"
+                              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-[var(--c-line-strong)] bg-[var(--c-sunken)] px-3 py-1.5 text-xs font-semibold text-brand transition-colors hover:border-brand/50 hover:bg-brand/[0.05]"
                             >
-                              {t("schoolAdmin.allocation.reassign")}
+                              <Search className="h-3.5 w-3.5" />
+                              <span>{t("schoolAdmin.allocation.selectTeacher")}</span>
                             </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleDeassign(
-                                  assignedInfo.teacher.id,
-                                  selectedClassNum,
-                                  selectedSection,
-                                  assignedInfo.assignment.subject || rawSubj,
-                                  assignedInfo.assignment.id
-                                )
-                              }
-                              className="text-xs text-text-tertiary hover:text-rose-500 hover:bg-rose-500/10 px-2.5 py-1 rounded transition-colors font-medium cursor-pointer"
-                              title="Remove teacher from subject"
+                          )}
+                        </Td>
+
+                        {/* Action */}
+                        <Td className="text-right">
+                          {hasTeacher ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setModalClassNum(selectedClassNum);
+                                  setModalSection(selectedSection);
+                                  setModalSubject(rawSubj);
+                                  setModalInitialTeacherId(assignedInfo.teacher.id);
+                                  setShowTeacherModal(true);
+                                }}
+                                className="cursor-pointer rounded px-2 py-1 text-xs font-medium text-text-secondary transition-colors hover:bg-brand/10 hover:text-brand"
+                                title="Change teacher for this subject"
+                              >
+                                {t("schoolAdmin.allocation.reassign")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeassign(
+                                    assignedInfo.teacher.id,
+                                    selectedClassNum,
+                                    selectedSection,
+                                    assignedInfo.assignment.subject || rawSubj,
+                                    assignedInfo.assignment.id
+                                  )
+                                }
+                                className="cursor-pointer rounded px-2.5 py-1 text-xs font-medium text-text-tertiary transition-colors hover:bg-rose-500/10 hover:text-rose-500"
+                                title="Remove teacher from subject"
+                              >
+                                {t("schoolAdmin.allocation.deassign")}
+                              </button>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => {
+                                setModalClassNum(selectedClassNum);
+                                setModalSection(selectedSection);
+                                setModalSubject(rawSubj);
+                                setModalInitialTeacherId("");
+                                setShowTeacherModal(true);
+                              }}
+                              className="h-auto px-3 py-1 text-xs"
                             >
-                              {t("schoolAdmin.allocation.deassign")}
-                            </button>
-                          </div>
-                        ) : (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => {
-                              setModalClassNum(selectedClassNum);
-                              setModalSection(selectedSection);
-                              setModalSubject(rawSubj);
-                              setModalInitialTeacherId("");
-                              setShowTeacherModal(true);
-                            }}
-                            className="text-xs px-3 py-1 h-auto font-semibold"
-                          >
-                            {t("schoolAdmin.allocation.assign")}
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                              {t("schoolAdmin.allocation.assign")}
+                            </Button>
+                          )}
+                        </Td>
+                      </Item>
+                    );
+                  })}
+                </Stagger>
+              </Table>
+            </div>
           </div>
-        </div>
-      ) : (
-        /* ═════════════════════════════════════════════════════════════════════
-           TEACHER DIRECTORY VIEW (Teacher Workload & Assigned Subjects)
-           ═════════════════════════════════════════════════════════════════════ */
-        <div className="space-y-4">
-          {/* Directory Search & Filters */}
-          <div className="p-3 bg-surface/50 rounded-lg border border-border-primary flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="w-3.5 h-3.5 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder={t("schoolAdmin.allocation.directorySearchPlaceholder")}
-                value={directorySearch}
-                onChange={(e) => setDirectorySearch(e.target.value)}
-                className="w-full pl-8 pr-8 py-1.5 bg-background text-text-primary text-xs rounded-md border border-border-primary outline-none focus:border-brand placeholder:text-text-tertiary"
+        ) : (
+          /* ═══════════════════════════════════════════════════════════════════
+             TEACHER DIRECTORY VIEW
+             ═══════════════════════════════════════════════════════════════════ */
+          <div className="p-5 pt-4">
+            {/* Directory Search & Filters */}
+            <div className="flex flex-col gap-3 rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative max-w-sm flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-tertiary" />
+                <input
+                  type="text"
+                  placeholder={t("schoolAdmin.allocation.directorySearchPlaceholder")}
+                  value={directorySearch}
+                  onChange={(e) => setDirectorySearch(e.target.value)}
+                  className={`${inputClass} bg-[var(--c-panel)] py-1.5 pl-8 pr-8`}
+                />
+                {directorySearch && (
+                  <button
+                    type="button"
+                    onClick={() => setDirectorySearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer text-text-tertiary hover:text-text-primary"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+
+              <Segmented
+                idPrefix="teacher-directory-filter"
+                value={directoryFilter}
+                onChange={(v) => setDirectoryFilter(v)}
+                options={[
+                  { value: "all", label: `${t("schoolAdmin.allocation.filterAll")} (${directoryCounts.all})` },
+                  { value: "unassigned", label: `${t("schoolAdmin.allocation.filterUnassigned")} (${directoryCounts.unassigned})` },
+                  { value: "assigned", label: `${t("schoolAdmin.allocation.filterAssigned")} (${directoryCounts.assigned})` },
+                  { value: "active", label: `${t("schoolAdmin.allocation.filterActive")} (${directoryCounts.active})` },
+                ]}
               />
-              {directorySearch && (
-                <button
-                  type="button"
-                  onClick={() => setDirectorySearch("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                </button>
+            </div>
+
+            {/* Teacher Directory List */}
+            <div className="mt-4">
+              {filteredDirectoryTeachers.length === 0 ? (
+                <EmptyState icon={Search} title="No teachers found">
+                  Try clearing the search query or changing filter tabs.
+                </EmptyState>
+              ) : (
+                <Stagger className="divide-y divide-[var(--c-line)]">
+                  {filteredDirectoryTeachers.map((t: TeacherListItem) => (
+                    <Item
+                      key={t.id}
+                      className="console-row flex flex-col gap-4 rounded-[var(--c-radius)] px-3 py-4 md:flex-row md:items-center md:justify-between"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full border border-brand/20 bg-brand/8 text-xs font-bold text-brand">
+                            {t.name
+                              .split(" ")
+                              .map((n: string) => n[0])
+                              .slice(0, 2)
+                              .join("")
+                              .toUpperCase()}
+                          </div>
+                          <span className="text-sm font-semibold text-text-primary font-[family-name:var(--font-display)]">
+                            {t.name}
+                          </span>
+                          <span className="font-mono text-xs text-text-tertiary">
+                            ({t.phone_number})
+                          </span>
+                          <Chip tone={t.is_active ? "emerald" : "rose"}>
+                            {t.is_active ? "Active" : "Inactive"}
+                          </Chip>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5 pl-9">
+                          <span className="text-xs font-medium text-text-secondary">
+                            Teaching:
+                          </span>
+                          {t.assigned_classes && t.assigned_classes.length > 0 ? (
+                            t.assigned_classes.map((c: TeacherClassOut) => (
+                              <span
+                                key={c.id || `${c.class_number}-${c.section}-${c.subject}`}
+                                className="inline-flex items-center gap-1.5 rounded-md border border-brand/25 bg-brand/8 py-0.5 pl-2 pr-1 text-xs font-semibold text-brand"
+                              >
+                                <span>
+                                  Class {c.class_number}
+                                  {c.section} • {parseSubjectMeta(c.subject || "General").title}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeassign(
+                                      t.id,
+                                      c.class_number,
+                                      c.section,
+                                      c.subject || "General",
+                                      c.id
+                                    )
+                                  }
+                                  className="ml-0.5 cursor-pointer rounded p-0.5 text-brand/60 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
+                                  title="De-assign subject"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs italic text-text-tertiary">
+                              No classes assigned yet (Available)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 pl-9 md:pl-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setModalInitialTeacherId(t.id);
+                            setModalClassNum(selectedClassNum);
+                            setModalSection(selectedSection);
+                            const subjs = getSubjectsForClass(selectedClassNum);
+                            setModalSubject(subjs[0] || "Mathematics");
+                            setShowTeacherModal(true);
+                          }}
+                          className="text-xs"
+                        >
+                          <Plus className="mr-1 h-3.5 w-3.5" />
+                          Assign Class
+                        </Button>
+                      </div>
+                    </Item>
+                  ))}
+                </Stagger>
               )}
             </div>
-
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setDirectoryFilter("all")}
-                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                  directoryFilter === "all"
-                    ? "bg-brand text-white shadow-sm"
-                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
-                }`}
-              >
-                {t("schoolAdmin.allocation.filterAll")} ({directoryCounts.all})
-              </button>
-              <button
-                type="button"
-                onClick={() => setDirectoryFilter("unassigned")}
-                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
-                  directoryFilter === "unassigned"
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
-                }`}
-              >
-                <Sparkles className="w-3 h-3 text-emerald-400" />
-                <span>{t("schoolAdmin.allocation.filterUnassigned")} ({directoryCounts.unassigned})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDirectoryFilter("assigned")}
-                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                  directoryFilter === "assigned"
-                    ? "bg-brand text-white shadow-sm"
-                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
-                }`}
-              >
-                {t("schoolAdmin.allocation.filterAssigned")} ({directoryCounts.assigned})
-              </button>
-              <button
-                type="button"
-                onClick={() => setDirectoryFilter("active")}
-                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                  directoryFilter === "active"
-                    ? "bg-brand text-white shadow-sm"
-                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
-                }`}
-              >
-                {t("schoolAdmin.allocation.filterActive")} ({directoryCounts.active})
-              </button>
-            </div>
           </div>
+        )}
 
-          {/* Teacher Directory List */}
-          <div className="divide-y divide-border-primary/40">
-            {filteredDirectoryTeachers.length === 0 ? (
-              <div className="py-8 text-center text-xs text-text-tertiary">
-                <p className="font-semibold text-text-secondary">No teachers found</p>
-                <p className="text-[11px] mt-1">Try clearing the search query or changing filter tabs.</p>
-              </div>
-            ) : (
-              filteredDirectoryTeachers.map((t: TeacherListItem) => (
-                <div
-                  key={t.id}
-                  className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
-                >
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="w-7 h-7 rounded-full bg-brand/10 text-brand font-bold text-xs flex items-center justify-center border border-border-brand">
-                        {t.name
-                          .split(" ")
-                          .map((n: string) => n[0])
-                          .slice(0, 2)
-                          .join("")
-                          .toUpperCase()}
-                      </div>
-                      <span className="font-bold text-sm text-text-primary">
-                        {t.name}
-                      </span>
-                      <span className="text-xs text-text-tertiary font-mono">
-                        ({t.phone_number})
-                      </span>
-                      <span
-                        className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${
-                          t.is_active
-                            ? "bg-emerald-500/10 text-emerald-500"
-                            : "bg-rose-500/10 text-rose-500"
-                        }`}
-                      >
-                        {t.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 flex-wrap pl-9">
-                      <span className="text-xs text-text-secondary font-medium">
-                        Teaching:
-                      </span>
-                      {t.assigned_classes && t.assigned_classes.length > 0 ? (
-                        t.assigned_classes.map((c: TeacherClassOut) => (
-                          <span
-                            key={c.id || `${c.class_number}-${c.section}-${c.subject}`}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand border border-border-brand"
-                          >
-                            <span>
-                              Class {c.class_number}{c.section} • {parseSubjectMeta(c.subject || "General").title}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleDeassign(
-                                  t.id,
-                                  c.class_number,
-                                  c.section,
-                                  c.subject || "General",
-                                  c.id
-                                )
-                              }
-                              className="hover:text-rose-500 cursor-pointer ml-0.5"
-                              title="De-assign subject"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-xs text-text-tertiary italic">
-                          No classes assigned yet (Available)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="shrink-0 pl-9 md:pl-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setModalInitialTeacherId(t.id);
-                        setModalClassNum(selectedClassNum);
-                        setModalSection(selectedSection);
-                        const subjs = getSubjectsForClass(selectedClassNum);
-                        setModalSubject(subjs[0] || "Mathematics");
-                        setShowTeacherModal(true);
-                      }}
-                      className="text-xs font-semibold"
-                    >
-                      <Plus className="w-3.5 h-3.5 mr-1" />
-                      Assign Class
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Modern Filter-based Teacher Selection Modal */}
-      <TeacherSearchModal
-        isOpen={showTeacherModal}
-        onClose={() => setShowTeacherModal(false)}
-        teachers={teachers}
-        classNum={modalClassNum}
-        section={modalSection}
-        subject={modalSubject}
-        onClassNumChange={setModalClassNum}
-        onSectionChange={setModalSection}
-        onSubjectChange={setModalSubject}
-        availableSubjects={getSubjectsForClass(modalClassNum)}
-        onAssign={handleAssign}
-        isAssigning={isAssigning}
-        initialTeacherId={modalInitialTeacherId}
-        parseSubjectMeta={parseSubjectMeta}
-        isMatchingSubject={isMatchingSubject}
-      />
-    </div>
+        {/* Modern Filter-based Teacher Selection Modal */}
+        <AnimatePresence>
+          {showTeacherModal && (
+            <TeacherSearchModal
+              isOpen={showTeacherModal}
+              onClose={() => setShowTeacherModal(false)}
+              teachers={teachers}
+              classNum={modalClassNum}
+              section={modalSection}
+              subject={modalSubject}
+              onClassNumChange={setModalClassNum}
+              onSectionChange={setModalSection}
+              onSubjectChange={setModalSubject}
+              availableSubjects={getSubjectsForClass(modalClassNum)}
+              onAssign={handleAssign}
+              isAssigning={isAssigning}
+              initialTeacherId={modalInitialTeacherId}
+              parseSubjectMeta={parseSubjectMeta}
+              isMatchingSubject={isMatchingSubject}
+            />
+          )}
+        </AnimatePresence>
+      </Panel>
+    </ConsoleMotion>
   );
 }

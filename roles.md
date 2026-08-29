@@ -100,6 +100,22 @@ combination confirmed to authenticate) — not copied from an old note.
   - Link children using their Unique Student ID.
   - Monitor a linked child's learning progress and diagnostic quiz results (score, gaps, AI summary).
 
+## 7. New School Registration (UDISE+ Directory Test Data)
+
+For testing the **School Self-Registration & Verification** flow (UDISE lookup and claim verification):
+
+- **UDISE+ Code**: `29280600418`
+- **School Name**: `Green Valley International School`
+- **State**: `Karnataka`
+- **District**: `Bengaluru Urban`
+- **Management**: `Private Unaided`
+- **Board**: `ICSE`
+- **Official Email**: `office@greenvalleyintl.edu.in`
+- **Official Phone**: `+919845044004`
+- **Head of School**: `Meera Iyer`
+
+ 
+
 ---
 
 ## Additional Test Accounts

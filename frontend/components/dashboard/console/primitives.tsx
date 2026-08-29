@@ -241,10 +241,35 @@ export interface StatDef {
  * grid of separate cards. Reads as one instrument panel, and stacks to rows
  * on small screens.
  */
-export function StatRow({ stats, className }: { stats: StatDef[]; className?: string }) {
+// Literal class strings (not interpolated) so Tailwind's scanner picks them
+// up regardless of which count a given call site uses. Always a single row
+// from `sm` up — Tailwind's `divide-x` borders every sibling in DOM order,
+// so letting the grid wrap to a second row would leave a stray left border
+// on the row-start cell.
+const STAT_ROW_COLUMNS: Record<2 | 3 | 4, string> = {
+  2: "sm:grid-cols-2",
+  3: "sm:grid-cols-3",
+  4: "sm:grid-cols-4",
+};
+
+export function StatRow({
+  stats,
+  columns = 3,
+  className,
+}: {
+  stats: StatDef[];
+  /** Column count on wider screens — always one column on mobile. */
+  columns?: 2 | 3 | 4;
+  className?: string;
+}) {
   return (
     <Panel flush className={cn("overflow-hidden", className)}>
-      <div className="grid grid-cols-1 divide-y divide-[var(--c-line)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <div
+        className={cn(
+          "grid grid-cols-1 divide-y divide-[var(--c-line)] sm:divide-x sm:divide-y-0",
+          STAT_ROW_COLUMNS[columns]
+        )}
+      >
         {stats.map((stat, index) => (
           <motion.div
             key={stat.label}
@@ -296,6 +321,77 @@ export function Meter({
         transition={{ duration: 0.55, ease: EASE }}
         className={cn("h-full rounded-full", METER_TONE[tone])}
       />
+    </div>
+  );
+}
+
+const RING_STROKE: Record<Tone, string> = {
+  neutral: "var(--text-tertiary)",
+  brand: "var(--brand-primary)",
+  emerald: "var(--accent-emerald)",
+  amber: "var(--accent-amber)",
+  rose: "var(--accent-rose)",
+  violet: "var(--accent-violet)",
+  sky: "var(--accent-sky)",
+};
+
+/**
+ * A single radial progress indicator — a thin drawn arc, not a filled donut.
+ * For one summary figure that deserves more visual weight than a row in a
+ * <StatRow> (e.g. "62% of this class has completed the diagnostic"). Not a
+ * general charting component: it takes one percentage, nothing else, so it
+ * can never be reached for from data that isn't already a clean 0–100 value.
+ */
+export function Ring({
+  value,
+  size = 56,
+  strokeWidth = 5,
+  tone = "brand",
+  label,
+  className,
+}: {
+  value: number;
+  size?: number;
+  strokeWidth?: number;
+  tone?: Tone;
+  /** Centered text — typically the percentage itself, kept as a prop so the caller controls formatting. */
+  label?: ReactNode;
+  className?: string;
+}) {
+  const clamped = Math.min(100, Math.max(0, value));
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  return (
+    <div className={cn("relative inline-flex shrink-0 items-center justify-center", className)} style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="var(--c-line)"
+          strokeWidth={strokeWidth}
+        />
+        <motion.circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={RING_STROKE[tone]}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: circumference * (1 - clamped / 100) }}
+          transition={{ duration: 0.7, ease: EASE }}
+        />
+      </svg>
+      {label !== undefined && (
+        <span className="console-num absolute text-[11px] font-bold text-text-primary">
+          {label}
+        </span>
+      )}
     </div>
   );
 }
@@ -425,10 +521,13 @@ export function EmptyState({
 export function Notice({
   tone = "brand",
   icon: Icon,
+  onDismiss,
   children,
 }: {
   tone?: Tone;
   icon?: LucideIcon;
+  /** Adds a close affordance — for a notice the user can dismiss early (e.g. a saved-confirmation). */
+  onDismiss?: () => void;
   children: ReactNode;
 }) {
   return (
@@ -438,12 +537,23 @@ export function Notice({
       exit={{ opacity: 0, y: -4 }}
       transition={QUICK}
       className={cn(
-        "flex items-center gap-2 rounded-[var(--c-radius)] border px-3.5 py-2.5 text-xs font-medium",
+        "flex items-center justify-between gap-2 rounded-[var(--c-radius)] border px-3.5 py-2.5 text-xs font-medium",
         CHIP_TONE[tone]
       )}
     >
-      {Icon && <Icon className="h-4 w-4 shrink-0" />}
-      <span className="min-w-0">{children}</span>
+      <div className="flex min-w-0 items-center gap-2">
+        {Icon && <Icon className="h-4 w-4 shrink-0" />}
+        <span className="min-w-0">{children}</span>
+      </div>
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="shrink-0 cursor-pointer rounded p-0.5 opacity-70 transition-opacity hover:opacity-100"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </motion.div>
   );
 }

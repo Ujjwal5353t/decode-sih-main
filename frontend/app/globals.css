@@ -105,7 +105,7 @@ html.font-urdu body {
   --glass-blur: 16px;
 
   /* Nav */
-  --nav-height: 76px;
+  --nav-height: 96px;
 }
 
 
@@ -778,3 +778,79 @@ button, a, [role="button"] {
 .console ::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
 }
+
+/* ─── Console hero band ───────────────────────────────────────────────
+   The one tinted surface in the console. A very low-contrast wash keyed
+   to the brand hue, plus a faint diagonal sheen — enough to separate the
+   hero from the plain panels below it without becoming the "big gradient
+   header" every dashboard template ships with. */
+.console-hero {
+  background:
+    radial-gradient(120% 140% at 88% 8%, rgba(37, 99, 235, 0.10) 0%, transparent 58%),
+    radial-gradient(90% 120% at 4% 96%, rgba(6, 182, 212, 0.07) 0%, transparent 55%),
+    var(--c-panel);
+}
+
+[data-theme="dark"] .console-hero {
+  background:
+    radial-gradient(120% 140% at 88% 8%, rgba(59, 130, 246, 0.16) 0%, transparent 58%),
+    radial-gradient(90% 120% at 4% 96%, rgba(34, 211, 238, 0.09) 0%, transparent 55%),
+    var(--c-panel);
+}
+
+/* Hairline highlight along the top edge, so the tinted band still reads as
+   a raised surface rather than a coloured hole in the page. */
+.console-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.5) 30%,
+    rgba(255, 255, 255, 0.5) 70%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+[data-theme="dark"] .console-hero::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(148, 163, 184, 0.16) 30%,
+    rgba(148, 163, 184, 0.16) 70%,
+    transparent
+  );
+}
+
+/* ─── Brand logo artwork ──────────────────────────────────────────────
+   The lockup is a single image, so there is no wordmark colour to theme.
+   Dark mode gets a whisper of lift so the artwork doesn't sit flat against
+   the dark navbar. If a light-on-dark variant file is added later, the
+   dark-hidden/dark-shown pair below swaps it in with no JS. */
+.brand-logo-img {
+  transition: filter 0.4s ease, transform 0.3s ease;
+}
+
+[data-theme="dark"] .brand-logo-img {
+  filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.20));
+}
+
+[data-theme="dark"] .dark-hidden {
+  display: none;
+}
+.dark-shown {
+  display: none;
+}
+[data-theme="dark"] .dark-shown {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-logo-img {
+    transition: none;
+  }
+}
+
