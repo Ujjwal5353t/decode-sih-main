@@ -82,6 +82,31 @@ class AssignmentCreateQuizRequest(BaseModel):
     deadline_days: Optional[int] = None
 
 
+class QuizQuestionPreview(BaseModel):
+    id: str = ""
+    question_number: int = 1
+    chapter_title: str = ""
+    question_text: str
+    options: list[str]
+    correct_option_index: int = 0
+    correct_answer: str = ""
+    explanation: Optional[str] = None
+
+
+class AssignmentQuizPreviewOut(BaseModel):
+    assignment_id: uuid.UUID
+    title: str
+    subject: Optional[str] = None
+    class_number: int
+    section: str
+    assignment_type: str
+    chapters: list[str]
+    total_questions: int
+    questions: list[QuizQuestionPreview]
+
+    model_config = {"from_attributes": True}
+
+
 class AssignmentUpdateRequest(BaseModel):
     title: Optional[str] = None
     subject: Optional[str] = None

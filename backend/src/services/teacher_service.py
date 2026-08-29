@@ -33,6 +33,7 @@ from src.schemas.teacher import (
     AssignClassRequest,
     AssignmentCreateQuizRequest,
     AssignmentCreatePdfRequest,
+    AssignmentQuizPreviewOut,
     AssignmentUpdateRequest,
     AssignmentQuizPreviewOut,
 )
@@ -701,7 +702,7 @@ async def get_assignment_quiz_preview(
     asgn = await _get_assignment_or_403(assignment_id, teacher, session)
 
     chapter_nums = []
-    if asgn.chapter_numbers:
+    if getattr(asgn, "chapter_numbers", None):
         try:
             chapter_nums = json.loads(asgn.chapter_numbers)
         except Exception:

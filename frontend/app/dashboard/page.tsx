@@ -132,11 +132,11 @@ import {
   getTeacherClassModules,
   getTeacherClassChapters,
   ChapterOut,
+  getAssignmentQuizPreview,
+  AssignmentQuizPreviewOut,
   getTeacherAssignments,
   createPdfAssignment,
   createAiQuizAssignment,
-  getAssignmentQuizPreview,
-  AssignmentQuizPreviewOut,
   updateAssignment,
   deleteAssignment,
   getAssignmentSubmissions,
@@ -2240,7 +2240,7 @@ function TeacherDashboardView({
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [loadingStudents, setLoadingStudents] = useState<boolean>(false);
 
-  // Class Modules & Chapters state (for AI Quiz)
+  // Class Modules state (for AI Quiz)
   const [classModules, setClassModules] = useState<ModuleOut[]>([]);
   const [classChapters, setClassChapters] = useState<ChapterOut[]>([]);
   const [selectedChapterNumbers, setSelectedChapterNumbers] = useState<number[]>([]);
@@ -2269,11 +2269,24 @@ function TeacherDashboardView({
   const [isSubmittingQuiz, setIsSubmittingQuiz] = useState(false);
   const [quizError, setQuizError] = useState<string | null>(null);
 
-  // AI Quiz Preview Modal state
-  const [showQuizPreviewModal, setShowQuizPreviewModal] = useState<boolean>(false);
-  const [quizPreviewData, setQuizPreviewData] = useState<AssignmentQuizPreviewOut | null>(null);
-  const [loadingQuizPreview, setLoadingQuizPreview] = useState<boolean>(false);
-  const [quizPreviewError, setQuizPreviewError] = useState<string | null>(null);
+  // Quiz Preview Modal State
+  const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
+  const [previewQuiz, setPreviewQuiz] = useState<AssignmentQuizPreviewOut | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState<boolean>(false);
+
+  const handleViewQuizPreview = async (assignmentId: string) => {
+    setLoadingPreview(true);
+    setShowPreviewModal(true);
+    try {
+      const res = await getAssignmentQuizPreview(assignmentId);
+      setPreviewQuiz(res);
+    } catch (err: any) {
+      alert(err.message || "Failed to load AI quiz questions preview.");
+      setShowPreviewModal(false);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
 
   // Progress Tab state
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>("");
@@ -2316,12 +2329,12 @@ function TeacherDashboardView({
       .catch((err) => console.log("Fetch students note:", err.message))
       .finally(() => setLoadingStudents(false));
 
-    // Load Modules for AI Quiz Selection (filtered by assigned subject)
+    // Load Modules for AI Quiz Selection & Curriculum View
     getTeacherClassModules(selectedClass.class_number, selectedClass.section, selectedClass.subject || undefined)
       .then((res) => setClassModules(res))
       .catch((err) => console.log("Fetch class modules note:", err.message));
 
-    // Load Chapter Breakdown for AI Quiz Selection
+    // Load Chapters for RAG Quiz Selection
     getTeacherClassChapters(selectedClass.class_number, selectedClass.subject || undefined)
       .then((res) => setClassChapters(res))
       .catch((err) => console.log("Fetch class chapters note:", err.message));
@@ -2391,8 +2404,11 @@ function TeacherDashboardView({
   // Handle AI Quiz Assignment Generation
   const handleCreateQuizAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
-    const hasSelection = selectedModuleIds.length > 0 || selectedChapterNumbers.length > 0;
-    if (!selectedClass || !quizTitle.trim() || !hasSelection) {
+    if (
+      !selectedClass ||
+      !quizTitle.trim() ||
+      (selectedModuleIds.length === 0 && selectedChapterNumbers.length === 0)
+    ) {
       setQuizError("Please enter a title and select at least one module or chapter.");
       return;
     }
@@ -2404,8 +2420,8 @@ function TeacherDashboardView({
         title: quizTitle.trim(),
         subject: selectedClass.subject || undefined,
         description: quizDesc.trim() || undefined,
-        module_ids: selectedModuleIds.length > 0 ? selectedModuleIds : undefined,
-        chapter_numbers: selectedChapterNumbers.length > 0 ? selectedChapterNumbers : undefined,
+        module_ids: selectedModuleIds,
+        chapter_numbers: selectedChapterNumbers,
         deadline_days: quizDeadlineDays !== "" ? Number(quizDeadlineDays) : undefined,
       });
       setShowQuizModal(false);
@@ -2685,7 +2701,16 @@ function TeacherDashboardView({
                               </p>
                             )}
 
-                            {asgn.file_url && (
+                            {asgn.assignment_type === "ai_quiz" ? (
+                              <button
+                                type="button"
+                                onClick={() => handleViewQuizPreview(asgn.id)}
+                                className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline cursor-pointer"
+                              >
+                                <Brain className="h-3.5 w-3.5 text-violet-400" />
+                                View AI Quiz Questions
+                              </button>
+                            ) : asgn.file_url ? (
                               <a
                                 href={formatPdfUrl(asgn.file_url)}
                                 target="_blank"
@@ -2695,31 +2720,7 @@ function TeacherDashboardView({
                                 <FileText className="h-3.5 w-3.5" />
                                 {t("teacherDashboard.viewAssignmentPdf")}
                               </a>
-                            )}
-
-                            {asgn.assignment_type === "ai_quiz" && (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  setLoadingQuizPreview(true);
-                                  setQuizPreviewError(null);
-                                  setQuizPreviewData(null);
-                                  setShowQuizPreviewModal(true);
-                                  try {
-                                    const res = await getAssignmentQuizPreview(asgn.id);
-                                    setQuizPreviewData(res);
-                                  } catch (err: any) {
-                                    setQuizPreviewError(err.message || "Failed to load quiz questions preview.");
-                                  } finally {
-                                    setLoadingQuizPreview(false);
-                                  }
-                                }}
-                                className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand transition-colors hover:bg-brand/20 cursor-pointer"
-                              >
-                                <Sparkles className="h-3.5 w-3.5" />
-                                View Generated Quiz Questions
-                              </button>
-                            )}
+                            ) : null}
                           </div>
 
                           <div className="flex shrink-0 items-center gap-5">
@@ -3100,14 +3101,14 @@ function TeacherDashboardView({
                 </div>
 
                 <div>
-                  <FieldLabel>Select Modules / Chapters *</FieldLabel>
+                  <FieldLabel>{t("teacherDashboard.selectModulesRequired")}</FieldLabel>
                   {classChapters.length > 0 ? (
                     <div className="max-h-48 space-y-1 overflow-y-auto rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-2 text-xs">
-                      {classChapters.map((ch) => {
+                      {classChapters.map((ch, idx) => {
                         const isChecked = selectedChapterNumbers.includes(ch.chapter_number);
                         return (
                           <label
-                            key={`${ch.chapter_number}-${ch.subject}`}
+                            key={`${ch.chapter_number}-${ch.module_id || 'seeded'}-${idx}`}
                             className={`flex cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors ${
                               isChecked ? "bg-brand/10 border border-brand/20" : "hover:bg-[var(--c-panel)]"
                             }`}
@@ -3201,17 +3202,13 @@ function TeacherDashboardView({
                     type="button"
                     onClick={() => setShowQuizModal(false)}
                   >
-                    {t("teacherDashboard.cancel")}
+                    {t("teacherDashboard.cancelBtn")}
                   </Button>
                   <Button
                     variant="primary"
                     size="sm"
                     type="submit"
-                    disabled={
-                      isSubmittingQuiz ||
-                      !quizTitle.trim() ||
-                      (selectedModuleIds.length === 0 && selectedChapterNumbers.length === 0)
-                    }
+                    disabled={isSubmittingQuiz || classModules.length === 0}
                   >
                     {isSubmittingQuiz ? t("teacherDashboard.generating") : t("teacherDashboard.generateQuizBtn")}
                   </Button>
@@ -3221,83 +3218,69 @@ function TeacherDashboardView({
           )}
 
           {/* AI Quiz Questions Preview Modal */}
-          {showQuizPreviewModal && (
+          {showPreviewModal && (
             <Modal
-              title="RAG-Generated AI Quiz Preview"
-              onClose={() => setShowQuizPreviewModal(false)}
+              title={previewQuiz?.title || "AI Quiz Questions Preview"}
+              icon={Brain}
+              iconTone="violet"
+              onClose={() => {
+                setShowPreviewModal(false);
+                setPreviewQuiz(null);
+              }}
             >
-              {loadingQuizPreview ? (
-                <Loading />
-              ) : quizPreviewError ? (
-                <div className="rounded-[var(--c-radius)] border border-rose-500/20 bg-rose-500/10 p-4 text-xs font-medium text-rose-400">
-                  {quizPreviewError}
+              {loadingPreview ? (
+                <div className="py-12 flex flex-col items-center gap-3 text-xs text-text-tertiary">
+                  <Loader2 className="w-6 h-6 animate-spin text-brand" />
+                  <span>Loading AI RAG Quiz Questions...</span>
                 </div>
-              ) : quizPreviewData ? (
-                <div className="space-y-4">
-                  <div className="rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-3 text-xs">
-                    <div className="font-semibold text-text-primary">
-                      {quizPreviewData.title}
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-text-tertiary">
-                      <span>Class {quizPreviewData.class_number}{quizPreviewData.section}</span>
-                      <span>&bull;</span>
-                      <span>{quizPreviewData.subject || "General"}</span>
-                      <span>&bull;</span>
-                      <span>{quizPreviewData.total_questions} Questions</span>
-                    </div>
-                    {quizPreviewData.chapters.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {quizPreviewData.chapters.map((c, i) => (
-                          <span
-                            key={i}
-                            className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium text-brand"
-                          >
-                            {c}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+              ) : previewQuiz ? (
+                <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-semibold text-text-secondary">Class & Subject:</span>
+                    <Chip tone="brand">Class {previewQuiz.class_number}{previewQuiz.section} &bull; {previewQuiz.subject || "Mathematics"}</Chip>
+                    <Chip tone="violet">{previewQuiz.total_questions} RAG Questions</Chip>
                   </div>
 
-                  <div className="max-h-96 space-y-4 overflow-y-auto pr-1">
-                    {quizPreviewData.questions.map((q) => (
-                      <div
-                        key={q.id}
-                        className="rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-panel)] p-3 text-xs"
-                      >
-                        <div className="flex items-center justify-between text-[11px] font-medium text-brand">
-                          <span>Question {q.question_number}</span>
-                          <span className="text-[10px] text-text-tertiary">{q.chapter_title}</span>
-                        </div>
-                        <div className="mt-1.5 font-semibold text-text-primary">
-                          {q.question_text}
+                  {previewQuiz.chapters && previewQuiz.chapters.length > 0 && (
+                    <div className="text-xs text-text-tertiary bg-[var(--c-sunken)] p-2.5 rounded-md border border-[var(--c-line)]">
+                      <span className="font-semibold text-text-secondary">Grounded in Chapters: </span>
+                      {previewQuiz.chapters.join(", ")}
+                    </div>
+                  )}
+
+                  <div className="space-y-3 pt-2">
+                    {previewQuiz.questions.map((q: any, idx: number) => (
+                      <div key={q.id || idx} className="p-3.5 rounded-lg border border-[var(--c-line)] bg-[var(--c-panel)] text-xs space-y-2">
+                        <div className="font-semibold text-text-primary flex items-start gap-2">
+                          <span className="shrink-0 font-mono text-brand font-bold">Q{idx + 1}.</span>
+                          <span>{q.question || q.question_text}</span>
                         </div>
 
-                        <div className="mt-2 space-y-1">
-                          {q.options.map((opt, idx) => {
-                            const isCorrect = idx === q.correct_option_index;
-                            return (
-                              <div
-                                key={idx}
-                                className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${
-                                  isCorrect
-                                    ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-medium"
-                                    : "bg-[var(--c-sunken)] text-text-secondary"
-                                }`}
-                              >
-                                <span className="font-mono text-[10px] font-bold">
-                                  {String.fromCharCode(65 + idx)}.
-                                </span>
-                                <span className="flex-1">{opt}</span>
-                                {isCorrect && <Check className="h-3.5 w-3.5 text-emerald-400" />}
-                              </div>
-                            );
-                          })}
-                        </div>
+                        {q.options && q.options.length > 0 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-6 pt-1">
+                            {q.options.map((opt: string, oIdx: number) => {
+                              const isCorrect = (q.correct_option_index !== undefined && oIdx === q.correct_option_index) || opt === q.correct_answer || opt === q.answer;
+                              return (
+                                <div
+                                  key={oIdx}
+                                  className={`p-2 rounded border text-xs font-medium transition-colors ${
+                                    isCorrect
+                                      ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-400 font-bold border-emerald-500/50 shadow-sm"
+                                      : "bg-[var(--c-sunken)] border-[var(--c-line)] text-text-secondary"
+                                  }`}
+                                >
+                                  <span className="font-bold mr-1.5">{String.fromCharCode(65 + oIdx)}.</span>
+                                  {opt}
+                                  {isCorrect && <span className="ml-2 text-[10px] text-emerald-400 font-extrabold uppercase">(Correct Answer)</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
 
                         {q.explanation && (
-                          <div className="mt-2.5 rounded-md border border-brand/20 bg-brand/5 p-2 text-[11px] text-text-secondary">
-                            <span className="font-semibold text-brand">RAG Grounding & Explanation: </span>
+                          <div className="pl-6 pt-1 text-[11px] text-text-tertiary italic">
+                            <span className="font-semibold text-brand">NCERT RAG Context: </span>
                             {q.explanation}
                           </div>
                         )}
@@ -3305,11 +3288,14 @@ function TeacherDashboardView({
                     ))}
                   </div>
 
-                  <div className="flex justify-end border-t border-[var(--c-line)] pt-3">
+                  <div className="flex justify-end pt-4 border-t border-[var(--c-line)]">
                     <Button
-                      variant="ghost"
+                      variant="primary"
                       size="sm"
-                      onClick={() => setShowQuizPreviewModal(false)}
+                      onClick={() => {
+                        setShowPreviewModal(false);
+                        setPreviewQuiz(null);
+                      }}
                     >
                       Close Preview
                     </Button>

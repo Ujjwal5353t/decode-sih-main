@@ -964,7 +964,9 @@
     "selectModulesRequired": "ਮਾਡਿਊਲ / ਅਧਿਆਏ ਚੁਣੋ *",
     "noModulesWarning": "ਇਸ ਕਲਾਸ ਲਈ ਕੋਈ ਮਾਡਿਊਲ ਨਹੀਂ ਮਿਲੇ। ਪਹਿਲਾਂ ਮਾਡਿਊਲ ਅੱਪਲੋਡ ਕਰੋ।",
     "generating": "ਤਿਆਰ ਹੋ ਰਿਹਾ ਹੈ...",
-    "generateQuizBtn": "AI ਕਵਿਜ਼ ਤਿਆਰ ਕਰੋ"
+    "generateQuizBtn": "AI ਕਵਿਜ਼ ਤਿਆਰ ਕਰੋ",
+    "cancelBtn": "ਰੱਦ ਕਰੋ",
+    "generatingBtn": "ਤਿਆਰ ਹੋ ਰਿਹਾ ਹੈ..."
   },
   "quizQuestions": {
     "science": [

@@ -193,8 +193,21 @@ async def get_class_chapters(
             )
         )
 
-    chapter_outs.sort(key=lambda x: (x.chapter_number, x.subject))
-    return chapter_outs
+    # Deduplicate chapters by chapter_number so each chapter appears exactly once
+    deduped_chapters: dict[int, ChapterOut] = {}
+    for ch in sorted(chapter_outs, key=lambda x: (x.chapter_number, 0 if x.module_id else 1)):
+        if ch.chapter_number not in deduped_chapters:
+            deduped_chapters[ch.chapter_number] = ch
+        else:
+            existing = deduped_chapters[ch.chapter_number]
+            existing.chunk_count += ch.chunk_count
+            if not existing.module_id and ch.module_id:
+                existing.module_id = ch.module_id
+                existing.module_title = ch.module_title
+
+    final_chapters = list(deduped_chapters.values())
+    final_chapters.sort(key=lambda x: x.chapter_number)
+    return final_chapters
 
 
 async def get_chapter_chunks(

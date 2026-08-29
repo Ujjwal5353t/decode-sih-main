@@ -20,7 +20,7 @@ GET  /teacher/assignments/{assignment_id}/students/{student_id}/feedback
 import uuid
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_session
@@ -29,6 +29,7 @@ from src.models.teacher import Teacher
 from src.schemas.teacher import (
     AssignmentCreateQuizRequest,
     AssignmentOut,
+    AssignmentQuizPreviewOut,
     AssignmentUpdateRequest,
     AssignmentQuizPreviewOut,
     FeedbackOut,
@@ -133,12 +134,12 @@ async def get_class_learning_progress(
 @router.get(
     "/classes/{class_number}/{section}/modules",
     response_model=list[ModuleOut],
-    summary="List modules for a class (same as school view)",
+    summary="List modules for a class (filtered by subject if provided)",
 )
 async def get_class_modules(
     class_number: int,
     section: str,
-    subject: Optional[str] = None,
+    subject: Optional[str] = Query(None, description="Subject filter for teacher's assigned subject"),
     teacher: Teacher = Depends(get_current_teacher),
     session: AsyncSession = Depends(get_session),
 ):

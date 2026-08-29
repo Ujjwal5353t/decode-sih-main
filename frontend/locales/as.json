@@ -848,7 +848,9 @@
     "selectModulesRequired": "মডিউল / অধ্যায় বাছক *",
     "noModulesWarning": "এই শ্ৰেণীৰ বাবে কোনো মডিউল পোৱা নগ'ল। প্ৰথমে মডিউল আপলোড কৰক।",
     "generating": "প্ৰস্তুত হৈ আছে...",
-    "generateQuizBtn": "AI কুইজ প্ৰস্তুত কৰক"
+    "generateQuizBtn": "AI কুইজ প্ৰস্তুত কৰক",
+    "cancelBtn": "বাতিল কৰক",
+    "generatingBtn": "প্ৰস্তুত হৈ আছে..."
   },
   "quizQuestions": {
     "science": [
