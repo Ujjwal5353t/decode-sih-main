@@ -30,6 +30,7 @@ from src.schemas.teacher import (
     AssignmentCreateQuizRequest,
     AssignmentOut,
     AssignmentUpdateRequest,
+    AssignmentQuizPreviewOut,
     FeedbackOut,
     FeedbackRequest,
     SetScoreRequest,
@@ -137,11 +138,13 @@ async def get_class_learning_progress(
 async def get_class_modules(
     class_number: int,
     section: str,
+    subject: Optional[str] = None,
     teacher: Teacher = Depends(get_current_teacher),
     session: AsyncSession = Depends(get_session),
 ):
-    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session)
-    return await module_service.get_class_modules(teacher.branch_name, class_number, session)
+    tca = await teacher_service.verify_teacher_class_access(teacher, class_number, section, session, subject=subject)
+    target_subject = subject or (tca.subject if tca and tca.subject and tca.subject.lower() != "general" else None)
+    return await module_service.get_class_modules(teacher.branch_name, class_number, session, subject=target_subject)
 
 
 @router.get(
@@ -302,6 +305,19 @@ async def delete_assignment(
     session: AsyncSession = Depends(get_session),
 ):
     await teacher_service.delete_assignment(assignment_id, teacher, session)
+
+
+@router.get(
+    "/assignments/{assignment_id}/quiz-preview",
+    response_model=AssignmentQuizPreviewOut,
+    summary="Preview RAG-generated quiz questions for an AI quiz assignment",
+)
+async def preview_assignment_quiz(
+    assignment_id: uuid.UUID,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    return await teacher_service.get_assignment_quiz_preview(assignment_id, teacher, session)
 
 
 # ── Progress / Submissions ─────────────────────────────────────────────────────
