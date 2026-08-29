@@ -15,14 +15,27 @@ import {
 } from "lucide-react";
 import { SectionWrapper } from "@/components/shared/SectionWrapper";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
-const featuresData = [
+interface FeatureItem {
+  id: string;
+  icon: any;
+  titleKey: string;
+  descKey: string;
+  badgeKey: string;
+  span: string;
+  colorBg: string;
+  colorBorder: string;
+  colorText: string;
+}
+
+const featureDefs: FeatureItem[] = [
   {
     id: "adaptive-learning",
     icon: Brain,
-    title: "Adaptive Learning",
-    description: "AI adjusts difficulty, pace, and teaching style in real-time based on each child's unique learning patterns.",
-    badge: "Core AI Engine",
+    titleKey: "features.items.adaptive.title",
+    descKey: "features.items.adaptive.desc",
+    badgeKey: "features.items.adaptive.badge",
     span: "lg:col-span-2 lg:row-span-1",
     colorBg: "bg-brand/10",
     colorBorder: "border-brand/20",
@@ -31,9 +44,9 @@ const featuresData = [
   {
     id: "snap-learn",
     icon: Camera,
-    title: "Snap & Learn",
-    description: "Point your camera at any textbook page — AI extracts content and creates interactive lessons instantly.",
-    badge: "Instant OCR",
+    titleKey: "features.items.snap.title",
+    descKey: "features.items.snap.desc",
+    badgeKey: "features.items.snap.badge",
     span: "lg:col-span-1 lg:row-span-1",
     colorBg: "bg-cyan-500/10",
     colorBorder: "border-cyan-500/20",
@@ -42,9 +55,9 @@ const featuresData = [
   {
     id: "languages",
     icon: Globe,
-    title: "50+ Regional Languages",
-    description: "Learn in Hindi, Tamil, Bengali, Marathi, or any of 50+ supported regional languages.",
-    badge: "Native Voices",
+    titleKey: "features.items.languages.title",
+    descKey: "features.items.languages.desc",
+    badgeKey: "features.items.languages.badge",
     span: "lg:col-span-1 lg:row-span-1",
     colorBg: "bg-emerald-500/10",
     colorBorder: "border-emerald-500/20",
@@ -53,9 +66,9 @@ const featuresData = [
   {
     id: "accessibility",
     icon: Accessibility,
-    title: "Accessibility Suite",
-    description: "Dyslexia-friendly fonts, ADHD focus modes, high-contrast themes, and screen reader optimized content.",
-    badge: "WCAG AAA",
+    titleKey: "features.items.accessibility.title",
+    descKey: "features.items.accessibility.desc",
+    badgeKey: "features.items.accessibility.badge",
     span: "lg:col-span-2 lg:row-span-1",
     colorBg: "bg-violet-500/10",
     colorBorder: "border-violet-500/20",
@@ -64,9 +77,9 @@ const featuresData = [
   {
     id: "offline-first",
     icon: WifiOff,
-    title: "Offline-First",
-    description: "Download lessons once, learn anywhere. No internet required after initial sync.",
-    badge: "Zero Latency",
+    titleKey: "features.items.offline.title",
+    descKey: "features.items.offline.desc",
+    badgeKey: "features.items.offline.badge",
     span: "lg:col-span-1 lg:row-span-1",
     colorBg: "bg-emerald-500/10",
     colorBorder: "border-emerald-500/20",
@@ -75,9 +88,9 @@ const featuresData = [
   {
     id: "gamified",
     icon: Gamepad2,
-    title: "Gamified Learning",
-    description: "XP points, streak rewards, leaderboards, and achievement badges that make learning addictive.",
-    badge: "Fun & Engaging",
+    titleKey: "features.items.gamified.title",
+    descKey: "features.items.gamified.desc",
+    badgeKey: "features.items.gamified.badge",
     span: "lg:col-span-1 lg:row-span-1",
     colorBg: "bg-amber-500/10",
     colorBorder: "border-amber-500/20",
@@ -86,9 +99,9 @@ const featuresData = [
   {
     id: "teacher-assistant",
     icon: GraduationCap,
-    title: "Teacher AI Assistant",
-    description: "Automated lesson planning, smart grading, and personalized student insights.",
-    badge: "Time Saver",
+    titleKey: "features.items.teacherAssistant.title",
+    descKey: "features.items.teacherAssistant.desc",
+    badgeKey: "features.items.teacherAssistant.badge",
     span: "lg:col-span-1 lg:row-span-1",
     colorBg: "bg-brand/10",
     colorBorder: "border-brand/20",
@@ -97,9 +110,9 @@ const featuresData = [
   {
     id: "parent-voice",
     icon: Mic,
-    title: "Parent Voice Updates",
-    description: "AI-generated audio summaries of your child's progress — in your language.",
-    badge: "Daily Audio",
+    titleKey: "features.items.parentVoice.title",
+    descKey: "features.items.parentVoice.desc",
+    badgeKey: "features.items.parentVoice.badge",
     span: "lg:col-span-1 lg:row-span-1",
     colorBg: "bg-rose-500/10",
     colorBorder: "border-rose-500/20",
@@ -108,9 +121,9 @@ const featuresData = [
   {
     id: "ai-lessons",
     icon: Sparkles,
-    title: "AI-Generated Lessons",
-    description: "Personalized lesson content created by AI, tailored to curriculum and learning goals.",
-    badge: "Auto Curriculum",
+    titleKey: "features.items.aiLessons.title",
+    descKey: "features.items.aiLessons.desc",
+    badgeKey: "features.items.aiLessons.badge",
     span: "lg:col-span-1 lg:row-span-1",
     colorBg: "bg-violet-500/10",
     colorBorder: "border-violet-500/20",
@@ -118,16 +131,16 @@ const featuresData = [
   },
 ];
 
-// Clean, static Feature Card Component
 function FeatureCard({
   feature,
   idx,
   isInView,
 }: {
-  feature: (typeof featuresData)[number];
+  feature: FeatureItem;
   idx: number;
   isInView: boolean;
 }) {
+  const { t } = useTranslation();
   const Icon = feature.icon;
 
   return (
@@ -147,7 +160,6 @@ function FeatureCard({
         feature.span
       )}
     >
-      {/* Subtle Hover Ambient Glow Overlay */}
       <div
         className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
         style={{
@@ -156,9 +168,7 @@ function FeatureCard({
         }}
       />
 
-      {/* ══ CLEAN MINIMAL CARD LAYOUT ══ */}
       <div className="relative z-10">
-        {/* Top Bar: Icon + Badge */}
         <div className="flex items-center justify-between mb-5">
           <div
             className={cn(
@@ -179,20 +189,17 @@ function FeatureCard({
               feature.colorText
             )}
           >
-            {feature.badge}
+            {t(feature.badgeKey)}
           </span>
         </div>
 
-        {/* Title & Description */}
         <h3 className="text-xl font-bold mb-2 text-text-primary font-[family-name:var(--font-display)]">
-          {feature.title}
+          {t(feature.titleKey)}
         </h3>
         <p className="text-sm text-text-secondary leading-relaxed">
-          {feature.description}
+          {t(feature.descKey)}
         </p>
       </div>
-
-
     </motion.div>
   );
 }
@@ -200,10 +207,10 @@ function FeatureCard({
 export function Features() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(containerRef, { once: true, margin: "-80px" });
+  const { t } = useTranslation();
 
   return (
     <SectionWrapper id="features" className="py-20 lg:py-26 overflow-hidden">
-      {/* Ambient Multi-Color Background Mesh */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <div
           className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full opacity-10"
@@ -220,7 +227,6 @@ export function Features() {
       </div>
 
       <div className="relative max-w-7xl mx-auto px-6 lg:px-12" ref={containerRef}>
-        {/* ════ SECTION HEADER ════ */}
         <div className="text-center mb-14 max-w-3xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -235,7 +241,7 @@ export function Features() {
             }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-            BUILT FOR EVERYONE
+            {t("features.badge")}
           </motion.div>
 
           <motion.h2
@@ -245,7 +251,7 @@ export function Features() {
             className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl
                      font-bold tracking-tight leading-[1.15]"
           >
-            Features that make a <span className="gradient-text">real difference.</span>
+            {t("features.title")} <span className="gradient-text">{t("features.titleHighlight")}</span>
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 16 }}
@@ -253,13 +259,12 @@ export function Features() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="mt-4 text-text-secondary text-base sm:text-lg"
           >
-            A purpose-built suite of tools designed for truly inclusive learning — from AI-powered adaptivity to offline access.
+            {t("features.subtitle")}
           </motion.p>
         </div>
 
-        {/* ════ CREATIVE BENTO GRID ════ */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {featuresData.map((feature, idx) => (
+          {featureDefs.map((feature, idx) => (
             <FeatureCard
               key={feature.id}
               feature={feature}
@@ -272,4 +277,3 @@ export function Features() {
     </SectionWrapper>
   );
 }
-

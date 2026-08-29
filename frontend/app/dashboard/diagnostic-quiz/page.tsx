@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Mascot, MascotMood } from "@/components/quiz/Mascot";
 import { QuizIllustration } from "@/components/quiz/illustrations/QuizIllustration";
 import { ConfettiBurst } from "@/components/quiz/ConfettiBurst";
@@ -48,6 +49,7 @@ type QuizStage = "checking" | "idle" | "in_progress" | "finished";
 export default function DiagnosticQuizPage() {
   const router = useRouter();
   const { user, role, loading } = useAuth();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!loading && (!user || !role)) {
@@ -60,7 +62,7 @@ export default function DiagnosticQuizPage() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-3 border-brand border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm font-medium text-text-secondary">Loading...</p>
+          <p className="text-sm font-medium text-text-secondary">{t("dashboard.common.loading")}</p>
         </div>
       </div>
     );
@@ -71,13 +73,13 @@ export default function DiagnosticQuizPage() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="glass rounded-[var(--radius-lg)] p-8 border border-border-primary text-center max-w-md">
           <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-3" />
-          <h1 className="text-base font-bold text-text-primary">Students Only</h1>
+          <h1 className="text-base font-bold text-text-primary">{t("diagnosticQuiz.studentsOnly")}</h1>
           <p className="text-sm text-text-secondary mt-1">
-            The diagnostic quiz is only available on student accounts.
+            {t("diagnosticQuiz.studentsOnlyDesc")}
           </p>
           <Link href="/dashboard">
             <Button variant="secondary" size="sm" className="mt-4">
-              Back to Dashboard
+              {t("diagnosticQuiz.backToDashboard")}
             </Button>
           </Link>
         </div>
@@ -400,6 +402,7 @@ function SubjectPicker({
   submitting: boolean;
   onStart: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -412,16 +415,16 @@ function SubjectPicker({
           <Sparkles className="w-5 h-5" />
         </div>
         <div className="flex-1">
-          <h1 className="text-base font-bold text-text-primary">Diagnostic Quiz</h1>
+          <h1 className="text-base font-bold text-text-primary">
+            {t("diagnosticQuiz.title")}
+          </h1>
           <p className="text-xs text-text-secondary mt-0.5">
-            This adaptive quiz checks your understanding at your current class level, and for
-            any topic you find tricky, it steps back through earlier classes to find exactly
-            where the gap starts — so we know what to strengthen first.
+            {t("diagnosticQuiz.subtitle")}
           </p>
 
           <div className="mt-5">
             <span className="block text-xs font-medium text-text-secondary mb-2">
-              Subjects to include
+              {t("dashboard.subjects")}
             </span>
             <div className="flex flex-wrap gap-2">
               {ALL_SUBJECTS.map((subject) => {
@@ -438,7 +441,6 @@ function SubjectPicker({
                         ? "bg-brand text-text-inverse border-brand"
                         : "bg-surface text-text-secondary border-border-primary hover:border-brand"
                     }`}
-                    title={disabled ? "EVS starts from Class 3" : undefined}
                   >
                     {subject}
                   </button>
@@ -454,7 +456,7 @@ function SubjectPicker({
               disabled={submitting || selectedSubjects.length === 0}
               onClick={onStart}
             >
-              {submitting ? "Starting..." : "Start Quiz"}
+              {submitting ? t("dashboard.common.loading") : t("dashboard.student.startDiagnosticQuiz")}
             </Button>
           </div>
         </div>
@@ -478,6 +480,7 @@ function QuestionCard({
   submitting: boolean;
   onAnswer: (optionIndex: number) => void;
 }) {
+  const { t } = useTranslation();
   const subjectPosition = subjectsInScope.indexOf(question.subject) + 1;
   const canReadAloud = typeof window !== "undefined" && "speechSynthesis" in window;
 
@@ -498,12 +501,12 @@ function QuestionCard({
     >
       <div className="flex items-center justify-between mb-4">
         <span className="text-xs text-text-tertiary">
-          {subjectPosition > 0 ? `Subject ${subjectPosition} of ${subjectsInScope.length}` : "Diagnostic"}
+          {subjectPosition > 0 ? `${question.subject} (${subjectPosition}/${subjectsInScope.length})` : t("diagnosticQuiz.title")}
           {" · "}
-          Question {questionCount}
+          {t("diagnosticQuiz.question")} {questionCount}
         </span>
         <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-          {question.subject} · Class {question.class_number}
+          {question.subject} · {t("dashboard.student.class")} {question.class_number}
         </span>
       </div>
 
@@ -530,7 +533,7 @@ function QuestionCard({
           <button
             type="button"
             onClick={readAloud}
-            title="Read question aloud"
+            title="Read aloud"
             className="shrink-0 w-8 h-8 rounded-full bg-surface border border-border-primary flex items-center justify-center text-text-secondary hover:text-brand hover:border-brand transition-colors cursor-pointer"
           >
             <Volume2 className="w-4 h-4" />
@@ -585,6 +588,7 @@ function GapReportView({
   points: number;
   bestStreak: number;
 }) {
+  const { t } = useTranslation();
   const gapsBySubject: Record<string, GapReportOut["gaps"]> = {};
   for (const subject of report.subjects_covered) {
     gapsBySubject[subject] = report.gaps.filter((g) => g.subject === subject);
@@ -600,25 +604,23 @@ function GapReportView({
         <div className="flex justify-center mb-2">
           <Mascot mood="celebrate" size={72} />
         </div>
-        <h1 className="text-lg font-bold text-text-primary">Quiz Complete</h1>
+        <h1 className="text-lg font-bold text-text-primary">{t("diagnosticQuiz.resultsTitle")}</h1>
         {report.overall_score !== null && (
           <div className="mt-3 flex items-center justify-center gap-2">
             <span className="text-4xl font-bold text-brand">{report.overall_score}%</span>
-            <span className="text-xs text-text-tertiary">overall score</span>
+            <span className="text-xs text-text-tertiary">{t("diagnosticQuiz.overallMastery")}</span>
           </div>
         )}
         <p className="text-xs text-text-secondary mt-2">
-          {report.gaps.length === 0
-            ? "No gaps found — you're solid across everything we tested."
-            : `We found ${report.gaps.length} topic${report.gaps.length === 1 ? "" : "s"} to strengthen, traced back to where the gap actually starts.`}
+          {t("diagnosticQuiz.resultsSubtitle")}
         </p>
         <div className="flex items-center justify-center gap-2 mt-4">
           <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs font-bold">
-            ⭐ {points} points
+            ⭐ {points} {t("diagnosticQuiz.points")}
           </span>
           {bestStreak >= 2 && (
             <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-500 text-xs font-bold">
-              🔥 Best streak: {bestStreak}
+              🔥 {t("diagnosticQuiz.streak")}: {bestStreak}
             </span>
           )}
         </div>
@@ -627,7 +629,7 @@ function GapReportView({
       <div className="glass rounded-[var(--radius-lg)] p-5 border border-border-primary">
         <h2 className="text-sm font-bold text-text-primary flex items-center gap-1.5 mb-2">
           <Sparkles className="w-4 h-4 text-brand" />
-          Summary
+          {t("diagnosticQuiz.recommendedFocus")}
         </h2>
         {report.ai_summary_status === "ready" && report.ai_summary ? (
           <p className="text-sm text-text-secondary leading-relaxed">{report.ai_summary}</p>
@@ -636,7 +638,7 @@ function GapReportView({
         ) : (
           <div className="flex items-center gap-3 text-xs text-text-secondary">
             <Mascot mood="dance" size={40} />
-            <span>Putting together your summary...</span>
+            <span>{t("dashboard.common.loading")}</span>
           </div>
         )}
       </div>
@@ -651,19 +653,13 @@ function GapReportView({
               {subjectScore && (
                 <div className="flex items-center gap-3 text-xs text-text-secondary">
                   <span className="font-bold text-text-primary">{subjectScore.score}%</span>
-                  {subjectScore.gaps_found > 0 && (
-                    <span>
-                      avg {subjectScore.average_classes_behind}{" "}
-                      class{subjectScore.average_classes_behind === 1 ? "" : "es"} behind
-                    </span>
-                  )}
                 </div>
               )}
             </div>
             {gaps.length === 0 ? (
               <p className="text-xs text-text-secondary flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                No gaps found in {subject}.
+                {t("dashboard.student.activeBadge")} · 100%
               </p>
             ) : (
               <div className="space-y-2">
@@ -674,7 +670,7 @@ function GapReportView({
                   >
                     <span className="text-xs font-medium text-text-primary">{gap.topic_name}</span>
                     <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded shrink-0 ml-3">
-                      Gap traced to Class {gap.originating_class}
+                      {t("dashboard.student.class")} {gap.originating_class}
                     </span>
                   </div>
                 ))}
@@ -687,7 +683,7 @@ function GapReportView({
       <div className="text-center pt-2">
         <Link href="/dashboard">
           <Button variant="secondary" size="md">
-            Back to Dashboard
+            {t("diagnosticQuiz.backToDashboard")}
           </Button>
         </Link>
       </div>

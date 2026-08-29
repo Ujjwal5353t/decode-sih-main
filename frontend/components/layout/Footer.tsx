@@ -4,31 +4,41 @@ import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
 import { ExternalLink, MessageCircle, Link2, Mail } from "lucide-react";
 import Image from "next/image";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface FooterLinkItem {
-  label: string;
+  tKey: string;
   href: string;
 }
 
-const footerLinks: Record<string, FooterLinkItem[]> = {
-  PRODUCT: [
-    { label: "Adaptive Learning", href: "#features" },
-    { label: "Regional Languages", href: "#features" },
-    { label: "Offline Learning", href: "#features" },
-    { label: "Accessibility", href: "#features" },
-  ],
-  EXPLORE: [
-    { label: "Why It Matters", href: "#why" },
-    { label: "Features", href: "#features" },
-    { label: "FAQs", href: "#faq" },
-  ],
-  "QUICK LINKS": [
-    { label: "Home", href: "#hero" },
-    { label: "Playground", href: "#playground" },
-    { label: "Dashboards", href: "#dashboards" },
-    { label: "Contact Us", href: "#contact" },
-  ],
-};
+const footerLinkDefs: { sectionTKey: string; links: FooterLinkItem[] }[] = [
+  {
+    sectionTKey: "footer.sections.product",
+    links: [
+      { tKey: "footer.links.adaptiveLearning", href: "#features" },
+      { tKey: "footer.links.regionalLanguages", href: "#features" },
+      { tKey: "footer.links.offlineLearning", href: "#features" },
+      { tKey: "footer.links.accessibility", href: "#features" },
+    ],
+  },
+  {
+    sectionTKey: "footer.sections.explore",
+    links: [
+      { tKey: "footer.links.whyItMatters", href: "#why" },
+      { tKey: "footer.links.features", href: "#features" },
+      { tKey: "footer.links.faqs", href: "#faq" },
+    ],
+  },
+  {
+    sectionTKey: "footer.sections.quickLinks",
+    links: [
+      { tKey: "footer.links.home", href: "#hero" },
+      { tKey: "footer.links.playground", href: "#playground" },
+      { tKey: "footer.links.dashboards", href: "#dashboards" },
+      { tKey: "footer.links.contactUs", href: "#contact" },
+    ],
+  },
+];
 
 const socialLinks = [
   { icon: MessageCircle, label: "Twitter", href: "#contact" },
@@ -40,6 +50,7 @@ const socialLinks = [
 export function Footer() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const { t } = useTranslation();
 
   return (
     <footer className="relative bg-surface overflow-hidden" role="contentinfo">
@@ -198,7 +209,7 @@ export function Footer() {
 
 
             <p className="text-sm text-text-secondary leading-relaxed max-w-sm">
-              AI-powered, inclusive learning designed around every child — regardless of language, ability, or internet access.
+              {t("footer.description")}
             </p>
 
             {/* Social links */}
@@ -225,26 +236,26 @@ export function Footer() {
 
           {/* Navigation Group (Product, Explore, Quick Links) shifted right with compact column gaps */}
           <div className="md:col-span-7 lg:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-6 sm:gap-8 lg:gap-8 items-start md:pl-6 lg:pl-10">
-            {Object.entries(footerLinks).map(([category, links], i) => (
+            {footerLinkDefs.map((section, i) => (
               <motion.div
-                key={category}
+                key={section.sectionTKey}
                 initial={{ opacity: 0, y: 20 }}
                 animate={isInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.5, delay: 0.1 + i * 0.05 }}
                 className="col-span-1 flex flex-col items-start pt-1"
               >
                 <h4 className="text-sm font-bold text-text-primary mb-4 font-[family-name:var(--font-display)] uppercase tracking-wider">
-                  {category}
+                  {t(section.sectionTKey)}
                 </h4>
                 <ul className="space-y-3">
-                  {links.map((item) => (
-                    <li key={item.label}>
+                  {section.links.map((item) => (
+                    <li key={item.tKey}>
                       <a
                         href={item.href}
                         className="text-sm text-text-secondary hover:text-brand
                                   transition-colors duration-200 block"
                       >
-                        {item.label}
+                        {t(item.tKey)}
                       </a>
                     </li>
                   ))}
@@ -264,17 +275,17 @@ export function Footer() {
                     justify-between gap-4"
         >
           <p className="text-xs text-text-tertiary">
-            © {new Date().getFullYear()} VidyaSetu • AI for Inclusive Education.
+            {t("footer.copyright").replace("{year}", String(new Date().getFullYear()))}
           </p>
           <div className="flex items-center gap-6">
             <a href="#why" className="text-xs text-text-tertiary hover:text-brand transition-colors">
-              India Data
+              {t("footer.links.indiaData")}
             </a>
             <a href="#features" className="text-xs text-text-tertiary hover:text-brand transition-colors">
-              Features
+              {t("footer.links.features")}
             </a>
             <a href="#dashboards" className="text-xs text-text-tertiary hover:text-brand transition-colors">
-              Dashboards
+              {t("footer.links.dashboards")}
             </a>
           </div>
         </motion.div>

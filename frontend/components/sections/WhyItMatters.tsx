@@ -5,10 +5,12 @@ import { useRef } from "react";
 import { SectionWrapper } from "@/components/shared/SectionWrapper";
 import { AnimatedCounter } from "@/components/shared/AnimatedCounter";
 import { Users, BookX, Languages, Brain, WifiOff, Sparkles, HeartHandshake } from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export function WhyItMatters() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(containerRef, { once: true, margin: "-60px" });
+  const { t } = useTranslation();
 
   return (
     <SectionWrapper id="why" className="py-20 lg:py-26 overflow-hidden">
@@ -46,7 +48,7 @@ export function WhyItMatters() {
             }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-            WHY IT MATTERS — INDIA EVIDENCE
+            {t("why.badge")}
           </motion.div>
 
           <motion.h2
@@ -56,8 +58,8 @@ export function WhyItMatters() {
             className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl
                      font-bold tracking-tight leading-[1.15] transform-gpu"
           >
-            Education is a right,{" "}
-            <span className="gradient-text">not a privilege.</span>
+            {t("why.title")}{" "}
+            <span className="gradient-text">{t("why.titleHighlight")}</span>
           </motion.h2>
 
           <motion.p
@@ -66,7 +68,7 @@ export function WhyItMatters() {
             transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
             className="mt-3 text-text-secondary text-base sm:text-lg leading-relaxed max-w-2xl mx-auto transform-gpu"
           >
-            India-specific evidence highlights the critical learning gaps that demand adaptive, multilingual, and offline-first AI education.
+            {t("why.subtitle")}
           </motion.p>
         </div>
 
@@ -101,7 +103,7 @@ export function WhyItMatters() {
                 <Users className="w-6 h-6 text-brand" />
               </div>
               <span className="px-3 py-1 rounded-full text-xs font-bold text-brand bg-brand/10 border border-brand/20 font-[family-name:var(--font-display)]">
-                India Education Data
+                {t("why.heroBadge")}
               </span>
             </div>
 
@@ -118,20 +120,21 @@ export function WhyItMatters() {
               </div>
 
               <h3 className="text-lg sm:text-xl font-extrabold text-text-primary font-[family-name:var(--font-display)] mt-3 mb-1.5">
-                Children in India&apos;s Foundational + Preparatory stages
+                {t("why.heroTitle")}
               </h3>
               <p className="text-text-secondary text-xs sm:text-sm leading-relaxed max-w-md">
-               Too many learners still navigate one-size-fits-all education that cannot adapt to their language, location, pace, or individual learning needs.  </p>
+                {t("why.heroDesc")}
+              </p>
             </div>
 
             {/* Bottom Citation Line */}
             <div className="pt-4 mt-4 border-t border-border-secondary/70 relative z-10 flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-text-tertiary uppercase tracking-wider font-[family-name:var(--font-display)]">
                 <Sparkles className="w-3.5 h-3.5 text-brand" />
-                According to UDISE+ 2023–24
+                {t("why.heroCitation")}
               </div>
               <span className="text-xs font-bold text-brand font-[family-name:var(--font-display)]">
-                Target Population
+                {t("why.targetPopulation")}
               </span>
             </div>
           </motion.div>
@@ -157,10 +160,10 @@ export function WhyItMatters() {
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-text-primary font-[family-name:var(--font-display)] leading-snug">
-                    Rural Class V children cannot read a Class II-level text
+                    {t("why.card1Title")}
                   </h4>
                   <p className="text-[11px] text-text-tertiary mt-0.5">
-                    According to ASER 2024
+                    {t("why.card1Citation")}
                   </p>
                 </div>
               </div>
@@ -192,10 +195,10 @@ export function WhyItMatters() {
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-text-primary font-[family-name:var(--font-display)] leading-snug">
-                    Students in India are not taught in the language they speak and understand best
+                    {t("why.card2Title")}
                   </h4>
                   <p className="text-[11px] text-text-tertiary mt-0.5">
-                    According to UNICEF India
+                    {t("why.card2Citation")}
                   </p>
                 </div>
               </div>
@@ -226,17 +229,17 @@ export function WhyItMatters() {
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-text-primary font-[family-name:var(--font-display)] leading-snug">
-                    Children with Special Needs in India&apos;s Foundational + Preparatory stages
+                    {t("why.card3Title")}
                   </h4>
                   <p className="text-[11px] text-text-tertiary mt-0.5">
-                    According to UDISE+ 2023–24
+                    {t("why.card3Citation")}
                   </p>
                 </div>
               </div>
               <AnimatedCounter
                 target={10.5}
                 decimals={1}
-                suffix=" Lakh"
+                suffix={t("why.card3Suffix")}
                 className="text-2xl sm:text-3xl font-black font-[family-name:var(--font-display)] text-violet-600 shrink-0"
                 duration={1.8}
               />
@@ -261,10 +264,10 @@ export function WhyItMatters() {
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-text-primary font-[family-name:var(--font-display)] leading-snug">
-                    Schools in India still lack internet access
+                    {t("why.card4Title")}
                   </h4>
                   <p className="text-[11px] text-text-tertiary mt-0.5">
-                    According to UDISE+ 2024–25
+                    {t("why.card4Citation")}
                   </p>
                 </div>
               </div>
@@ -294,12 +297,12 @@ export function WhyItMatters() {
               <HeartHandshake className="w-5 h-5 text-white" />
             </div>
             <p className="text-base sm:text-lg md:text-xl font-bold text-text-primary leading-relaxed font-[family-name:var(--font-display)]">
-              &ldquo;Every child deserves the chance to learn in a way that works for them — regardless of language, ability, or internet access.&rdquo;
+              {t("why.missionQuote")}
             </p>
             <div className="mt-3 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-brand" />
               <span className="text-[11px] font-bold uppercase tracking-widest text-brand font-[family-name:var(--font-display)]">
-                Our Core Mission
+                {t("why.missionLabel")}
               </span>
             </div>
           </div>

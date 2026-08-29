@@ -26,18 +26,26 @@ import {
 } from "lucide-react";
 import { SectionWrapper } from "@/components/shared/SectionWrapper";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
 type DashboardRole = "teacher" | "parent" | "student";
 
-const ROLES: { id: DashboardRole; label: string; icon: React.ElementType; badge: string }[] = [
-  { id: "teacher", label: "Teacher View", icon: GraduationCap, badge: "Ms. Ananya · Grade 5 Science" },
-  { id: "parent", label: "Parent View", icon: Heart, badge: "Mr. Sharma · Parent of Rohan" },
-  { id: "student", label: "Student View", icon: Users, badge: "Rohan S. · Level 4 Learner" },
+const BASE_ROLES: { id: DashboardRole; icon: React.ElementType }[] = [
+  { id: "teacher", icon: GraduationCap },
+  { id: "parent", icon: Heart },
+  { id: "student", icon: Users },
 ];
 
 export function TeacherParentDashboard() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(containerRef, { once: true, margin: "-80px" });
+  const { t } = useTranslation();
+
+  const ROLES = [
+    { id: "teacher" as DashboardRole, label: t("dashboardDemo.roles.teacher.label"), icon: GraduationCap, badge: t("dashboardDemo.roles.teacher.badge") },
+    { id: "parent" as DashboardRole, label: t("dashboardDemo.roles.parent.label"), icon: Heart, badge: t("dashboardDemo.roles.parent.badge") },
+    { id: "student" as DashboardRole, label: t("dashboardDemo.roles.student.label"), icon: Users, badge: t("dashboardDemo.roles.student.badge") },
+  ];
 
   const [activeRole, setActiveRole] = useState<DashboardRole>("teacher");
   const [isPlayingAudioReport, setIsPlayingAudioReport] = useState<boolean>(false);
@@ -110,7 +118,7 @@ export function TeacherParentDashboard() {
             }}
           >
             <Sparkles className="w-3.5 h-3.5 text-brand animate-pulse" />
-            LIVE PRODUCT DASHBOARD DEMO
+            {t("dashboardDemo.badge")}
           </motion.div>
 
           <motion.h2
@@ -120,7 +128,8 @@ export function TeacherParentDashboard() {
             className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl
                      font-bold tracking-tight leading-[1.15]"
           >
-            Teachers, parents & students <span className="gradient-text">connected in one place.</span>
+            {t("dashboardDemo.title")}{" "}
+            <span className="gradient-text">{t("dashboardDemo.titleHighlight")}</span>
           </motion.h2>
 
           <motion.p
@@ -129,7 +138,7 @@ export function TeacherParentDashboard() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="mt-3 text-text-secondary text-base sm:text-lg leading-relaxed"
           >
-            Switch roles to experience how AI delivers actionable insights for educators, clear voice updates for parents, and adaptive goals for students.
+            {t("dashboardDemo.subtitle")}
           </motion.p>
         </div>
 
@@ -188,7 +197,7 @@ export function TeacherParentDashboard() {
                   {ROLES.find((r) => r.id === activeRole)?.badge}
                 </h3>
                 <p className="text-xs text-text-tertiary">
-                  VidyaSetu AI Connected Ecosystem · Real-Time Sync
+                  {t("dashboardDemo.ecosystemDesc")}
                 </p>
 
               </div>
@@ -196,7 +205,7 @@ export function TeacherParentDashboard() {
 
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Live Session Sync Active</span>
+              <span>{t("dashboardDemo.liveSync")}</span>
             </div>
           </div>
 
@@ -216,53 +225,53 @@ export function TeacherParentDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="p-5 rounded-2xl bg-muted/40 border border-border-secondary">
                     <div className="flex items-center justify-between text-xs text-text-tertiary font-bold mb-2">
-                      <span>CLASS MASTERY</span>
+                      <span>{t("dashboardDemo.teacher.classMastery")}</span>
                       <TrendingUp className="w-4 h-4 text-emerald-500" />
                     </div>
                     <p className="text-3xl font-black text-brand font-[family-name:var(--font-display)]">
                       {masteryScore}%
                     </p>
                     <p className="text-[11px] text-emerald-600 font-semibold mt-1">
-                      +12% vs last week
+                      {t("dashboardDemo.teacher.vsLastWeek")}
                     </p>
                   </div>
 
                   <div className="p-5 rounded-2xl bg-muted/40 border border-border-secondary">
                     <div className="flex items-center justify-between text-xs text-text-tertiary font-bold mb-2">
-                      <span>STUDENTS ENROLLED</span>
+                      <span>{t("dashboardDemo.teacher.studentsEnrolled")}</span>
                       <Users className="w-4 h-4 text-sky-500" />
                     </div>
                     <p className="text-3xl font-black text-text-primary font-[family-name:var(--font-display)]">
                       32
                     </p>
                     <p className="text-[11px] text-text-tertiary font-semibold mt-1">
-                      100% Active Attendance
+                      {t("dashboardDemo.teacher.activeAttendance")}
                     </p>
                   </div>
 
                   <div className="p-5 rounded-2xl bg-rose-500/5 border border-rose-500/20">
                     <div className="flex items-center justify-between text-xs text-rose-600 font-bold mb-2">
-                      <span>AT-RISK ALERT</span>
+                      <span>{t("dashboardDemo.teacher.atRiskAlert")}</span>
                       <AlertTriangle className="w-4 h-4 text-rose-500" />
                     </div>
                     <p className="text-3xl font-black text-rose-600 font-[family-name:var(--font-display)]">
                       3
                     </p>
                     <p className="text-[11px] text-rose-500 font-semibold mt-1">
-                      Need Photosynthesis Recap
+                      {t("dashboardDemo.teacher.needRecap")}
                     </p>
                   </div>
 
                   <div className="p-5 rounded-2xl bg-violet-500/5 border border-violet-500/20">
                     <div className="flex items-center justify-between text-xs text-violet-600 font-bold mb-2">
-                      <span>ACCESSIBILITY MODES</span>
+                      <span>{t("dashboardDemo.teacher.accessibilityModes")}</span>
                       <Sparkles className="w-4 h-4 text-violet-500" />
                     </div>
                     <p className="text-3xl font-black text-violet-600 font-[family-name:var(--font-display)]">
                       8
                     </p>
                     <p className="text-[11px] text-violet-600 font-semibold mt-1">
-                      Dyslexia & ADHD Active
+                      {t("dashboardDemo.teacher.dyslexiaAdhd")}
                     </p>
                   </div>
                 </div>
@@ -272,15 +281,15 @@ export function TeacherParentDashboard() {
                   {/* Weak Concept Breakdown */}
                   <div className="lg:col-span-7 p-6 rounded-2xl bg-surface border border-border-secondary shadow-xs">
                     <h4 className="text-base font-bold text-text-primary font-[family-name:var(--font-display)] mb-4 flex items-center justify-between">
-                      <span>Weak Concepts & Class Gaps</span>
-                      <span className="text-xs text-text-tertiary font-normal">Auto-detected by AI</span>
+                      <span>{t("dashboardDemo.teacher.weakConceptsTitle")}</span>
+                      <span className="text-xs text-text-tertiary font-normal">{t("dashboardDemo.teacher.autoDetected")}</span>
                     </h4>
 
                     <div className="space-y-4">
                       <div>
                         <div className="flex items-center justify-between text-xs font-bold mb-1">
                           <span className="text-text-primary">Chemical Equation (CO₂ + H₂O)</span>
-                          <span className="text-rose-500">42% Low Mastery</span>
+                          <span className="text-rose-500">42{t("dashboardDemo.teacher.lowMastery")}</span>
                         </div>
                         <div className="h-2.5 rounded-full bg-muted overflow-hidden">
                           <motion.div
@@ -295,7 +304,7 @@ export function TeacherParentDashboard() {
                       <div>
                         <div className="flex items-center justify-between text-xs font-bold mb-1">
                           <span className="text-text-primary">Chlorophyll Role & Light Absorption</span>
-                          <span className="text-amber-500">68% Moderate</span>
+                          <span className="text-amber-500">68{t("dashboardDemo.teacher.moderate")}</span>
                         </div>
                         <div className="h-2.5 rounded-full bg-muted overflow-hidden">
                           <motion.div
@@ -310,7 +319,7 @@ export function TeacherParentDashboard() {
                       <div>
                         <div className="flex items-center justify-between text-xs font-bold mb-1">
                           <span className="text-text-primary">Plant Stomata & Oxygen Output</span>
-                          <span className="text-emerald-600">91% High Mastery</span>
+                          <span className="text-emerald-600">91{t("dashboardDemo.teacher.highMastery")}</span>
                         </div>
                         <div className="h-2.5 rounded-full bg-muted overflow-hidden">
                           <motion.div
@@ -328,18 +337,18 @@ export function TeacherParentDashboard() {
                   <div className="lg:col-span-5 p-6 rounded-2xl bg-brand/5 border border-brand/20 flex flex-col justify-between">
                     <div>
                       <div className="inline-flex items-center gap-1.5 text-xs font-bold text-brand bg-brand/10 px-3 py-1 rounded-full mb-3">
-                        <Sparkles className="w-3.5 h-3.5" /> AI Recommended Next Lesson
+                        <Sparkles className="w-3.5 h-3.5" /> {t("dashboardDemo.teacher.aiRecommended")}
                       </div>
                       <h4 className="text-lg font-bold text-text-primary font-[family-name:var(--font-display)] mb-2">
-                        15-Min Visual Experiment Recap
+                        {t("dashboardDemo.teacher.recapTitle")}
                       </h4>
                       <p className="text-xs text-text-secondary leading-relaxed mb-4">
-                        AI generated a 4-slide interactive visual presentation to address the chemical equation gap identified in today&apos;s assessment.
+                        {t("dashboardDemo.teacher.recapDesc")}
                       </p>
                     </div>
 
                     <button className="w-full py-3 rounded-xl bg-brand text-white text-xs font-bold font-[family-name:var(--font-display)] cursor-pointer hover:bg-brand-hover transition-colors shadow-sm flex items-center justify-center gap-2">
-                      <span>Project Recap Deck to Classroom</span>
+                      <span>{t("dashboardDemo.teacher.projectRecap")}</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -361,13 +370,13 @@ export function TeacherParentDashboard() {
                 <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-md">
                   <div>
                     <span className="text-xs font-bold text-sky-300 uppercase tracking-wider font-[family-name:var(--font-display)]">
-                      Rohan&apos;s Weekly Report
+                      {t("dashboardDemo.parent.weeklyReport")}
                     </span>
                     <h4 className="text-2xl font-extrabold font-[family-name:var(--font-display)] mt-1">
-                      Great progress in Science this week! 🎉
+                      {t("dashboardDemo.parent.greatProgress")}
                     </h4>
                     <p className="text-xs text-slate-300 mt-1 max-w-lg">
-                      Rohan completed 4 lessons, earned 450 XP points, and mastered plant photosynthesis in Hindi audio narration mode.
+                      {t("dashboardDemo.parent.progressDesc")}
                     </p>
                   </div>
 
@@ -376,14 +385,14 @@ export function TeacherParentDashboard() {
                       <div className="flex items-center justify-center gap-1 text-amber-400 text-xl font-bold font-[family-name:var(--font-display)]">
                         <Flame className="w-5 h-5 fill-amber-400" /> 7 Days
                       </div>
-                      <span className="text-[10px] text-slate-300 font-semibold">Streak</span>
+                      <span className="text-[10px] text-slate-300 font-semibold">{t("dashboardDemo.parent.streak")}</span>
                     </div>
 
                     <div className="text-center bg-white/10 px-4 py-3 rounded-xl border border-white/20">
                       <div className="text-xl font-bold font-[family-name:var(--font-display)] text-sky-300">
                         4/4
                       </div>
-                      <span className="text-[10px] text-slate-300 font-semibold">Lessons</span>
+                      <span className="text-[10px] text-slate-300 font-semibold">{t("dashboardDemo.parent.lessons")}</span>
                     </div>
                   </div>
                 </div>
@@ -396,16 +405,16 @@ export function TeacherParentDashboard() {
                       <div className="flex items-center gap-2">
                         <Volume2 className="w-5 h-5 text-rose-500" />
                         <h4 className="text-sm font-bold text-text-primary font-[family-name:var(--font-display)]">
-                          Hindi Audio Voice Update for Parents
+                          {t("dashboardDemo.parent.audioUpdateTitle")}
                         </h4>
                       </div>
                       <span className="text-xs font-bold text-rose-500 bg-rose-500/10 px-2.5 py-0.5 rounded-full">
-                        1 Min Audio
+                        {t("dashboardDemo.parent.audioLength")}
                       </span>
                     </div>
 
                     <p className="text-xs text-text-secondary leading-relaxed mb-4">
-                      &ldquo;नमस्ते! रोहन ने इस सप्ताह प्रकाश संश्लेषण (Photosynthesis) का अध्याय 92% अंकों के साथ पूरा किया है।&rdquo;
+                      {t("dashboardDemo.parent.audioTranscript")}
                     </p>
 
                     {/* Audio Player Bar */}
@@ -425,7 +434,7 @@ export function TeacherParentDashboard() {
                           />
                         </div>
                         <div className="flex justify-between text-[10px] font-bold text-text-tertiary">
-                          <span>{isPlayingAudioReport ? "Playing Audio Report..." : "Tap to Play Summary"}</span>
+                          <span>{isPlayingAudioReport ? t("dashboardDemo.parent.playingAudio") : t("dashboardDemo.parent.tapToPlay")}</span>
                           <span>0:58</span>
                         </div>
                       </div>
@@ -437,22 +446,22 @@ export function TeacherParentDashboard() {
                     <div>
                       <h4 className="text-sm font-bold text-text-primary font-[family-name:var(--font-display)] mb-3 flex items-center gap-2">
                         <BookOpen className="w-4 h-4 text-brand" />
-                        Recommended 5-Min Home Activity
+                        {t("dashboardDemo.parent.homeActivityTitle")}
                       </h4>
 
                       <div className="p-3.5 rounded-xl bg-brand/5 border border-brand/20 mb-3 text-xs">
                         <p className="font-bold text-brand font-[family-name:var(--font-display)] mb-1">
-                          🌱 Plant Sunlight Experiment
+                          {t("dashboardDemo.parent.homeActivityName")}
                         </p>
                         <p className="text-text-secondary leading-relaxed">
-                          Ask Rohan to show you a leaf in your home garden and explain how plants use sunlight to make food.
+                          {t("dashboardDemo.parent.homeActivityDesc")}
                         </p>
                       </div>
                     </div>
 
                     <div className="pt-3 border-t border-border-secondary flex items-center justify-between text-xs text-text-tertiary">
-                      <span>Weekly WhatsApp Digest Sent</span>
-                      <span className="font-bold text-emerald-600">✓ Delivered</span>
+                      <span>{t("dashboardDemo.parent.whatsappDigest")}</span>
+                      <span className="font-bold text-emerald-600">{t("dashboardDemo.parent.delivered")}</span>
                     </div>
                   </div>
                 </div>
@@ -473,13 +482,13 @@ export function TeacherParentDashboard() {
                 <div className="p-6 rounded-2xl bg-gradient-to-r from-brand via-sky-600 to-indigo-600 text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-md">
                   <div>
                     <span className="text-xs font-bold bg-white/20 px-3 py-1 rounded-full uppercase tracking-wider font-[family-name:var(--font-display)]">
-                      Level 4 Explorer
+                      {t("dashboardDemo.student.levelBadge")}
                     </span>
                     <h4 className="text-2xl font-extrabold font-[family-name:var(--font-display)] mt-2">
-                      Welcome back, Rohan! 👋
+                      {t("dashboardDemo.student.welcome")}
                     </h4>
                     <p className="text-xs text-sky-100 mt-1">
-                      You are 1 lesson away from earning your &ldquo;Botany Master&rdquo; badge!
+                      {t("dashboardDemo.student.badgeMsg")}
                     </p>
                   </div>
 
@@ -488,7 +497,7 @@ export function TeacherParentDashboard() {
                       <div className="text-2xl font-black font-[family-name:var(--font-display)] text-amber-300">
                         {studentXP} XP
                       </div>
-                      <span className="text-[10px] text-sky-100 font-semibold">Total Points</span>
+                      <span className="text-[10px] text-sky-100 font-semibold">{t("dashboardDemo.student.totalPoints")}</span>
                     </div>
                   </div>
                 </div>
@@ -500,9 +509,9 @@ export function TeacherParentDashboard() {
                       ✓
                     </div>
                     <h5 className="font-bold text-sm text-text-primary font-[family-name:var(--font-display)] mb-1">
-                      1. Plant Structure
+                      {t("dashboardDemo.student.lesson1")}
                     </h5>
-                    <p className="text-xs text-emerald-600 font-semibold">Completed 100%</p>
+                    <p className="text-xs text-emerald-600 font-semibold">{t("dashboardDemo.student.completed100")}</p>
                   </div>
 
                   <div className="p-5 rounded-2xl bg-brand/10 border-2 border-brand shadow-xs cursor-pointer group">
@@ -510,9 +519,9 @@ export function TeacherParentDashboard() {
                       <Play className="w-4 h-4 ml-0.5" />
                     </div>
                     <h5 className="font-bold text-sm text-text-primary font-[family-name:var(--font-display)] mb-1">
-                      2. Photosynthesis
+                      {t("dashboardDemo.student.lesson2")}
                     </h5>
-                    <p className="text-xs text-brand font-bold">In Progress (85%)</p>
+                    <p className="text-xs text-brand font-bold">{t("dashboardDemo.student.inProgress")}</p>
                   </div>
 
                   <div className="p-5 rounded-2xl bg-muted/40 border border-border-secondary opacity-60">
@@ -520,9 +529,9 @@ export function TeacherParentDashboard() {
                       🔒
                     </div>
                     <h5 className="font-bold text-sm text-text-primary font-[family-name:var(--font-display)] mb-1">
-                      3. Solar Energy Quiz
+                      {t("dashboardDemo.student.lesson3")}
                     </h5>
-                    <p className="text-xs text-text-tertiary">Unlocks Next</p>
+                    <p className="text-xs text-text-tertiary">{t("dashboardDemo.student.unlocksNext")}</p>
                   </div>
                 </div>
               </motion.div>

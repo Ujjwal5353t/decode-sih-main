@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Mascot, MascotMood } from "@/components/quiz/Mascot";
 import { QuizIllustration } from "@/components/quiz/illustrations/QuizIllustration";
 import { ConfettiBurst } from "@/components/quiz/ConfettiBurst";
@@ -33,6 +34,7 @@ import { recordLearningEvent } from "@/lib/offline/learningEvents";
 export default function LessonViewerPage() {
   const router = useRouter();
   const { user, role, loading } = useAuth();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!loading && (!user || !role)) {
@@ -45,7 +47,7 @@ export default function LessonViewerPage() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-3 border-brand border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm font-medium text-text-secondary">Loading...</p>
+          <p className="text-sm font-medium text-text-secondary">{t("dashboard.common.loading")}</p>
         </div>
       </div>
     );
@@ -56,13 +58,13 @@ export default function LessonViewerPage() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="glass rounded-[var(--radius-lg)] p-8 border border-border-primary text-center max-w-md">
           <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-3" />
-          <h1 className="text-base font-bold text-text-primary">Students Only</h1>
+          <h1 className="text-base font-bold text-text-primary">{t("diagnosticQuiz.studentsOnly")}</h1>
           <p className="text-sm text-text-secondary mt-1">
-            Animated lessons are only available on student accounts.
+            {t("diagnosticQuiz.studentsOnlyDesc")}
           </p>
           <Link href="/dashboard">
             <Button variant="secondary" size="sm" className="mt-4">
-              Back to Dashboard
+              {t("diagnosticQuiz.backToDashboard")}
             </Button>
           </Link>
         </div>
@@ -76,6 +78,7 @@ export default function LessonViewerPage() {
 type ViewState = "loading" | "error" | "slide" | "completed";
 
 function LessonFlow({ student }: { student: StudentProfile }) {
+  const { t } = useTranslation();
   const params = useParams();
   const lessonId = Array.isArray(params.lessonId) ? params.lessonId[0] : (params.lessonId as string);
 
@@ -334,19 +337,19 @@ function LessonFlow({ student }: { student: StudentProfile }) {
             <div className="flex justify-center mb-3">
               <Mascot mood="celebrate" size={88} />
             </div>
-            <h1 className="text-lg font-bold text-text-primary">Lesson Complete!</h1>
+            <h1 className="text-lg font-bold text-text-primary">{t("lessons.lessonFinished")}</h1>
             <p className="text-sm text-text-secondary mt-2">
-              You finished "{lesson.chapter_title}" — great work.
+              "{lesson.chapter_title}"
             </p>
             <div className="flex items-center justify-center gap-3 mt-6">
               <Link href="/dashboard/learn">
                 <Button variant="secondary" size="md">
-                  More Lessons
+                  {t("lessons.returnToLessons")}
                 </Button>
               </Link>
               <Link href="/dashboard">
                 <Button variant="primary" size="md">
-                  Back to Dashboard
+                  {t("diagnosticQuiz.backToDashboard")}
                 </Button>
               </Link>
             </div>
@@ -394,6 +397,7 @@ function ContentSlideCard({
   onBack?: () => void;
   onNext: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <motion.div
       initial={{ opacity: 0, x: 24 }}
@@ -403,7 +407,7 @@ function ContentSlideCard({
       className="glass rounded-[var(--radius-lg)] p-8 border border-border-primary text-center"
     >
       <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand mb-4">
-        {slide.slide_type === "example" ? "Example" : "Concept"} · Slide {slideNumber} of {totalSlides}
+        {t("lessons.slide")} {slideNumber} / {totalSlides}
       </span>
 
       {(slide.image_asset_key || slide.image_emoji) && (
@@ -429,11 +433,11 @@ function ContentSlideCard({
         {onBack && (
           <Button variant="secondary" size="md" onClick={onBack}>
             <ArrowLeft className="w-4 h-4" />
-            Back
+            {t("lessons.prev")}
           </Button>
         )}
         <Button variant="primary" size="md" onClick={onNext}>
-          Next
+          {t("lessons.next")}
           <ArrowRight className="w-4 h-4" />
         </Button>
       </div>
@@ -454,6 +458,7 @@ function CheckSlideCard({
   onSelect: (idx: number) => void;
   onFinish: () => void;
 }) {
+  const { t } = useTranslation();
   const options = slide.options || [];
   const answered = selectedOption !== null;
   const wasCorrect = selectedOption === slide.correct_option_index;
@@ -468,7 +473,7 @@ function CheckSlideCard({
     >
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="w-4 h-4 text-brand" />
-        <span className="text-xs font-semibold text-text-secondary">Quick Check</span>
+        <span className="text-xs font-semibold text-text-secondary">{t("lessons.checkUnderstanding")}</span>
       </div>
 
       {(slide.image_asset_key || slide.image_emoji) && (
@@ -528,14 +533,14 @@ function CheckSlideCard({
                   : "border-blue-500/30 bg-blue-500/10 text-blue-600"
               }`}
             >
-              <p className="font-semibold">{wasCorrect ? "Correct!" : "Not quite!"}</p>
+              <p className="font-semibold">{wasCorrect ? t("lessons.correct") : t("lessons.incorrect")}</p>
               {slide.explanation && (
                 <p className="mt-1 text-text-secondary">{slide.explanation}</p>
               )}
             </div>
             <div className="mt-4 flex justify-center">
               <Button variant="primary" size="md" onClick={onFinish}>
-                Finish Lesson
+                {t("lessons.lessonFinished")}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>

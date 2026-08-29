@@ -48,10 +48,18 @@ const faqData = [
   },
 ];
 
+import { useTranslation } from "@/hooks/useTranslation";
+
 export function FAQ() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
   const [openIndex, setOpenIndex] = useState<number | null>(0);
+  const { t, language } = useTranslation();
+
+  const faqItems = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({
+    question: t(`faq.items.${i}.q`),
+    answer: t(`faq.items.${i}.a`),
+  }));
 
   const toggleQuestion = (index: number) => {
     setOpenIndex(openIndex === index ? null : index);
@@ -75,7 +83,7 @@ export function FAQ() {
             }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-            FAQ
+            {t("faq.badge")}
           </motion.div>
 
           <motion.h2
@@ -85,18 +93,18 @@ export function FAQ() {
             className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl lg:text-6xl
                      font-bold tracking-tight leading-[1.1]"
           >
-            Answers, before <span className="gradient-text">you have to ask.</span>
+            {t("faq.title")} <span className="gradient-text">{t("faq.titleHighlight")}</span>
           </motion.h2>
         </div>
 
         {/* FAQ Accordion List */}
         <div className="space-y-4">
-          {faqData.map((item, index) => {
+          {faqItems.map((item, index) => {
             const isOpen = openIndex === index;
 
             return (
               <motion.div
-                key={item.question}
+                key={`${language}-${index}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={isInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.5, delay: 0.15 + index * 0.05 }}

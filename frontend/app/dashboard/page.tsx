@@ -91,6 +91,7 @@ import {
   useModuleProcessing,
 } from "@/components/school/ModuleProcessingProvider";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Mascot, MascotMood } from "@/components/quiz/Mascot";
 import {
   StudentProfile,
@@ -222,6 +223,7 @@ function SubjectGroupHeader({
 export default function DashboardPage() {
   const router = useRouter();
   const { user, role, loading, logout, setupClass } = useAuth();
+  const { t } = useTranslation();
 
   const [permissions, setPermissions] = useState<RolePermissionsResponse | null>(null);
   const [activeTab, setActiveTab] = useState<string>("overview");
@@ -275,7 +277,7 @@ export default function DashboardPage() {
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-3 border-brand border-t-transparent rounded-full animate-spin" />
           <p className="text-sm font-medium text-text-secondary">
-            Loading your dashboard...
+            {t("actions.loading")}
           </p>
         </div>
       </div>
@@ -285,6 +287,53 @@ export default function DashboardPage() {
   const activePermissionItem =
     permissions?.navigation.find((i) => i.id === activeTab) ||
     permissions?.navigation[0];
+
+  const navItemKeyMap: Record<string, string> = {
+    overview: "dashboard.nav.overview",
+    modules: "dashboard.nav.learningModules",
+    assignments: "dashboard.nav.classAssignments",
+    practice: "dashboard.nav.practiceQuizzes",
+    quizzes: "dashboard.nav.practiceQuizzes",
+    grading: "dashboard.nav.grading",
+    "diagnostic-quiz": "dashboard.nav.diagnosticQuiz",
+    "gap-report": "dashboard.nav.gapReport",
+    classes: "dashboard.nav.classes",
+    teachers: "dashboard.nav.teachers",
+    students: "dashboard.nav.students",
+    subjects: "dashboard.nav.subjects",
+    curriculum: "dashboard.nav.curriculum",
+    analytics: "dashboard.nav.analytics",
+    "parent-connect": "dashboard.nav.parentConnect",
+    settings: "dashboard.nav.settings",
+    "admin-requests": "dashboard.nav.adminRequests",
+    "school-requests": "dashboard.nav.schoolRequests",
+  };
+
+  const getPageTitle = () => {
+    if (role === "student" && activeTab === "overview") {
+      return t("dashboard.nav.studentOverview");
+    }
+    const navKey = navItemKeyMap[activeTab] || `dashboard.nav.${activeTab}`;
+    const translated = t(navKey as any);
+    if (translated && translated !== navKey) return translated;
+    return activePermissionItem?.label || `${role?.toUpperCase()} Dashboard`;
+  };
+
+  const getPageDesc = () => {
+    if (role === "student" && activeTab === "overview") {
+      return t("dashboard.topbar.studentOverviewDesc");
+    }
+    const descKey = `dashboard.descriptions.${activeTab}`;
+    const translated = t(descKey as any);
+    if (translated && translated !== descKey) return translated;
+    return activePermissionItem?.description || t("dashboard.topbar.manageWorkspace");
+  };
+
+  const getRoleBadge = () => {
+    const key = `dashboard.topbar.roles.${role}`;
+    const translated = t(key as any);
+    return translated && translated !== key ? translated : (permissions?.role_label || `${role} Role`);
+  };
 
   return (
     <div className={`min-h-screen bg-background relative flex ${isConsole ? "console" : ""}`}>
@@ -314,7 +363,7 @@ export default function DashboardPage() {
             <button
               onClick={() => setMobileSidebarOpen(true)}
               className="p-2 rounded-[var(--radius-sm)] text-text-secondary hover:text-text-primary hover:bg-surface lg:hidden cursor-pointer"
-              aria-label="Open navigation sidebar"
+              aria-label={t("nav.openMenu")}
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -328,7 +377,7 @@ export default function DashboardPage() {
                       : "text-base sm:text-lg font-bold text-text-primary truncate"
                   }
                 >
-                  {activePermissionItem?.label || `${role?.toUpperCase()} Dashboard`}
+                  {getPageTitle()}
                 </h1>
                 {activePermissionItem?.badge && (
                   <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-brand/10 text-brand border border-border-brand">
@@ -337,7 +386,7 @@ export default function DashboardPage() {
                 )}
               </div>
               <p className="text-xs text-text-secondary truncate hidden sm:block">
-                {activePermissionItem?.description || "Manage your inclusive learning workspace"}
+                {getPageDesc()}
               </p>
             </div>
           </div>
@@ -350,7 +399,7 @@ export default function DashboardPage() {
               {role === "parent" && <Users className="w-3.5 h-3.5" />}
               {role === "admin" && <ShieldCheck className="w-3.5 h-3.5" />}
               {role === "teacher" && <BookOpen className="w-3.5 h-3.5" />}
-              <span>{permissions?.role_label || `${role} Role`}</span>
+              <span>{getRoleBadge()}</span>
             </div>
 
             <ThemeToggle />
@@ -366,7 +415,7 @@ export default function DashboardPage() {
               className="text-text-secondary hover:text-rose-500 text-xs px-2.5 sm:px-3"
             >
               <LogOut className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Sign Out</span>
+              <span className="hidden sm:inline">{t("dashboard.topbar.signOut")}</span>
             </Button>
           </div>
         </header>
@@ -429,6 +478,7 @@ function StudentDashboardView({
   setupClass: (data: { class_number: number; section: string }) => Promise<void>;
   activeTab?: string;
 }) {
+  const { t } = useTranslation();
   const [selectedClass, setSelectedClass] = useState<number>(student.class_number || 1);
   const [selectedSection, setSelectedSection] = useState<string>(student.section || "A");
   const [isSettingUp, setIsSettingUp] = useState<boolean>(false);
@@ -443,22 +493,10 @@ function StudentDashboardView({
   const isSelfEnrolled = student.enrollment_type === "self" || student.branch_name === "SELF";
   const needsSetup = isSelfEnrolled ? student.class_number === null : (student.class_number === null || student.section === null);
 
-  // A persistent companion mood, derived straight from state already in
-  // scope — no separate state of its own, no backend involvement. "idle"
-  // (now a genuinely lively animation — blink, sway, an occasional
-  // sparkle, tap-for-a-cheer) is the resting state; "encourage" is a
-  // reaction to a specific wrong answer elsewhere in the app, not
-  // something to show constantly just because the quiz isn't done yet —
-  // that would read as a nagging/puzzled face rather than a companion.
-  // "happy" is reserved as a steady positive state once the diagnostic is
-  // actually complete.
   const mascotMood: MascotMood = !needsSetup && !loadingQuizStatus && quizStatus?.completed
     ? "happy"
     : "idle";
 
-
-  // The diagnostic quiz is mandatory — modules/curriculum stay locked until
-  // it's completed, so this must resolve before deciding what to render.
   useEffect(() => {
     if (needsSetup) return;
     setLoadingQuizStatus(true);
@@ -482,9 +520,6 @@ function StudentDashboardView({
         .catch((err) => console.log("School modules fetch note:", err.message))
         .finally(() => setLoadingModules(false));
     }
-    // Simple, rule-based ordering (not a live personalization engine) — see
-    // LEARNING_PATH.txt. Purely additive: groups/orders the same module
-    // list above, never blocks it if this call fails.
     getSubjectPriority()
       .then((res) => setSubjectPriority(res))
       .catch((err) => console.log("Subject priority fetch note:", err.message));
@@ -506,8 +541,6 @@ function StudentDashboardView({
 
   return (
     <div className="space-y-6">
-      {/* Persistent companion — stays mounted across every tab, mood
-          derived from state already in scope above (no backend call). */}
       <div className="fixed bottom-5 right-5 z-30 hidden sm:block">
         <Mascot mood={mascotMood} size={72} />
       </div>
@@ -515,13 +548,12 @@ function StudentDashboardView({
       {/* TAB: OVERVIEW */}
       {activeTab === "overview" && (
         <div className="space-y-6">
-          {/* Profile Overview Card */}
           <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary relative overflow-hidden">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-bold text-text-primary">
-                    Welcome, {student.full_name || `Student #${student.unique_number}`}
+                    {t("dashboard.student.welcomePrefix")} {student.full_name || `${t("dashboard.student.studentPrefix")}${student.unique_number}`}
                   </h1>
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-mono bg-brand/10 text-brand border border-border-brand">
                     {student.unique_number}
@@ -529,7 +561,7 @@ function StudentDashboardView({
                 </div>
                 <p className="text-sm text-text-secondary mt-1">
                   {isSelfEnrolled ? (
-                    <span className="font-semibold text-brand">🌟 Self-Educated Student (NCERT Curriculum)</span>
+                    <span className="font-semibold text-brand">{t("dashboard.student.selfEnrolledTag")}</span>
                   ) : (
                     <span>{student.school_name} — {student.branch_name} ({student.state})</span>
                   )}
@@ -540,32 +572,31 @@ function StudentDashboardView({
                 <div className="px-3.5 py-1.5 rounded-full bg-surface border border-border-primary text-xs flex items-center gap-2">
                   {isSelfEnrolled ? (
                     <span className="text-brand font-bold flex items-center gap-1">
-                      <BookOpen className="w-3.5 h-3.5" /> Self Enrolled
+                      <BookOpen className="w-3.5 h-3.5" /> {t("dashboard.student.selfEnrolledBadge")}
                     </span>
                   ) : (
                     <span className="text-text-primary font-bold flex items-center gap-1">
-                      <Building2 className="w-3.5 h-3.5 text-brand" /> School Enrolled
+                      <Building2 className="w-3.5 h-3.5 text-brand" /> {t("dashboard.student.schoolEnrolledBadge")}
                     </span>
                   )}
                 </div>
 
                 <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
                   <span className="text-text-tertiary block">
-                    {isSelfEnrolled ? "Class" : "Class & Section"}
+                    {isSelfEnrolled ? t("dashboard.student.class") : t("dashboard.student.classAndSection")}
                   </span>
                   <span className="font-semibold text-text-primary">
                     {student.class_number
                       ? isSelfEnrolled
-                        ? `Class ${student.class_number}`
-                        : `Class ${student.class_number} - Section ${student.section}`
-                      : "Not Configured"}
+                        ? `${t("dashboard.student.class")} ${student.class_number}`
+                        : `${t("dashboard.student.class")} ${student.class_number} - Section ${student.section}`
+                      : t("dashboard.student.notConfigured")}
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Class Setup Card if Class/Section not set */}
           {needsSetup && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -578,12 +609,12 @@ function StudentDashboardView({
                 </div>
                 <div className="flex-1">
                   <h2 className="text-base font-bold text-text-primary">
-                    {isSelfEnrolled ? "Select Your Class" : "Complete Your Class & Section Setup"}
+                    {isSelfEnrolled ? t("dashboard.student.selectClassTitle") : t("dashboard.student.setupClassTitle")}
                   </h2>
                   <p className="text-xs text-text-secondary mt-0.5">
                     {isSelfEnrolled
-                      ? "Select your class (1–5) to view your official NCERT learning curriculum."
-                      : "Select your class (1–5) and section to view your assigned school learning modules."}
+                      ? t("dashboard.student.selectClassDesc")
+                      : t("dashboard.student.setupClassDesc")}
                   </p>
 
                   {errorMsg && (
@@ -595,7 +626,7 @@ function StudentDashboardView({
 
                   <form onSubmit={handleSetupSubmit} className="mt-4 flex flex-wrap items-center gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-text-secondary mb-1">Class</label>
+                      <label className="block text-xs font-medium text-text-secondary mb-1">{t("dashboard.student.class")}</label>
                       <select
                         value={selectedClass}
                         onChange={(e) => setSelectedClass(Number(e.target.value))}
@@ -603,7 +634,7 @@ function StudentDashboardView({
                       >
                         {[1, 2, 3, 4, 5].map((num) => (
                           <option key={num} value={num}>
-                            Class {num}
+                            {t("dashboard.student.class")} {num}
                           </option>
                         ))}
                       </select>
@@ -611,7 +642,7 @@ function StudentDashboardView({
 
                     {!isSelfEnrolled && (
                       <div>
-                        <label className="block text-xs font-medium text-text-secondary mb-1">Section</label>
+                        <label className="block text-xs font-medium text-text-secondary mb-1">{t("dashboard.student.section")}</label>
                         <select
                           value={selectedSection}
                           onChange={(e) => setSelectedSection(e.target.value)}
@@ -619,7 +650,7 @@ function StudentDashboardView({
                         >
                           {["A", "B", "C", "D"].map((sec) => (
                             <option key={sec} value={sec}>
-                              Section {sec}
+                              {t("dashboard.student.section")} {sec}
                             </option>
                           ))}
                         </select>
@@ -629,10 +660,10 @@ function StudentDashboardView({
                     <div className="self-end">
                       <Button type="submit" variant="primary" size="sm" disabled={isSettingUp}>
                         {isSettingUp
-                          ? "Saving..."
+                          ? t("actions.loading")
                           : isSelfEnrolled
-                          ? "Save Class"
-                          : "Save Class & Section"}
+                          ? t("dashboard.student.saveClass")
+                          : t("dashboard.student.saveClassAndSection")}
                       </Button>
                     </div>
                   </form>
@@ -641,10 +672,9 @@ function StudentDashboardView({
             </motion.div>
           )}
 
-          {/* Quick Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
-              <span className="text-xs text-text-tertiary block">Available Modules</span>
+              <span className="text-xs text-text-tertiary block">{t("dashboard.student.availableModules")}</span>
               <span className="text-2xl font-bold text-text-primary block">
                 {isSelfEnrolled ? ncertBooks.length : modules.length}
               </span>
@@ -692,16 +722,20 @@ function StudentDashboardView({
                 </div>
                 <div className="flex-1">
                   <h2 className="text-base font-bold text-text-primary">
-                    Complete Your Diagnostic Assessment to Unlock Learning Modules
+                    {t("dashboard.student.unlockBannerTitle")}
                   </h2>
                   <p className="text-xs text-text-secondary mt-1 max-w-lg">
-                    Before you can access your {isSelfEnrolled ? "NCERT curriculum" : "learning modules"}, take a
-                    short adaptive quiz that finds any weak topics from previous classes. This is a
-                    one-time assessment — you won't be asked to retake it.
+                    {t("dashboard.student.unlockBannerDesc", {
+                      curriculum: isSelfEnrolled
+                        ? t("dashboard.student.ncertCurriculum")
+                        : t("dashboard.student.learningModules"),
+                    })}
                   </p>
                   <Link href="/dashboard/diagnostic-quiz" className="inline-block mt-4">
                     <Button variant="primary" size="sm">
-                      {quizStatus.in_progress_attempt_id ? "Continue Quiz" : "Start Quiz"}
+                      {quizStatus.in_progress_attempt_id
+                        ? t("dashboard.student.continueQuiz")
+                        : t("dashboard.student.startQuiz")}
                     </Button>
                   </Link>
                 </div>
@@ -713,10 +747,12 @@ function StudentDashboardView({
             <div className="glass rounded-[var(--radius-md)] p-4 border border-border-primary flex items-center justify-between gap-4 mb-4">
               <div className="flex items-center gap-3">
                 <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
-                <span className="text-sm text-text-primary font-semibold">Diagnostic Assessment Completed</span>
+                <span className="text-sm text-text-primary font-semibold">
+                  {t("dashboard.student.diagnosticCompleted")}
+                </span>
               </div>
               <Link href="/dashboard/diagnostic-quiz" className="text-xs text-brand font-semibold hover:underline">
-                View My Results →
+                {t("dashboard.student.viewResults")}
               </Link>
             </div>
           )}
@@ -727,8 +763,8 @@ function StudentDashboardView({
             <Layers className="w-5 h-5 text-brand" />
             <span>
               {isSelfEnrolled
-                ? `NCERT Official Curriculum (Class ${student.class_number || 1})`
-                : "School-Provided Learning Modules"}
+                ? t("dashboard.student.ncertClassCurriculum", { class: student.class_number || 1 })
+                : t("dashboard.student.schoolModules")}
             </span>
           </h2>
 
@@ -1005,6 +1041,7 @@ function SchoolDashboardView({
   activeTab?: string;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const { jobFor, unwatch, completionNonce } = useModuleProcessing();
   const [selectedClass, setSelectedClass] = useState<number>(1);
   const [curriculumSection, setCurriculumSection] = useState<"ncert" | "upload">("ncert");
@@ -1696,6 +1733,7 @@ function ParentDashboardView({
   parent: ParentProfile;
   activeTab?: string;
 }) {
+  const { t } = useTranslation();
   const [childrenList, setChildrenList] = useState<ChildLinkOut[]>([]);
   const [loadingChildren, setLoadingChildren] = useState<boolean>(true);
   const [newStudentId, setNewStudentId] = useState<string>("");
@@ -1739,18 +1777,18 @@ function ParentDashboardView({
           <div className="space-y-6">
             <IdentityBar
               icon={Users}
-              title={`Welcome, ${parent.full_name || "Parent"}`}
+              title={t("parentDashboard.welcome", { name: parent.full_name || t("parentDashboard.parentFallback") })}
               meta={
                 <>
-                  <span>Guardian Account:</span>
+                  <span>{t("parentDashboard.guardianAccount")}</span>
                   <span className="font-mono font-medium text-text-primary">
-                    {parent.phone_number || parent.email || "Registered Guardian"}
+                    {parent.phone_number || parent.email || t("parentDashboard.registeredGuardian")}
                   </span>
                 </>
               }
               aside={
-                <Fact label="Linked Wards">
-                  <span className="text-brand">{childrenList.length} Child(ren)</span>
+                <Fact label={t("parentDashboard.linkedWards")}>
+                  <span className="text-brand">{t("parentDashboard.childrenCount", { count: childrenList.length })}</span>
                 </Fact>
               }
             />
@@ -1759,23 +1797,23 @@ function ParentDashboardView({
             <StatRow
               stats={[
                 {
-                  label: "Monitored Wards",
+                  label: t("parentDashboard.monitoredWards"),
                   icon: Users,
                   value: <AnimatedNumber value={childrenList.length} />,
-                  hint: "Registered Students",
+                  hint: t("parentDashboard.registeredStudents"),
                   hintTone: "brand",
                 },
                 {
-                  label: "Progress Tracking",
+                  label: t("parentDashboard.progressTracking"),
                   icon: RefreshCw,
-                  value: <span className="text-emerald-500">Active</span>,
-                  hint: "Syncing School & NCERT Modules",
+                  value: <span className="text-emerald-500">{t("parentDashboard.activeStatus")}</span>,
+                  hint: t("parentDashboard.syncingModules"),
                 },
                 {
-                  label: "Guardian Feedback",
+                  label: t("parentDashboard.guardianFeedback"),
                   icon: MessageSquare,
-                  value: <span className="text-violet-500">Connected</span>,
-                  hint: "Direct Teacher Remarks & Alerts",
+                  value: <span className="text-violet-500">{t("parentDashboard.connectedStatus")}</span>,
+                  hint: t("parentDashboard.directTeacherRemarks"),
                   hintTone: "violet",
                 },
               ]}
@@ -1785,11 +1823,11 @@ function ParentDashboardView({
             <div>
               <SectionHead
                 icon={Users}
-                title="Your Wards / Children"
+                title={t("parentDashboard.yourWards")}
                 actions={
                   childrenList.length > 0 ? (
                     <span className="text-xs text-text-tertiary">
-                      Showing {childrenList.length} linked student(s)
+                      {t("parentDashboard.showingLinkedStudents", { count: childrenList.length })}
                     </span>
                   ) : undefined
                 }
@@ -1810,7 +1848,7 @@ function ParentDashboardView({
                           </div>
                           <div className="min-w-0">
                             <h3 className="truncate text-sm font-semibold leading-tight text-text-primary font-[family-name:var(--font-display)]">
-                              {child.full_name || `Student #${child.student_unique_number}`}
+                              {child.full_name || t("parentDashboard.studentPrefix", { id: child.student_unique_number })}
                             </h3>
                             <div className="mt-1">
                               <Code>{child.student_unique_number}</Code>
@@ -1819,28 +1857,28 @@ function ParentDashboardView({
                         </div>
 
                         <div className="flex-1 divide-y divide-[var(--c-line)] border-t border-[var(--c-line)] px-5 py-2">
-                          <Field label="Class & Section:">
+                          <Field label={t("parentDashboard.classSection")}>
                             {child.class_number
                               ? child.enrollment_type === "self" || child.branch_name === "SELF"
-                                ? `Class ${child.class_number} (Self)`
-                                : `Class ${child.class_number} - Section ${child.section || "A"}`
-                              : "Class not set"}
+                                ? t("parentDashboard.classSelf", { classNumber: child.class_number })
+                                : t("parentDashboard.classSectionVal", { classNumber: child.class_number, section: child.section || "A" })
+                              : t("parentDashboard.classNotSet")}
                           </Field>
 
-                          <Field label="School / Branch:">
+                          <Field label={t("parentDashboard.schoolBranch")}>
                             {child.enrollment_type === "self" || child.branch_name === "SELF"
-                              ? "NCERT Self-Educated"
-                              : `${child.school_name || "School"} (${child.branch_name || "Branch"})`}
+                              ? t("parentDashboard.selfEducated")
+                              : t("parentDashboard.schoolBranchVal", { school: child.school_name || "School", branch: child.branch_name || "Branch" })}
                           </Field>
                         </div>
 
                         <div className="flex items-center justify-between border-t border-[var(--c-line)] bg-[var(--c-sunken)] px-5 py-2.5 text-[11px] text-text-tertiary">
                           <span className="console-num">
-                            Linked {new Date(child.created_at).toLocaleDateString()}
+                            {t("parentDashboard.linkedDate", { date: new Date(child.created_at).toLocaleDateString() })}
                           </span>
                           <span className="flex items-center gap-1.5 font-medium text-emerald-500">
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                            Monitoring
+                            {t("parentDashboard.monitoringStatus")}
                           </span>
                         </div>
                       </Panel>
@@ -1849,9 +1887,8 @@ function ParentDashboardView({
                 </Stagger>
               ) : (
                 <Panel flush>
-                  <EmptyState icon={Users} title="No Wards Linked Yet">
-                    Students who register with your mobile number will automatically appear here.
-                    You can also link a child directly using their Unique Student ID.
+                  <EmptyState icon={Users} title={t("parentDashboard.noWardsTitle")}>
+                    {t("parentDashboard.noWardsDesc")}
                   </EmptyState>
                 </Panel>
               )}
@@ -1866,8 +1903,8 @@ function ParentDashboardView({
             <Panel flush className="overflow-hidden">
               <PanelHead
                 icon={Plus}
-                title="Link an Additional Child"
-                description="Enter your child's Unique Student ID (e.g. LKD0001) to link their learning progress to your dashboard."
+                title={t("parentDashboard.linkChildTitle")}
+                description={t("parentDashboard.linkChildDesc")}
               />
 
               <div className="p-5">
@@ -1884,14 +1921,14 @@ function ParentDashboardView({
                 <form onSubmit={handleAddChild} className="flex max-w-md gap-3">
                   <input
                     type="text"
-                    placeholder="Unique Student ID (e.g. LKD0001)"
+                    placeholder={t("parentDashboard.studentIdPlaceholder")}
                     value={newStudentId}
                     onChange={(e) => setNewStudentId(e.target.value.toUpperCase())}
                     className={`${inputClass} font-mono uppercase tracking-wide`}
                     required
                   />
                   <Button type="submit" variant="primary" size="sm" disabled={isLinking}>
-                    {isLinking ? "Linking..." : "Link Child"}
+                    {isLinking ? t("parentDashboard.linkingBtn") : t("parentDashboard.linkChildBtn")}
                   </Button>
                 </form>
               </div>
@@ -1899,7 +1936,7 @@ function ParentDashboardView({
 
             {/* Linked Children List */}
             <div>
-              <SectionHead icon={Users} title="Your Linked Children & Wards" />
+              <SectionHead icon={Users} title={t("parentDashboard.linkedChildrenList")} />
 
               {loadingChildren ? (
                 <Panel flush>
@@ -1916,37 +1953,37 @@ function ParentDashboardView({
                           </div>
                           <div className="min-w-0">
                             <h3 className="truncate text-sm font-semibold leading-tight text-text-primary font-[family-name:var(--font-display)]">
-                              {child.full_name || `Student #${child.student_unique_number}`}
+                              {child.full_name || t("parentDashboard.studentPrefix", { id: child.student_unique_number })}
                             </h3>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                               <Code>{child.student_unique_number}</Code>
                               <Chip tone="neutral">
                                 {child.enrollment_type === "self" || child.branch_name === "SELF"
-                                  ? "Self Enrolled"
-                                  : "School Enrolled"}
+                                  ? t("parentDashboard.selfEnrolled")
+                                  : t("parentDashboard.schoolEnrolled")}
                               </Chip>
                             </div>
                           </div>
                         </div>
 
                         <div className="flex-1 divide-y divide-[var(--c-line)] border-t border-[var(--c-line)] px-5 py-2">
-                          <Field label="Enrolled Class:">
+                          <Field label={t("parentDashboard.enrolledClass")}>
                             {child.class_number
                               ? child.enrollment_type === "self" || child.branch_name === "SELF"
-                                ? `Class ${child.class_number}`
-                                : `Class ${child.class_number} - Section ${child.section || "A"}`
-                              : "Not Configured"}
+                                ? t("parentDashboard.classSelf", { classNumber: child.class_number })
+                                : t("parentDashboard.classSectionVal", { classNumber: child.class_number, section: child.section || "A" })
+                              : t("parentDashboard.notConfigured")}
                           </Field>
 
-                          <Field label="School / Institution:">
+                          <Field label={t("parentDashboard.schoolInstitution")}>
                             {child.enrollment_type === "self" || child.branch_name === "SELF"
-                              ? "NCERT Self-Educated"
-                              : `${child.school_name || "School"} (${child.branch_name || "Branch"})`}
+                              ? t("parentDashboard.selfEducated")
+                              : t("parentDashboard.schoolBranchVal", { school: child.school_name || "School", branch: child.branch_name || "Branch" })}
                           </Field>
 
-                          <Field label="Linked Date:">
+                          <Field label={t("parentDashboard.classSection")}>
                             <span className="console-num text-text-secondary">
-                              {new Date(child.created_at).toLocaleDateString()}
+                              {t("parentDashboard.linkedDate", { date: new Date(child.created_at).toLocaleDateString() })}
                             </span>
                           </Field>
                         </div>
@@ -1956,9 +1993,8 @@ function ParentDashboardView({
                 </Stagger>
               ) : (
                 <Panel flush>
-                  <EmptyState icon={Users} title="No Linked Children Found">
-                    Link your child using their Unique Student ID above to monitor their academic
-                    performance and adaptive learning progress.
+                  <EmptyState icon={Users} title={t("parentDashboard.noLinkedChildrenFound")}>
+                    {t("parentDashboard.noLinkedChildrenDesc")}
                   </EmptyState>
                 </Panel>
               )}
@@ -1971,8 +2007,8 @@ function ParentDashboardView({
           <div className="space-y-6">
             <SectionHead
               icon={Award}
-              title="Academic Reports & Progress Analytics"
-              description="Diagnostic quiz performance, gap topics, and AI-generated summaries for each linked child."
+              title={t("parentDashboard.reportsTitle")}
+              description={t("parentDashboard.reportsDesc")}
             />
 
             {loadingChildren ? (
@@ -1989,9 +2025,8 @@ function ParentDashboardView({
               </Stagger>
             ) : (
               <Panel flush>
-                <EmptyState icon={Users} title="No Wards Linked Yet">
-                  Link a child from the Children tab to see their diagnostic assessment results
-                  here.
+                <EmptyState icon={Users} title={t("parentDashboard.noWardsTitle")}>
+                  {t("parentDashboard.noWardsDesc")}
                 </EmptyState>
               </Panel>
             )}
@@ -2005,6 +2040,7 @@ function ParentDashboardView({
 // ── Child Card (with diagnostic quiz summary) ────────────────────────────────
 
 function ChildCard({ child }: { child: ChildLinkOut }) {
+  const { t } = useTranslation();
   const [result, setResult] = useState<GapReportOut | null>(null);
   const [loadingResult, setLoadingResult] = useState<boolean>(true);
 
@@ -2026,23 +2062,23 @@ function ChildCard({ child }: { child: ChildLinkOut }) {
 
       <div className="flex flex-1 flex-col p-5">
         <p className="text-xs text-text-secondary">
-          Linked on {new Date(child.created_at).toLocaleDateString()}
+          {t("parentDashboard.linkedDate", { date: new Date(child.created_at).toLocaleDateString() })}
         </p>
 
         <div className="mt-4 border-t border-[var(--c-line)] pt-4">
-          <span className="console-eyebrow">Gap Identification Quiz</span>
+          <span className="console-eyebrow">{t("parentDashboard.gapQuizTitle")}</span>
 
           {loadingResult ? (
             <div className="mt-2 h-4 w-24 animate-pulse rounded bg-[var(--c-sunken)]" />
           ) : result === null ? (
-            <p className="mt-1.5 text-xs text-text-secondary">Not completed yet.</p>
+            <p className="mt-1.5 text-xs text-text-secondary">{t("parentDashboard.notCompletedYet")}</p>
           ) : (
             <div className="mt-2">
               <div className="flex items-baseline gap-2">
                 <span className="console-num text-2xl font-semibold tracking-[-0.02em] text-text-primary font-[family-name:var(--font-display)]">
                   {result.overall_score !== null ? `${result.overall_score}%` : "—"}
                 </span>
-                <span className="text-[10px] text-text-tertiary">overall score</span>
+                <span className="text-[10px] text-text-tertiary">{t("parentDashboard.overallScore")}</span>
               </div>
 
               {result.overall_score !== null && (
@@ -2060,12 +2096,12 @@ function ChildCard({ child }: { child: ChildLinkOut }) {
               )}
 
               {result.gaps.length === 0 ? (
-                <p className="mt-2 text-xs font-medium text-emerald-500">No gaps found.</p>
+                <p className="mt-2 text-xs font-medium text-emerald-500">{t("parentDashboard.noGapsFound")}</p>
               ) : (
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {result.gaps.slice(0, 3).map((gap) => (
                     <Chip key={gap.topic_code} tone="amber">
-                      {gap.subject}: Class {gap.originating_class}
+                      {gap.subject}: {t("teacherDashboard.classPrefix")} {gap.originating_class}
                     </Chip>
                   ))}
                   {result.gaps.length > 3 && (
@@ -2082,7 +2118,7 @@ function ChildCard({ child }: { child: ChildLinkOut }) {
                 </p>
               )}
               {result.ai_summary_status === "pending" && (
-                <p className="mt-2 text-[10px] italic text-text-tertiary">Summary generating...</p>
+                <p className="mt-2 text-[10px] italic text-text-tertiary">{t("parentDashboard.summaryGenerating")}</p>
               )}
             </div>
           )}
@@ -2101,6 +2137,7 @@ function AdminDashboardView({
   admin: AdminProfile;
   activeTab?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-6">
       {/* TAB: OVERVIEW */}
@@ -2179,6 +2216,7 @@ function TeacherDashboardView({
   teacher: TeacherProfile;
   activeTab?: string;
 }) {
+  const { t } = useTranslation();
   const [assignedClasses, setAssignedClasses] = useState<TeacherClassOut[]>([]);
   const [selectedClass, setSelectedClass] = useState<TeacherClassOut | null>(null);
   const [localTab, setLocalTab] = useState<"students" | "assignments" | "progress">("students");
@@ -2416,16 +2454,14 @@ function TeacherDashboardView({
           <Panel flush>
             <EmptyState
               icon={AlertCircle}
-              title="No Class Assigned Yet"
+              title={t("teacherDashboard.noClassAssignedTitle")}
               action={
                 <div className="max-w-md rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-4 text-xs leading-relaxed text-text-tertiary">
-                  Once assigned, you will be able to view student lists, upload PDF assignments,
-                  generate adaptive AI quizzes, and track student progress with feedback.
+                  {t("teacherDashboard.noClassAssignedHint")}
                 </div>
               }
             >
-              You can&apos;t perform any actions since no class has been assigned to you yet. Please
-              contact your school branch administrator to assign your class (e.g. 4th A).
+              {t("teacherDashboard.noClassAssignedDesc")}
             </EmptyState>
           </Panel>
         ) : (
@@ -2433,7 +2469,7 @@ function TeacherDashboardView({
             {/* Active Class Switcher (only shown if teacher has multiple classes) */}
             {assignedClasses.length > 1 && (
               <div className="flex flex-wrap items-center gap-3">
-                <span className="console-eyebrow">Active Class:</span>
+                <span className="console-eyebrow">{t("teacherDashboard.activeClass")}</span>
                 <Segmented
                   idPrefix="teacher-class"
                   value={selectedClass?.id ?? assignedClasses[0].id}
@@ -2443,7 +2479,7 @@ function TeacherDashboardView({
                   }}
                   options={assignedClasses.map((c) => ({
                     value: c.id,
-                    label: `Class ${c.label}`,
+                    label: `${t("teacherDashboard.classPrefix")} ${c.label}`,
                   }))}
                 />
               </div>
@@ -2455,24 +2491,25 @@ function TeacherDashboardView({
                 <IdentityBar
                   icon={UserCog}
                   title={teacher.name}
-                  badge={<Chip tone="brand">Educator</Chip>}
+                  badge={<Chip tone="brand">{t("teacherDashboard.educatorBadge")}</Chip>}
                   meta={
                     <>
                       <span>
-                        School:{" "}
+                        {t("teacherDashboard.school")}{" "}
                         <span className="font-medium text-text-primary">
                           {teacher.school_name}
                         </span>
                       </span>
                       <MetaDot />
                       <span>
-                        Branch: <span className="font-mono font-semibold text-brand">{teacher.branch_name}</span>
+                        {t("teacherDashboard.branch")}{" "}
+                        <span className="font-mono font-semibold text-brand">{teacher.branch_name}</span>
                       </span>
                     </>
                   }
                   aside={
-                    <Fact label="Current Class">
-                      <span className="text-brand">Class {selectedClass.label}</span>
+                    <Fact label={t("teacherDashboard.currentClass")}>
+                      <span className="text-brand">{t("teacherDashboard.classPrefix")} {selectedClass.label}</span>
                     </Fact>
                   }
                 />
@@ -2481,22 +2518,22 @@ function TeacherDashboardView({
                 <StatRow
                   stats={[
                     {
-                      label: "Enrolled Students",
+                      label: t("teacherDashboard.enrolledStudents"),
                       icon: Users,
                       value: <AnimatedNumber value={students.length} />,
-                      hint: `Class ${selectedClass.label}`,
+                      hint: `${t("teacherDashboard.classPrefix")} ${selectedClass.label}`,
                     },
                     {
-                      label: "Active Assignments",
+                      label: t("teacherDashboard.activeAssignments"),
                       icon: FileText,
                       value: <AnimatedNumber value={assignments.length} />,
-                      hint: "PDF & AI Quizzes",
+                      hint: t("teacherDashboard.pdfAndAiQuizzes"),
                     },
                     {
-                      label: "Curriculum Modules",
+                      label: t("teacherDashboard.curriculumModules"),
                       icon: Layers,
                       value: <AnimatedNumber value={classModules.length} />,
-                      hint: "Available for AI Quiz",
+                      hint: t("teacherDashboard.availableForAiQuiz"),
                     },
                   ]}
                 />
@@ -2508,8 +2545,8 @@ function TeacherDashboardView({
               <Panel flush className="overflow-hidden">
                 <PanelHead
                   icon={Users}
-                  title={`Students Enrolled in Class ${selectedClass.label}`}
-                  actions={<Chip tone="brand">{students.length} Student(s)</Chip>}
+                  title={`${t("teacherDashboard.studentsEnrolledIn")} ${t("teacherDashboard.classPrefix")} ${selectedClass.label}`}
+                  actions={<Chip tone="brand">{students.length} {t("dashboard.students")}</Chip>}
                 />
 
                 {loadingStudents ? (
@@ -2518,10 +2555,10 @@ function TeacherDashboardView({
                   <Table>
                     <thead>
                       <tr>
-                        <Th>Unique ID</Th>
-                        <Th>Student Name / Email</Th>
-                        <Th>Enrollment Mode</Th>
-                        <Th>Joined Date</Th>
+                        <Th>{t("teacherDashboard.uniqueId")}</Th>
+                        <Th>{t("teacherDashboard.studentNameEmail")}</Th>
+                        <Th>{t("teacherDashboard.enrollmentMode")}</Th>
+                        <Th>{t("teacherDashboard.joinedDate")}</Th>
                       </tr>
                     </thead>
                     <Stagger as="tbody" className="divide-y divide-[var(--c-line)]">
@@ -2544,7 +2581,7 @@ function TeacherDashboardView({
                 ) : (
                   <EmptyState
                     icon={Users}
-                    title={`No students enrolled in Class ${selectedClass.label} yet.`}
+                    title={`${t("teacherDashboard.noStudentsEnrolled")} ${t("teacherDashboard.classPrefix")} ${selectedClass.label}.`}
                   />
                 )}
               </Panel>
@@ -2564,8 +2601,8 @@ function TeacherDashboardView({
                 {/* Action Bar */}
                 <SectionHead
                   icon={FileText}
-                  title={`Class ${selectedClass.label} Assignments & Quizzes`}
-                  description="Upload homework documents or generate automatic AI quizzes from curriculum modules."
+                  title={`${t("teacherDashboard.classPrefix")} ${selectedClass.label} ${t("teacherDashboard.assignmentsAndQuizzes")}`}
+                  description={t("teacherDashboard.assignmentsDesc")}
                   actions={
                     <>
                       <Button
@@ -2578,7 +2615,7 @@ function TeacherDashboardView({
                         className="text-xs"
                       >
                         <Upload className="mr-1.5 h-3.5 w-3.5" />
-                        Upload PDF Assignment (Max 5MB)
+                        {t("teacherDashboard.uploadPdfAssignmentBtn")}
                       </Button>
 
                       <Button
@@ -2591,7 +2628,7 @@ function TeacherDashboardView({
                         className="text-xs"
                       >
                         <Brain className="mr-1.5 h-3.5 w-3.5" />
-                        Generate AI Quiz from Modules
+                        {t("teacherDashboard.generateAiQuizBtn")}
                       </Button>
                     </>
                   }
@@ -2611,11 +2648,11 @@ function TeacherDashboardView({
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <Chip tone={asgn.assignment_type === "pdf_upload" ? "sky" : "violet"}>
-                                {asgn.assignment_type === "pdf_upload" ? "PDF Upload" : "AI Quiz"}
+                                {asgn.assignment_type === "pdf_upload" ? t("teacherDashboard.pdfUpload") : t("teacherDashboard.aiQuiz")}
                               </Chip>
 
                               <Chip tone={asgn.is_locked ? "rose" : "emerald"}>
-                                {asgn.is_locked ? "Locked" : "Active"}
+                                {asgn.is_locked ? t("teacherDashboard.locked") : t("teacherDashboard.active")}
                               </Chip>
                             </div>
 
@@ -2636,7 +2673,7 @@ function TeacherDashboardView({
                                 className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline"
                               >
                                 <FileText className="h-3.5 w-3.5" />
-                                View Assignment PDF
+                                {t("teacherDashboard.viewAssignmentPdf")}
                               </a>
                             )}
                           </div>
@@ -2651,17 +2688,17 @@ function TeacherDashboardView({
                               {asgn.deadline_at ? (
                                 <span className="console-num flex items-center justify-end gap-1.5 font-medium text-amber-500">
                                   <Clock className="h-3.5 w-3.5" />
-                                  Deadline: {new Date(asgn.deadline_at).toLocaleDateString()}
+                                  {t("teacherDashboard.deadline")} {new Date(asgn.deadline_at).toLocaleDateString()}
                                 </span>
                               ) : (
-                                <span className="block">No Deadline Set</span>
+                                <span className="block">{t("teacherDashboard.noDeadline")}</span>
                               )}
                             </div>
 
                             <button
                               onClick={() => handleDeleteAssignment(asgn.id)}
                               className="cursor-pointer rounded-md p-2 text-text-tertiary transition-all hover:bg-rose-500/10 hover:text-rose-500 lg:opacity-0 lg:focus-visible:opacity-100 lg:group-hover:opacity-100"
-                              title="Delete assignment"
+                              title={t("teacherDashboard.deleteAssignment")}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -2670,9 +2707,8 @@ function TeacherDashboardView({
                       ))}
                     </Stagger>
                   ) : (
-                    <EmptyState icon={FileText} title="No Assignments Created Yet">
-                      Use the buttons above to upload a manual PDF assignment (max 5MB) or generate
-                      an adaptive AI quiz from your class modules.
+                    <EmptyState icon={FileText} title={t("teacherDashboard.noAssignmentsTitle")}>
+                      {t("teacherDashboard.noAssignmentsDesc")}
                     </EmptyState>
                   )}
                 </Panel>
@@ -2684,8 +2720,8 @@ function TeacherDashboardView({
               <Panel flush className="overflow-hidden">
                 <PanelHead
                   icon={Award}
-                  title="Student Progress & Assessment Scores"
-                  description="Select an assignment to view student scores and give individual feedback."
+                  title={t("teacherDashboard.gradingTitle")}
+                  description={t("teacherDashboard.gradingDesc")}
                   actions={
                     assignments.length > 0 ? (
                       <select
@@ -2695,7 +2731,7 @@ function TeacherDashboardView({
                       >
                         {assignments.map((a) => (
                           <option key={a.id} value={a.id}>
-                            {a.title} ({a.assignment_type === "pdf_upload" ? "PDF" : "AI Quiz"})
+                            {a.title} ({a.assignment_type === "pdf_upload" ? t("teacherDashboard.pdfUpload") : t("teacherDashboard.aiQuiz")})
                           </option>
                         ))}
                       </select>
@@ -2720,11 +2756,11 @@ function TeacherDashboardView({
                     <Table>
                       <thead>
                         <tr>
-                          <Th>Student ID</Th>
-                          <Th>Attempt Status</Th>
-                          <Th>Score / Max</Th>
-                          <Th>Last Attempted</Th>
-                          <Th className="text-right">Actions</Th>
+                          <Th>{t("teacherDashboard.uniqueId")}</Th>
+                          <Th>{t("teacherDashboard.attemptStatus")}</Th>
+                          <Th>{t("teacherDashboard.scoreMax")}</Th>
+                          <Th>{t("teacherDashboard.lastAttempted")}</Th>
+                          <Th className="text-right">{t("teacherDashboard.actions")}</Th>
                         </tr>
                       </thead>
                       <Stagger as="tbody" className="divide-y divide-[var(--c-line)]">
@@ -2740,10 +2776,10 @@ function TeacherDashboardView({
                                 <Code>{sub.student_unique_number}</Code>
                               </Td>
                               <Td>
-                                <Chip tone="emerald">Attempted</Chip>
+                                <Chip tone="emerald">{t("teacherDashboard.attempted")}</Chip>
                               </Td>
                               <Td className="console-num font-semibold text-text-primary">
-                                {sub.score !== null ? `${sub.score} / ${sub.max_score}` : "Not Graded"}
+                                {sub.score !== null ? `${sub.score} / ${sub.max_score}` : t("teacherDashboard.notGraded")}
                               </Td>
                               <Td className="console-num text-text-tertiary">
                                 {new Date(sub.last_attempted_at).toLocaleString()}
@@ -2760,7 +2796,7 @@ function TeacherDashboardView({
                                   className="text-xs"
                                 >
                                   <MessageSquare className="mr-1 h-3.5 w-3.5" />
-                                  {isEditing ? "Close" : "Grade / Feedback"}
+                                  {isEditing ? t("teacherDashboard.close") : t("teacherDashboard.gradeFeedback")}
                                 </Button>
                               </Td>
                             </Item>
@@ -2782,12 +2818,12 @@ function TeacherDashboardView({
                           <div className="space-y-4 p-5">
                             <h4 className="flex items-center gap-1.5 text-xs font-semibold text-text-primary font-[family-name:var(--font-display)]">
                               <Edit className="h-4 w-4 text-brand" />
-                              <span>Grade &amp; Feedback for Student</span>
+                              <span>{t("teacherDashboard.gradeFeedbackForStudent")}</span>
                             </h4>
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                               <div>
-                                <FieldLabel>Score (Out of 100)</FieldLabel>
+                                <FieldLabel>{t("teacherDashboard.scoreOutOf100")}</FieldLabel>
                                 <input
                                   type="number"
                                   min={0}
@@ -2800,10 +2836,10 @@ function TeacherDashboardView({
                               </div>
 
                               <div className="sm:col-span-2">
-                                <FieldLabel>Feedback / Guidance Message</FieldLabel>
+                                <FieldLabel>{t("teacherDashboard.feedbackGuidanceMsg")}</FieldLabel>
                                 <textarea
                                   rows={2}
-                                  placeholder="Enter feedback or advice for this student..."
+                                  placeholder={t("teacherDashboard.feedbackPlaceholder")}
                                   value={feedbackInput}
                                   onChange={(e) => setFeedbackInput(e.target.value)}
                                   className={inputClass}
@@ -2818,7 +2854,7 @@ function TeacherDashboardView({
                                 onClick={() => setEditingStudentId(null)}
                                 className="text-xs"
                               >
-                                Cancel
+                                {t("teacherDashboard.cancel")}
                               </Button>
                               <Button
                                 variant="primary"
@@ -2827,7 +2863,7 @@ function TeacherDashboardView({
                                 onClick={() => handleSaveScoreAndFeedback(editingStudentId)}
                                 className="text-xs"
                               >
-                                {savingScore ? "Saving..." : "Save Score & Feedback"}
+                                {savingScore ? t("teacherDashboard.saving") : t("teacherDashboard.saveScoreFeedback")}
                               </Button>
                             </div>
                           </div>
@@ -2838,7 +2874,7 @@ function TeacherDashboardView({
                 ) : (
                   <EmptyState
                     icon={Award}
-                    title="No student submissions yet for this assignment."
+                    title={t("teacherDashboard.noSubmissionsYet")}
                   />
                 )}
               </Panel>
@@ -2849,7 +2885,7 @@ function TeacherDashboardView({
               <Panel flush className="overflow-hidden">
                 <PanelHead
                   icon={BookOpen}
-                  title={`Curriculum Modules for Class ${selectedClass.label}`}
+                  title={`${t("teacherDashboard.curriculumModulesFor")} ${t("teacherDashboard.classPrefix")} ${selectedClass.label}`}
                   actions={
                     <span className="text-xs text-text-tertiary">
                       {classModules.length} Module(s)
@@ -2885,11 +2921,11 @@ function TeacherDashboardView({
                             className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand hover:underline"
                           >
                             <FileText className="h-3.5 w-3.5" />
-                            View Module PDF
+                            {t("teacherDashboard.viewModulePdf")}
                           </a>
                         ) : (
                           <span className="shrink-0 text-xs italic text-text-tertiary">
-                            NCERT Module
+                            {t("teacherDashboard.ncertModule")}
                           </span>
                         )}
                       </Item>
@@ -2898,7 +2934,7 @@ function TeacherDashboardView({
                 ) : (
                   <EmptyState
                     icon={BookOpen}
-                    title={`No curriculum modules found for Class ${selectedClass.label}.`}
+                    title={`${t("teacherDashboard.noModulesFoundFor")} ${t("teacherDashboard.classPrefix")} ${selectedClass.label}.`}
                   />
                 )}
               </Panel>
@@ -2910,7 +2946,7 @@ function TeacherDashboardView({
         <AnimatePresence>
           {showPdfModal && (
             <Modal
-              title="Upload PDF Assignment"
+              title={t("teacherDashboard.uploadPdfModalTitle")}
               icon={Upload}
               onClose={() => setShowPdfModal(false)}
             >
@@ -2924,7 +2960,7 @@ function TeacherDashboardView({
 
               <form onSubmit={handleCreatePdfAssignment} className="space-y-4">
                 <div>
-                  <FieldLabel>Assignment Title *</FieldLabel>
+                  <FieldLabel>{t("teacherDashboard.assignmentTitleRequired")}</FieldLabel>
                   <input
                     type="text"
                     placeholder="e.g. Chapter 1 Worksheet"
@@ -2936,10 +2972,10 @@ function TeacherDashboardView({
                 </div>
 
                 <div>
-                  <FieldLabel>Description / Instructions</FieldLabel>
+                  <FieldLabel>{t("teacherDashboard.descInstructions")}</FieldLabel>
                   <textarea
                     rows={2}
-                    placeholder="Instructions for students..."
+                    placeholder={t("teacherDashboard.instructionsPlaceholder")}
                     value={pdfDesc}
                     onChange={(e) => setPdfDesc(e.target.value)}
                     className={inputClass}
@@ -2947,11 +2983,11 @@ function TeacherDashboardView({
                 </div>
 
                 <div>
-                  <FieldLabel>Deadline (Days Active)</FieldLabel>
+                  <FieldLabel>{t("teacherDashboard.deadlineDays")}</FieldLabel>
                   <input
                     type="number"
                     min={1}
-                    placeholder="e.g. 7 (leave empty for no deadline)"
+                    placeholder={t("teacherDashboard.deadlinePlaceholder")}
                     value={pdfDeadlineDays}
                     onChange={(e) =>
                       setPdfDeadlineDays(e.target.value ? Number(e.target.value) : "")
@@ -2961,7 +2997,7 @@ function TeacherDashboardView({
                 </div>
 
                 <div>
-                  <FieldLabel>Select PDF Document (Max 5 MB) *</FieldLabel>
+                  <FieldLabel>{t("teacherDashboard.selectPdfRequired")}</FieldLabel>
                   <input
                     type="file"
                     accept="application/pdf"
@@ -2978,10 +3014,10 @@ function TeacherDashboardView({
                     type="button"
                     onClick={() => setShowPdfModal(false)}
                   >
-                    Cancel
+                    {t("teacherDashboard.cancel")}
                   </Button>
                   <Button variant="primary" size="sm" type="submit" disabled={isSubmittingPdf}>
-                    {isSubmittingPdf ? "Uploading..." : "Upload Assignment"}
+                    {isSubmittingPdf ? t("teacherDashboard.uploading") : t("teacherDashboard.uploadAssignmentBtn")}
                   </Button>
                 </div>
               </form>
@@ -2993,7 +3029,7 @@ function TeacherDashboardView({
         <AnimatePresence>
           {showQuizModal && (
             <Modal
-              title="Generate Adaptive AI Quiz"
+              title={t("teacherDashboard.generateAiQuizModalTitle")}
               icon={Brain}
               iconTone="violet"
               onClose={() => setShowQuizModal(false)}
@@ -3008,7 +3044,7 @@ function TeacherDashboardView({
 
               <form onSubmit={handleCreateQuizAssignment} className="space-y-4">
                 <div>
-                  <FieldLabel>Quiz Title *</FieldLabel>
+                  <FieldLabel>{t("teacherDashboard.quizTitleRequired")}</FieldLabel>
                   <input
                     type="text"
                     placeholder="e.g. Adaptive Math Quiz"
@@ -3020,7 +3056,7 @@ function TeacherDashboardView({
                 </div>
 
                 <div>
-                  <FieldLabel>Select Modules / Chapters *</FieldLabel>
+                  <FieldLabel>{t("teacherDashboard.selectModulesRequired")}</FieldLabel>
                   {classModules.length > 0 ? (
                     <div className="max-h-40 space-y-0.5 overflow-y-auto rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-1.5 text-xs">
                       {classModules.map((m) => {
@@ -3055,18 +3091,17 @@ function TeacherDashboardView({
                     </div>
                   ) : (
                     <div className="rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-3 text-xs italic text-text-tertiary">
-                      No uploaded modules found for this class. Upload modules first in the School
-                      dashboard to generate adaptive quizzes.
+                      {t("teacherDashboard.noModulesWarning")}
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <FieldLabel>Deadline (Days Active)</FieldLabel>
+                  <FieldLabel>{t("teacherDashboard.deadlineDays")}</FieldLabel>
                   <input
                     type="number"
                     min={1}
-                    placeholder="e.g. 7 (leave empty for no deadline)"
+                    placeholder={t("teacherDashboard.deadlinePlaceholder")}
                     value={quizDeadlineDays}
                     onChange={(e) =>
                       setQuizDeadlineDays(e.target.value ? Number(e.target.value) : "")
@@ -3082,7 +3117,7 @@ function TeacherDashboardView({
                     type="button"
                     onClick={() => setShowQuizModal(false)}
                   >
-                    Cancel
+                    {t("teacherDashboard.cancel")}
                   </Button>
                   <Button
                     variant="primary"
@@ -3090,7 +3125,7 @@ function TeacherDashboardView({
                     type="submit"
                     disabled={isSubmittingQuiz || classModules.length === 0}
                   >
-                    {isSubmittingQuiz ? "Generating..." : "Generate Quiz"}
+                    {isSubmittingQuiz ? t("teacherDashboard.generating") : t("teacherDashboard.generateQuizBtn")}
                   </Button>
                 </div>
               </form>
@@ -3807,6 +3842,7 @@ function isMatchingSubject(a: string, b: string): boolean {
 }
 
 function SchoolTeacherManagement() {
+  const { t } = useTranslation();
   const [teachers, setTeachers] = useState<TeacherListItem[]>([]);
   const [allSubjects, setAllSubjects] = useState<SchoolSubjectDetail[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -4086,10 +4122,10 @@ function SchoolTeacherManagement() {
         <div>
           <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
             <UserCog className="w-5 h-5 text-brand" />
-            <span>Teacher & Subject Allocation</span>
+            <span>{t("schoolAdmin.allocation.title")}</span>
           </h3>
           <p className="text-xs text-text-secondary mt-0.5">
-            Assign one subject teacher per class subject. Teachers can teach multiple subjects across different classes.
+            {t("schoolAdmin.allocation.subtitle")}
           </p>
         </div>
 
@@ -4104,7 +4140,7 @@ function SchoolTeacherManagement() {
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
-              Class Subject Matrix
+              {t("schoolAdmin.allocation.matrixTab")}
             </button>
             <button
               onClick={() => setViewMode("directory")}
@@ -4114,7 +4150,7 @@ function SchoolTeacherManagement() {
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
-              Teacher Directory ({teachers.length})
+              {t("schoolAdmin.allocation.directoryTab", { count: teachers.length })}
             </button>
           </div>
 
@@ -4132,7 +4168,7 @@ function SchoolTeacherManagement() {
             className="text-xs shrink-0 font-semibold"
           >
             <Plus className="w-3.5 h-3.5 mr-1" />
-            Assign Teacher
+            {t("schoolAdmin.allocation.assignTeacherBtn")}
           </Button>
         </div>
       </div>
@@ -4163,9 +4199,9 @@ function SchoolTeacherManagement() {
       ) : teachers.length === 0 ? (
         <div className="p-8 text-center text-text-tertiary text-xs glass rounded-lg border border-border-primary space-y-2">
           <UserCog className="w-8 h-8 mx-auto text-text-tertiary/40" />
-          <p className="font-semibold text-text-secondary text-sm">No teachers registered in this branch yet</p>
+          <p className="font-semibold text-text-secondary text-sm">{t("schoolAdmin.allocation.noTeachers")}</p>
           <p className="text-xs text-text-tertiary max-w-sm mx-auto">
-            When teachers sign up with your branch name, they will appear in this directory for class and subject assignments.
+            {t("schoolAdmin.allocation.noTeachersDesc")}
           </p>
         </div>
       ) : viewMode === "hierarchy" ? (
@@ -4178,7 +4214,7 @@ function SchoolTeacherManagement() {
             <div className="flex items-center gap-4 flex-wrap">
               {/* Class Selector */}
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-text-tertiary">Class:</span>
+                <span className="text-xs font-semibold text-text-tertiary">{t("schoolAdmin.allocation.classLabel")}</span>
                 <select
                   value={selectedClassNum}
                   onChange={(e) => setSelectedClassNum(Number(e.target.value))}
@@ -4186,7 +4222,7 @@ function SchoolTeacherManagement() {
                 >
                   {[1, 2, 3, 4, 5].map((cls) => (
                     <option key={cls} value={cls}>
-                      Class {cls}
+                      {t("schoolAdmin.allocation.classOption", { cls })}
                     </option>
                   ))}
                 </select>
@@ -4194,7 +4230,7 @@ function SchoolTeacherManagement() {
 
               {/* Section Selector */}
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-text-tertiary">Section:</span>
+                <span className="text-xs font-semibold text-text-tertiary">{t("schoolAdmin.allocation.sectionLabel")}</span>
                 <select
                   value={selectedSection}
                   onChange={(e) => setSelectedSection(e.target.value)}
@@ -4202,7 +4238,7 @@ function SchoolTeacherManagement() {
                 >
                   {["A", "B", "C", "D"].map((sec) => (
                     <option key={sec} value={sec}>
-                      Section {sec}
+                      {t("schoolAdmin.allocation.sectionOption", { sec })}
                     </option>
                   ))}
                 </select>
@@ -4212,7 +4248,7 @@ function SchoolTeacherManagement() {
             {/* Live Staffing Metric */}
             <div className="flex items-center gap-2">
               <span className="text-xs text-text-secondary">
-                Staffing Status:
+                {t("schoolAdmin.allocation.staffingStatus")}
               </span>
               <span
                 className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
@@ -4223,7 +4259,7 @@ function SchoolTeacherManagement() {
                     : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
                 }`}
               >
-                {assignedCount} of {totalCount} Subjects Assigned
+                {t("schoolAdmin.allocation.subjectsAssignedCount", { assigned: assignedCount, total: totalCount })}
               </span>
             </div>
           </div>
@@ -4233,10 +4269,10 @@ function SchoolTeacherManagement() {
             <table className="w-full text-left text-xs">
               <thead className="bg-surface/80 text-text-tertiary font-semibold uppercase text-[10px] tracking-wider border-b border-border-primary">
                 <tr>
-                  <th className="py-3 px-4">Subject</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Assigned Subject Teacher</th>
-                  <th className="py-3 px-4 text-right">Action</th>
+                  <th className="py-3 px-4">{t("schoolAdmin.allocation.table.subject")}</th>
+                  <th className="py-3 px-4">{t("schoolAdmin.allocation.table.status")}</th>
+                  <th className="py-3 px-4">{t("schoolAdmin.allocation.table.assignedTeacher")}</th>
+                  <th className="py-3 px-4 text-right">{t("schoolAdmin.allocation.table.action")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-primary/40 bg-surface/20">
@@ -4280,12 +4316,12 @@ function SchoolTeacherManagement() {
                         {hasTeacher ? (
                           <span className="inline-flex items-center gap-1.5 text-xs text-emerald-500 font-medium">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            Assigned
+                            {t("schoolAdmin.allocation.assigned")}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 text-xs text-amber-500 font-medium">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                            Unassigned
+                            {t("schoolAdmin.allocation.unassigned")}
                           </span>
                         )}
                       </td>
@@ -4317,7 +4353,7 @@ function SchoolTeacherManagement() {
                                   className="text-[10px] text-brand hover:underline font-medium cursor-pointer"
                                   title="Change assigned teacher"
                                 >
-                                  (Change)
+                                  {t("schoolAdmin.allocation.change")}
                                 </button>
                               </div>
                               <div className="text-[10px] text-text-tertiary font-mono">
@@ -4338,7 +4374,7 @@ function SchoolTeacherManagement() {
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface hover:bg-surface/80 text-brand border border-dashed border-border-brand transition-all cursor-pointer shadow-sm hover:shadow"
                           >
                             <Search className="w-3.5 h-3.5" />
-                            <span>Select Teacher</span>
+                            <span>{t("schoolAdmin.allocation.selectTeacher")}</span>
                           </button>
                         )}
                       </td>
@@ -4359,7 +4395,7 @@ function SchoolTeacherManagement() {
                               className="text-xs text-text-secondary hover:text-brand hover:bg-brand/10 px-2 py-1 rounded transition-colors font-medium cursor-pointer"
                               title="Change teacher for this subject"
                             >
-                              Reassign
+                              {t("schoolAdmin.allocation.reassign")}
                             </button>
                             <button
                               type="button"
@@ -4375,7 +4411,7 @@ function SchoolTeacherManagement() {
                               className="text-xs text-text-tertiary hover:text-rose-500 hover:bg-rose-500/10 px-2.5 py-1 rounded transition-colors font-medium cursor-pointer"
                               title="Remove teacher from subject"
                             >
-                              De-assign
+                              {t("schoolAdmin.allocation.deassign")}
                             </button>
                           </div>
                         ) : (
@@ -4391,7 +4427,7 @@ function SchoolTeacherManagement() {
                             }}
                             className="text-xs px-3 py-1 h-auto font-semibold"
                           >
-                            Assign
+                            {t("schoolAdmin.allocation.assign")}
                           </Button>
                         )}
                       </td>
@@ -4413,7 +4449,7 @@ function SchoolTeacherManagement() {
               <Search className="w-3.5 h-3.5 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search by teacher name, phone, or class..."
+                placeholder={t("schoolAdmin.allocation.directorySearchPlaceholder")}
                 value={directorySearch}
                 onChange={(e) => setDirectorySearch(e.target.value)}
                 className="w-full pl-8 pr-8 py-1.5 bg-background text-text-primary text-xs rounded-md border border-border-primary outline-none focus:border-brand placeholder:text-text-tertiary"
@@ -4439,7 +4475,7 @@ function SchoolTeacherManagement() {
                     : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
                 }`}
               >
-                All ({directoryCounts.all})
+                {t("schoolAdmin.allocation.filterAll")} ({directoryCounts.all})
               </button>
               <button
                 type="button"
@@ -4451,7 +4487,7 @@ function SchoolTeacherManagement() {
                 }`}
               >
                 <Sparkles className="w-3 h-3 text-emerald-400" />
-                <span>Unassigned ({directoryCounts.unassigned})</span>
+                <span>{t("schoolAdmin.allocation.filterUnassigned")} ({directoryCounts.unassigned})</span>
               </button>
               <button
                 type="button"
@@ -4462,7 +4498,7 @@ function SchoolTeacherManagement() {
                     : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
                 }`}
               >
-                Assigned ({directoryCounts.assigned})
+                {t("schoolAdmin.allocation.filterAssigned")} ({directoryCounts.assigned})
               </button>
               <button
                 type="button"
@@ -4473,7 +4509,7 @@ function SchoolTeacherManagement() {
                     : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
                 }`}
               >
-                Active Only ({directoryCounts.active})
+                {t("schoolAdmin.allocation.filterActive")} ({directoryCounts.active})
               </button>
             </div>
           </div>

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { SectionWrapper } from "@/components/shared/SectionWrapper";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
 /* ══════════════════════════════════════════════════════════════
    TYPES & DATA LAYER
@@ -83,7 +84,14 @@ const RECOMMENDED_NEXT: Record<SubjectId, { topic: string; reason: string; emoji
   hindi:   { topic: "काल (Tenses)",            reason: "Grammar progression: Noun → Verb → Tenses", emoji: "📝" },
 };
 
-const LANGUAGES = ["EN", "हिं", "தமி", "বাং", "मरा", "ਪੰਜ"];
+const LANGUAGES: { code: any; label: string }[] = [
+  { code: "en", label: "EN" },
+  { code: "hi", label: "हिं" },
+  { code: "pa", label: "ਪੰਜ" },
+  { code: "ur", label: "اردو" },
+  { code: "ta", label: "தமி" },
+  { code: "as", label: "অসমী" },
+];
 
 /* ── Shared card style using CSS variables — fully theme-aware ── */
 const cardStyle: React.CSSProperties = {
@@ -112,6 +120,7 @@ function LearningPathPanel({
   onSubjectChange: (id: SubjectId) => void;
   activePathStep: number;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Student Card */}
@@ -138,7 +147,7 @@ function LearningPathPanel({
               }}
             >
               <span className="text-[7.5px] font-bold uppercase tracking-wider leading-none text-emerald-400 opacity-90 mb-[1px]">
-                LVL
+                {t("quizShowcase.studentCard.lvl")}
               </span>
               <span className="text-base font-black leading-none text-emerald-400 font-[family-name:var(--font-display)]">
                 12
@@ -149,7 +158,7 @@ function LearningPathPanel({
         <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl" style={{ background: "rgba(37,99,235,0.08)", border: "1px solid var(--border-brand)" }}>
           <Upload className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--brand-primary)" }} />
           <span className="text-[10px] font-medium leading-tight" style={{ color: "var(--text-secondary)" }}>
-            CBSE Class 5 · Uploaded by <strong style={{ color: "var(--brand-primary)" }}>Teacher Priya</strong>
+            {t("quizShowcase.controls.cbseClass")} · {t("quizShowcase.studentCard.uploadedBy")} <strong style={{ color: "var(--brand-primary)" }}>Teacher Priya</strong>
           </span>
         </div>
       </div>
@@ -157,7 +166,7 @@ function LearningPathPanel({
       {/* Path Stepper */}
       <div style={cardStyle} className="p-4 flex-1">
         <p className="text-[10px] font-bold uppercase tracking-wider mb-3 font-[family-name:var(--font-display)]" style={{ color: "var(--text-tertiary)" }}>
-          Learning Journey
+          {t("quizShowcase.learningPath.title")}
         </p>
         <div className="space-y-0.5">
           {PATH_STEPS.map((step, idx) => {
@@ -188,14 +197,14 @@ function LearningPathPanel({
                 <div className="pb-1">
                   <p className="text-xs font-bold leading-tight font-[family-name:var(--font-display)]"
                     style={{ color: isCompleted ? "var(--brand-primary)" : isActive ? "var(--text-primary)" : "var(--text-tertiary)" }}>
-                    {step.label}
+                    {t(`quizShowcase.learningPath.steps.${step.id}.label`)}
                     {isActive && (
                       <motion.span animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.5, repeat: Infinity }}
                         className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full align-middle" style={{ background: "var(--brand-primary)" }}
                       />
                     )}
                   </p>
-                  <p className="text-[10px] leading-tight" style={{ color: "var(--text-tertiary)" }}>{step.desc}</p>
+                  <p className="text-[10px] leading-tight" style={{ color: "var(--text-tertiary)" }}>{t(`quizShowcase.learningPath.steps.${step.id}.desc`)}</p>
                 </div>
               </div>
             );
@@ -206,7 +215,7 @@ function LearningPathPanel({
       {/* Subject Selector */}
       <div style={cardStyle} className="p-4">
         <p className="text-[10px] font-bold uppercase tracking-wider mb-2.5 font-[family-name:var(--font-display)]" style={{ color: "var(--text-tertiary)" }}>
-          Subjects
+          {t("quizShowcase.subjects.title")}
         </p>
         <div className="space-y-1.5">
           {SUBJECTS.map((s) => {
@@ -226,7 +235,7 @@ function LearningPathPanel({
                 <span className="text-sm">{s.emoji}</span>
                 <span className="text-xs font-semibold flex-1 font-[family-name:var(--font-display)]"
                   style={{ color: isActive ? s.color : "var(--text-secondary)" }}>
-                  {s.label}
+                  {t(`quizShowcase.subjects.${s.id}`)}
                 </span>
                 <div className="w-12 h-1 rounded-full overflow-hidden" style={{ background: "var(--border-primary)" }}>
                   <motion.div className="h-full rounded-full" style={{ backgroundColor: s.color }}
@@ -272,23 +281,25 @@ function MasteryRing({ percent, color, label }: { percent: number; color: string
 }
 
 function AIInsightsPanel({
-  subject, mastery, activeLang, onLangChange, isOffline, onOfflineToggle,
+  subject, mastery, isOffline, onOfflineToggle,
 }: {
-  subject: (typeof SUBJECTS)[number]; mastery: number; activeLang: string;
-  onLangChange: (l: string) => void; isOffline: boolean; onOfflineToggle: () => void;
+  subject: (typeof SUBJECTS)[number]; mastery: number;
+  isOffline: boolean; onOfflineToggle: () => void;
 }) {
+  const { t, language, setLanguage } = useTranslation();
+
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Mastery ring */}
       <div style={cardStyle} className="p-4 flex flex-col items-center gap-3">
         <p className="text-[10px] font-bold uppercase tracking-wider self-start font-[family-name:var(--font-display)]"
-          style={{ color: "var(--text-tertiary)" }}>Topic Mastery</p>
-        <MasteryRing percent={mastery} color={subject.color} label={subject.label} />
+          style={{ color: "var(--text-tertiary)" }}>{t("quizShowcase.controls.topicMastery")}</p>
+        <MasteryRing percent={mastery} color={subject.color} label={t(`quizShowcase.subjects.${subject.id}`) || subject.label} />
         <div className="w-full space-y-1.5 pt-3" style={{ borderTop: "1px solid var(--border-primary)" }}>
           {SUBJECTS.map((s) => (
             <div key={s.id} className="flex items-center gap-2">
               <span className="text-[10px] w-14 shrink-0 truncate font-[family-name:var(--font-display)]"
-                style={{ color: "var(--text-secondary)" }}>{s.label}</span>
+                style={{ color: "var(--text-secondary)" }}>{t(`quizShowcase.subjects.${s.id}`) || s.label}</span>
               <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border-primary)" }}>
                 <motion.div className="h-full rounded-full" style={{ backgroundColor: s.color }}
                   animate={{ width: `${s.progress}%` }} transition={{ duration: 0.8, delay: 0.05 * SUBJECTS.indexOf(s) }} />
@@ -304,13 +315,13 @@ function AIInsightsPanel({
         <div className="flex items-center gap-1.5 mb-3">
           <GraduationCap className="w-4 h-4" style={{ color: "var(--accent-violet)" }} />
           <p className="text-[10px] font-bold uppercase tracking-wider font-[family-name:var(--font-display)]"
-            style={{ color: "var(--text-tertiary)" }}>Teacher AI Co-Pilot</p>
+            style={{ color: "var(--text-tertiary)" }}>{t("quizShowcase.insights.teacherCopilot")}</p>
         </div>
         <div className="space-y-2">
           {[
-            { icon: AlertCircle, color: "var(--accent-amber)", title: "Weak Concept Alert", desc: "Denominators — 3 attempts, 40% accuracy", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.25)" },
-            { icon: Users,       color: "var(--brand-primary)", title: "Class Insight",      desc: "12 students behind on Science quiz", bg: "rgba(37,99,235,0.08)", border: "var(--border-brand)" },
-            { icon: TrendingUp,  color: "var(--accent-emerald)", title: "Top Progress",      desc: "Aarav → 90th percentile this week", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.25)" },
+            { icon: AlertCircle, color: "var(--accent-amber)", title: t("quizShowcase.insights.weakConceptAlert"), desc: t("quizShowcase.insights.weakConceptDesc"), bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.25)" },
+            { icon: Users,       color: "var(--brand-primary)", title: t("quizShowcase.insights.classInsight"),      desc: t("quizShowcase.insights.classInsightDesc"), bg: "rgba(37,99,235,0.08)", border: "var(--border-brand)" },
+            { icon: TrendingUp,  color: "var(--accent-emerald)", title: t("quizShowcase.insights.topProgress"),      desc: t("quizShowcase.insights.topProgressDesc"), bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.25)" },
           ].map((item) => {
             const Icon = item.icon;
             return (
@@ -331,17 +342,17 @@ function AIInsightsPanel({
       {/* Language + Offline */}
       <div style={cardStyle} className="p-4">
         <p className="text-[10px] font-bold uppercase tracking-wider mb-2 font-[family-name:var(--font-display)]"
-          style={{ color: "var(--text-tertiary)" }}>Regional Language</p>
+          style={{ color: "var(--text-tertiary)" }}>{t("quizShowcase.insights.regionalLanguage")}</p>
         <div className="flex flex-wrap gap-1.5 mb-3">
           {LANGUAGES.map((l) => (
-            <button key={l} onClick={() => onLangChange(l)}
+            <button key={l.code} onClick={() => setLanguage(l.code)}
               className="px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all"
               style={{
-                background: activeLang === l ? "var(--brand-primary)" : "var(--bg-muted)",
-                border: `1px solid ${activeLang === l ? "var(--brand-primary)" : "var(--border-primary)"}`,
-                color: activeLang === l ? "white" : "var(--text-secondary)",
+                background: language === l.code ? "var(--brand-primary)" : "var(--bg-muted)",
+                border: `1px solid ${language === l.code ? "var(--brand-primary)" : "var(--border-primary)"}`,
+                color: language === l.code ? "white" : "var(--text-secondary)",
               }}
-            >{l}</button>
+            >{l.label}</button>
           ))}
         </div>
         <button onClick={onOfflineToggle}
@@ -353,7 +364,7 @@ function AIInsightsPanel({
           }}
         >
           {isOffline ? <WifiOff className="w-3.5 h-3.5" /> : <Wifi className="w-3.5 h-3.5" />}
-          <span className="font-[family-name:var(--font-display)]">{isOffline ? "Offline Mode Active" : "Synced · Offline Ready"}</span>
+          <span className="font-[family-name:var(--font-display)]">{isOffline ? t("quizShowcase.controls.offlineActive") : t("quizShowcase.controls.offlineReady")}</span>
         </button>
       </div>
     </div>
@@ -369,7 +380,19 @@ function QuizEngine({ subject, onMasteryChange, onPathStepChange }: {
   onMasteryChange: (m: number) => void;
   onPathStepChange: (step: number) => void;
 }) {
-  const questions = QUESTIONS[subject.id];
+  const { dictionary, language, t } = useTranslation();
+  const localizedQuizData = (dictionary as any)?.quizQuestions?.[subject.id] || t(`quizQuestions.${subject.id}` as any);
+  const baseQuestions = QUESTIONS[subject.id];
+  const questions: Question[] = baseQuestions.map((bq, i) => {
+    const loc = Array.isArray(localizedQuizData) && localizedQuizData[i] ? localizedQuizData[i] : null;
+    return {
+      ...bq,
+      text: loc?.text || bq.text,
+      options: Array.isArray(loc?.options) && loc.options.length ? loc.options : bq.options,
+      explanation: loc?.explanation || bq.explanation,
+      topic: loc?.topic || bq.topic,
+    };
+  });
   const [qIdx, setQIdx]               = useState(0);
   const [selected, setSelected]       = useState<number | null>(null);
   const [answered, setAnswered]       = useState(false);
@@ -457,6 +480,8 @@ function QuizEngine({ subject, onMasteryChange, onPathStepChange }: {
     return { background: "var(--bg-surface)", border: "1px solid var(--border-primary)", color: "var(--text-tertiary)" };
   };
 
+  const difficultyLabel = difficulty === "Easy" ? t("quizShowcase.controls.easy") : difficulty === "Medium" ? t("quizShowcase.controls.medium") : t("quizShowcase.controls.hard");
+
   return (
     <div className="flex flex-col gap-0">
       {/* Header */}
@@ -465,14 +490,14 @@ function QuizEngine({ subject, onMasteryChange, onPathStepChange }: {
           <div className="flex items-center gap-2 flex-wrap">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide font-[family-name:var(--font-display)]"
               style={{ background: "rgba(37,99,235,0.1)", border: "1px solid var(--border-brand)", color: "var(--brand-primary)" }}>
-              <Upload className="w-3 h-3" /> CBSE Class 5
+              <Upload className="w-3 h-3" /> {t("quizShowcase.controls.cbseClass")}
             </span>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide font-[family-name:var(--font-display)]"
               style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.25)", color: "var(--accent-violet)" }}>
-              <Sparkles className="w-3 h-3" /> AI Adaptive
+              <Sparkles className="w-3 h-3" /> {t("quizShowcase.controls.aiAdaptive")}
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide font-[family-name:var(--font-display)]"
-              style={diffBadgeStyle(difficulty)}>{difficulty}
+              style={diffBadgeStyle(difficulty)}>{difficultyLabel}
             </span>
           </div>
           <span className="text-xl">{subject.emoji}</span>
@@ -492,7 +517,7 @@ function QuizEngine({ subject, onMasteryChange, onPathStepChange }: {
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
             style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)" }}>
             <Flame className="w-3.5 h-3.5" style={{ color: "var(--accent-amber)" }} />
-            <span className="text-xs font-black font-[family-name:var(--font-display)]" style={{ color: "var(--accent-amber)" }}>{streak} streak</span>
+            <span className="text-xs font-black font-[family-name:var(--font-display)]" style={{ color: "var(--accent-amber)" }}>{streak} {t("quizShowcase.controls.streak")}</span>
           </div>
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
@@ -527,8 +552,8 @@ function QuizEngine({ subject, onMasteryChange, onPathStepChange }: {
           />
         </div>
         <div className="flex justify-between mt-0.5">
-          <span className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>Question {Math.min(qIdx + 1, totalQ)} of {totalQ}</span>
-          <span className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>Topic: {q.topic}</span>
+          <span className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>{t("quizShowcase.controls.question")} {Math.min(qIdx + 1, totalQ)} {t("quizShowcase.controls.of")} {totalQ}</span>
+          <span className="text-[9px]" style={{ color: "var(--text-tertiary)" }}>{t("quizShowcase.controls.topic")}: {q.topic}</span>
         </div>
       </div>
 
@@ -591,7 +616,8 @@ function QuizEngine({ subject, onMasteryChange, onPathStepChange }: {
                       <div>
                         <p className="font-bold font-[family-name:var(--font-display)] text-sm"
                           style={{ color: isCorrect ? "var(--accent-emerald)" : "var(--accent-rose)" }}>
-                          {isCorrect ? `Correct! +${q.xp} XP earned ✨` : "Explanation:"}
+                          {isCorrect ? t("quizShowcase.quiz.correctMsg").replace("{xp}", String(q.xp)) : t("quizShowcase.quiz.explanation")}
+                          {isCorrect ? t("quizShowcase.quiz.correctMsg").replace("{xp}", String(q.xp)) : t("quizShowcase.quiz.explanationLabel")}
                         </p>
                         <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--text-secondary)" }}>{q.explanation}</p>
                       </div>
@@ -601,7 +627,7 @@ function QuizEngine({ subject, onMasteryChange, onPathStepChange }: {
                       style={{ background: "linear-gradient(135deg, #2563EB, #7C3AED)" }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 20px rgba(37,99,235,0.35)"; }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "none"; }}>
-                      {qIdx + 1 < totalQ ? "Next Question" : "See Results"}
+                      {qIdx + 1 < totalQ ? t("quizShowcase.quiz.nextQuestion") : t("quizShowcase.quiz.seeResults")}
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </motion.div>
@@ -619,18 +645,18 @@ function QuizEngine({ subject, onMasteryChange, onPathStepChange }: {
                   <Trophy className="w-9 h-9 text-white" />
                 </motion.div>
                 <h3 className="text-xl font-black font-[family-name:var(--font-display)]" style={{ color: "var(--text-primary)" }}>
-                  {sessionScore === totalQ ? "Perfect Score! 🎉" : "Great Work! 💪"}
+                  {sessionScore === totalQ ? t("quizShowcase.quiz.perfectScore") : t("quizShowcase.quiz.greatWork")}
                 </h3>
                 <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-                  {sessionScore} of {totalQ} correct · +{sessionScore * 15} XP earned
+                  {t("quizShowcase.quiz.resultsOf").replace("{score}", String(sessionScore)).replace("{total}", String(totalQ)).replace("{xp}", String(sessionScore * 15))}
                 </p>
               </div>
 
               <div className="grid grid-cols-3 gap-3 mb-6">
                 {[
-                  { label: "Accuracy",  value: `${Math.round((sessionScore / totalQ) * 100)}%`, color: "var(--brand-primary)",   bg: "rgba(37,99,235,0.08)",  border: "var(--border-brand)" },
-                  { label: "Streak",    value: `${streak}🔥`, color: "var(--accent-amber)",  bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)" },
-                  { label: "Difficulty",value: difficulty,   color: "var(--accent-violet)", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.2)" },
+                  { label: t("quizShowcase.quiz.accuracy"),  value: `${Math.round((sessionScore / totalQ) * 100)}%`, color: "var(--brand-primary)",   bg: "rgba(37,99,235,0.08)",  border: "var(--border-brand)" },
+                  { label: t("quizShowcase.quiz.streak"),    value: `${streak}🔥`, color: "var(--accent-amber)",  bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)" },
+                  { label: t("quizShowcase.quiz.difficulty"),value: difficulty,   color: "var(--accent-violet)", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.2)" },
                 ].map((stat) => (
                   <div key={stat.label} className="rounded-xl p-3 text-center"
                     style={{ background: stat.bg, border: `1px solid ${stat.border}` }}>
@@ -645,7 +671,7 @@ function QuizEngine({ subject, onMasteryChange, onPathStepChange }: {
                 <div className="flex items-center gap-1.5 mb-2">
                   <Brain className="w-3.5 h-3.5" style={{ color: "var(--brand-primary)" }} />
                   <span className="text-[10px] font-black uppercase tracking-wider font-[family-name:var(--font-display)]"
-                    style={{ color: "var(--brand-primary)" }}>AI Recommends Next Topic</span>
+                    style={{ color: "var(--brand-primary)" }}>{t("quizShowcase.quiz.aiRecommends")}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{rec.emoji}</span>
@@ -666,7 +692,7 @@ function QuizEngine({ subject, onMasteryChange, onPathStepChange }: {
                 style={{ border: "1px solid var(--border-primary)", color: "var(--text-secondary)", background: "transparent" }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--bg-muted)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}>
-                <RefreshCw className="w-4 h-4" /> Retake Quiz
+                <RefreshCw className="w-4 h-4" /> {t("quizShowcase.quiz.retakeQuiz")}
               </button>
             </motion.div>
           )}
@@ -678,7 +704,7 @@ function QuizEngine({ subject, onMasteryChange, onPathStepChange }: {
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border-primary)", boxShadow: "var(--shadow-sm)" }}>
         <MessageSquare className="w-4 h-4 shrink-0" style={{ color: "var(--accent-emerald)" }} />
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-bold font-[family-name:var(--font-display)]" style={{ color: "var(--text-primary)" }}>Parent Update Auto-Sent</p>
+          <p className="text-[11px] font-bold font-[family-name:var(--font-display)]" style={{ color: "var(--text-primary)" }}>{t("quizShowcase.quiz.parentUpdateSent")}</p>
           <p className="text-[10px] truncate" style={{ color: "var(--text-tertiary)" }}>
             &quot;Aarav scored {sessionScore}/{totalQ} in {subject.label}. Next: {rec.topic}&quot;
           </p>
@@ -695,6 +721,7 @@ function QuizEngine({ subject, onMasteryChange, onPathStepChange }: {
 ══════════════════════════════════════════════════════════════ */
 
 function CurriculumUploadDemo() {
+  const { t } = useTranslation();
   const [selectedFile, setSelectedFile] = useState<string>("CBSE_Class5_Science_Syllabus.pdf");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [pipelineStep, setPipelineStep] = useState<number>(0);
@@ -707,10 +734,10 @@ function CurriculumUploadDemo() {
   ];
 
   const steps = [
-    { label: "Document Parsing",   desc: "Extracting chapters, topics & learning objectives" },
-    { label: "Concept Graphing",   desc: "Mapping dependencies to CBSE / NCERT standards" },
-    { label: "Quiz & Item Synthesis", desc: "Generating adaptive questions (Easy / Med / Hard)" },
-    { label: "Multi-Lingual Ready",   desc: "Generating 6 regional language translations & audio" },
+    { id: "parsing", label: t("quizShowcase.upload.steps.parsing.label"),   desc: t("quizShowcase.upload.steps.parsing.desc") },
+    { id: "graphing", label: t("quizShowcase.upload.steps.graphing.label"),   desc: t("quizShowcase.upload.steps.graphing.desc") },
+    { id: "synthesis", label: t("quizShowcase.upload.steps.synthesis.label"), desc: t("quizShowcase.upload.steps.synthesis.desc") },
+    { id: "multilingual", label: t("quizShowcase.upload.steps.multilingual.label"),   desc: t("quizShowcase.upload.steps.multilingual.desc") },
   ];
 
   const handleProcess = () => {
@@ -736,9 +763,9 @@ function CurriculumUploadDemo() {
               </div>
               <div>
                 <h4 className="text-sm font-bold font-[family-name:var(--font-display)]" style={{ color: "var(--text-primary)" }}>
-                  School Curriculum Upload
+                  {t("quizShowcase.upload.title")}
                 </h4>
-                <p className="text-[11px]" style={{ color: "var(--text-secondary)" }}>Upload syllabus, textbook PDF, or exam scheme</p>
+                <p className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{t("quizShowcase.upload.subtitle")}</p>
               </div>
             </div>
 
@@ -746,14 +773,14 @@ function CurriculumUploadDemo() {
               style={{ background: "rgba(37,99,235,0.05)", border: "2px dashed var(--border-brand)" }}>
               <FileText className="w-8 h-8 mx-auto mb-2 opacity-70" style={{ color: "var(--brand-primary)" }} />
               <p className="text-xs font-bold font-[family-name:var(--font-display)]" style={{ color: "var(--text-primary)" }}>
-                Drag & drop syllabus PDF or select sample
+                {t("quizShowcase.upload.dropZoneTitle")}
               </p>
-              <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>Supports PDF, DOCX, scanned textbook images</p>
+              <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>{t("quizShowcase.upload.dropZoneSubtitle")}</p>
             </div>
 
             <div className="mt-4 space-y-2">
               <p className="text-[10px] font-bold uppercase tracking-wider font-[family-name:var(--font-display)]"
-                style={{ color: "var(--text-tertiary)" }}>Select Sample Curriculum File:</p>
+                style={{ color: "var(--text-tertiary)" }}>{t("quizShowcase.upload.selectFileLabel")}</p>
               {sampleFiles.map((file) => {
                 const isSelected = selectedFile === file.name;
                 return (
@@ -780,7 +807,7 @@ function CurriculumUploadDemo() {
             className="mt-6 w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-white font-bold text-sm cursor-pointer font-[family-name:var(--font-display)] transition-all"
             style={{ background: isProcessing ? "var(--text-tertiary)" : "var(--brand-primary)", opacity: isProcessing ? 0.7 : 1 }}>
             {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {isProcessing ? "AI Processing Curriculum..." : "Convert Syllabus to Interactive Engine"}
+            {isProcessing ? t("quizShowcase.upload.processingBtn") : t("quizShowcase.upload.convertBtn")}
           </button>
         </div>
 
@@ -789,10 +816,10 @@ function CurriculumUploadDemo() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-xs font-bold uppercase tracking-wider font-[family-name:var(--font-display)]"
-                style={{ color: "var(--text-tertiary)" }}>AI Synthesis Pipeline</h4>
+                style={{ color: "var(--text-tertiary)" }}>{t("quizShowcase.upload.pipelineTitle")}</h4>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-[family-name:var(--font-display)]"
                 style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.25)", color: "var(--accent-violet)" }}>
-                OCR + LLM Extraction
+                {t("quizShowcase.upload.pipelineBadge")}
               </span>
             </div>
             <div className="space-y-3">
@@ -830,13 +857,13 @@ function CurriculumUploadDemo() {
                 className="mt-4 p-4 rounded-xl" style={{ background: "rgba(37,99,235,0.08)", border: "1px solid var(--border-brand)" }}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold font-[family-name:var(--font-display)]" style={{ color: "var(--brand-primary)" }}>
-                    ✨ Ready for Classroom
+                    {t("quizShowcase.upload.readyBadge")}
                   </span>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                    style={{ background: "rgba(16,185,129,0.1)", color: "var(--accent-emerald)" }}>100% Aligned</span>
+                    style={{ background: "rgba(16,185,129,0.1)", color: "var(--accent-emerald)" }}>{t("quizShowcase.upload.alignedBadge")}</span>
                 </div>
                 <p className="text-[11px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  Generated 14 lesson modules, 42 adaptive quiz items & 6 regional language audio tracks from{" "}
+                  {t("quizShowcase.upload.generatedMsg")}{" "}
                   <strong style={{ color: "var(--text-primary)" }}>{selectedFile}</strong>.
                 </p>
               </motion.div>
@@ -850,25 +877,26 @@ function CurriculumUploadDemo() {
 
 /* ══════════════════════════════════════════════════════════════
    MODE 3: Curriculum Builder
-══════════════════════════════════════════════════════════════ */
+ ══════════════════════════════════════════════════════════════ */
 
 function CurriculumBuilderDemo() {
   const [studentScore, setStudentScore] = useState<"high" | "low">("high");
+  const { t } = useTranslation();
 
   const nodes = [
-    { title: "Unit 1: Plant Anatomy",         status: "Mastered",    score: "96%",     icon: CheckCircle2, bg: "rgba(16,185,129,0.1)",  border: "rgba(16,185,129,0.3)",  badgeBg: "rgba(16,185,129,0.12)", badgeColor: "var(--accent-emerald)" },
-    { title: "Unit 2: Photosynthesis",         status: "Current Focus",score: "72%",   icon: Sparkles,     bg: "rgba(37,99,235,0.1)",   border: "var(--border-brand)",   badgeBg: "rgba(37,99,235,0.12)",  badgeColor: "var(--brand-primary)" },
+    { title: t("quizShowcase.builder.nodes.unit1"),         status: t("quizShowcase.builder.nodes.mastered"),    score: "96%",     icon: CheckCircle2, bg: "rgba(16,185,129,0.1)",  border: "rgba(16,185,129,0.3)",  badgeBg: "rgba(16,185,129,0.12)", badgeColor: "var(--accent-emerald)" },
+    { title: t("quizShowcase.builder.nodes.unit2"),         status: t("quizShowcase.builder.nodes.currentFocus"),score: "72%",   icon: Sparkles,     bg: "rgba(37,99,235,0.1)",   border: "var(--border-brand)",   badgeBg: "rgba(37,99,235,0.12)",  badgeColor: "var(--brand-primary)" },
     {
-      title: studentScore === "high" ? "Unit 3: Plant Respiration (Advanced)" : "Unit 2B: Leaf Micro-Structure (Remediation)",
-      status: studentScore === "high" ? "AI Unlocked Next"  : "AI Injected Remediation",
-      score:  studentScore === "high" ? "Ready"             : "Assigned",
+      title: studentScore === "high" ? t("quizShowcase.builder.nodes.unit3High") : t("quizShowcase.builder.nodes.unit3Low"),
+      status: studentScore === "high" ? t("quizShowcase.builder.nodes.aiUnlocked")  : t("quizShowcase.builder.nodes.aiRemediation"),
+      score:  studentScore === "high" ? t("quizShowcase.builder.nodes.scoreReady")  : t("quizShowcase.builder.nodes.scoreAssigned"),
       icon:   studentScore === "high" ? TrendingUp : AlertCircle,
       bg:     studentScore === "high" ? "rgba(139,92,246,0.1)"  : "rgba(245,158,11,0.1)",
       border: studentScore === "high" ? "rgba(139,92,246,0.35)" : "rgba(245,158,11,0.35)",
       badgeBg:     studentScore === "high" ? "rgba(139,92,246,0.12)"  : "rgba(245,158,11,0.12)",
       badgeColor:  studentScore === "high" ? "var(--accent-violet)"   : "var(--accent-amber)",
     },
-    { title: "Unit 4: Ecosystem Energy Flow", status: "Upcoming",     score: "Locked", icon: Lock,         bg: "var(--bg-muted)",       border: "var(--border-primary)", badgeBg: "var(--border-primary)", badgeColor: "var(--text-tertiary)" },
+    { title: t("quizShowcase.builder.nodes.unit4"), status: t("quizShowcase.builder.nodes.upcoming"),     score: t("quizShowcase.builder.nodes.scoreLocked"), icon: Lock,         bg: "var(--bg-muted)",       border: "var(--border-primary)", badgeBg: "var(--border-primary)", badgeColor: "var(--text-tertiary)" },
   ];
 
   return (
@@ -879,11 +907,11 @@ function CurriculumBuilderDemo() {
           <div className="flex items-center gap-2">
             <Cpu className="w-4 h-4" style={{ color: "var(--accent-violet)" }} />
             <h4 className="text-sm font-bold font-[family-name:var(--font-display)]" style={{ color: "var(--text-primary)" }}>
-              AI Adaptive Learning Path Simulator
+              {t("quizShowcase.simulator.title")}
             </h4>
           </div>
           <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
-            See how the curriculum dynamically rewires itself based on student quiz scores
+            {t("quizShowcase.simulator.desc")}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -892,14 +920,14 @@ function CurriculumBuilderDemo() {
             style={studentScore === "high"
               ? { background: "var(--accent-emerald)", border: "1px solid var(--accent-emerald)", color: "white" }
               : { background: "var(--bg-muted)", border: "1px solid var(--border-primary)", color: "var(--text-secondary)" }}>
-            Simulate High Score (95%)
+            {t("quizShowcase.simulator.simHighScore")}
           </button>
           <button onClick={() => setStudentScore("low")}
             className="px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all font-[family-name:var(--font-display)]"
             style={studentScore === "low"
               ? { background: "var(--accent-amber)", border: "1px solid var(--accent-amber)", color: "white" }
               : { background: "var(--bg-muted)", border: "1px solid var(--border-primary)", color: "var(--text-secondary)" }}>
-            Simulate Struggling (40%)
+            {t("quizShowcase.simulator.simStruggling")}
           </button>
         </div>
       </div>
@@ -908,10 +936,10 @@ function CurriculumBuilderDemo() {
       <div style={cardStyle} className="p-6 relative overflow-hidden">
         <div className="flex items-center justify-between mb-6">
           <span className="text-xs font-bold uppercase tracking-wider font-[family-name:var(--font-display)]"
-            style={{ color: "var(--text-tertiary)" }}>Curriculum Dependency Graph</span>
+            style={{ color: "var(--text-tertiary)" }}>{t("quizShowcase.simulator.depGraph")}</span>
           <span className="text-xs font-bold px-3 py-1 rounded-full"
             style={{ background: "rgba(37,99,235,0.1)", border: "1px solid var(--border-brand)", color: "var(--brand-primary)" }}>
-            Real-Time AI Adaptation
+            {t("quizShowcase.simulator.realTimeAdapt")}
           </span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-10">
@@ -935,7 +963,7 @@ function CurriculumBuilderDemo() {
                 </div>
                 <div className="flex items-center justify-between text-[11px] pt-2"
                   style={{ borderTop: "1px solid var(--border-primary)" }}>
-                  <span style={{ color: "var(--text-tertiary)" }}>Mastery:</span>
+                  <span style={{ color: "var(--text-tertiary)" }}>{t("quizShowcase.simulator.masteryLabel")}</span>
                   <span className="font-bold" style={{ color: "var(--text-primary)" }}>{node.score}</span>
                 </div>
               </motion.div>
@@ -949,17 +977,17 @@ function CurriculumBuilderDemo() {
 
 /* ══════════════════════════════════════════════════════════════
    MAIN EXPORT
-══════════════════════════════════════════════════════════════ */
+ ══════════════════════════════════════════════════════════════ */
 
 export function QuizShowcase() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(containerRef, { once: true, margin: "-80px" });
+  const { t, language } = useTranslation();
 
   const [mode, setMode]                       = useState<Mode>("quiz");
   const [activeSubjectId, setActiveSubjectId] = useState<SubjectId>("science");
   const [mastery, setMastery]                 = useState(72);
   const [activePathStep, setActivePathStep]   = useState(3);
-  const [activeLang, setActiveLang]           = useState("EN");
   const [isOffline, setIsOffline]             = useState(false);
 
   const subject = SUBJECTS.find((s) => s.id === activeSubjectId)!;
@@ -970,9 +998,9 @@ export function QuizShowcase() {
   }, []);
 
   const tabs = [
-    { id: "quiz",               label: "Personalized Adaptive Quizzes", icon: Target },
-    { id: "curriculum-upload",  label: "School Curriculum Upload",      icon: Upload },
-    { id: "curriculum-builder", label: "AI Curriculum Builder",         icon: Cpu },
+    { id: "quiz",               label: t("quizShowcase.tabs.quiz"),   icon: Target },
+    { id: "curriculum-upload",  label: t("quizShowcase.tabs.upload"), icon: Upload },
+    { id: "curriculum-builder", label: t("quizShowcase.tabs.builder"),icon: Cpu },
   ] as const;
 
   return (
@@ -987,20 +1015,20 @@ export function QuizShowcase() {
                        tracking-wider uppercase font-[family-name:var(--font-display)] mb-4"
             style={{ background: "color-mix(in srgb, var(--brand-primary) 8%, var(--bg-surface))", border: "1px solid var(--border-brand)", color: "var(--brand-primary)" }}>
             <Brain className="w-3.5 h-3.5" />
-            CORE LEARNING INTELLIGENCE
+            {t("quizShowcase.badge")}
           </motion.div>
 
           <motion.h2 initial={{ opacity: 0, y: 20 }} animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 0.68, 0, 1] }}
             className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight leading-[1.15]">
-            AI that turns any curriculum into{" "}
-            <span className="gradient-text">adaptive mastery.</span>
+            {t("quizShowcase.title")}{" "}
+            <span className="gradient-text">{t("quizShowcase.titleHighlight")}</span>
           </motion.h2>
 
           <motion.p initial={{ opacity: 0, y: 16 }} animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.5, delay: 0.2 }}
             className="mt-4 text-base sm:text-lg max-w-2xl mx-auto" style={{ color: "var(--text-secondary)" }}>
-            Experience personalized quizzes, school curriculum ingestion, and live adaptive learning paths — engineered around every child&apos;s speed.
+            {t("quizShowcase.subtitle")}
           </motion.p>
         </div>
 
@@ -1058,7 +1086,7 @@ export function QuizShowcase() {
                   </div>
 
                   <AnimatePresence mode="wait">
-                    <motion.div key={activeSubjectId} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                    <motion.div key={`${activeSubjectId}-${language}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
                       <QuizEngine subject={subject} onMasteryChange={setMastery} onPathStepChange={setActivePathStep} />
                     </motion.div>
@@ -1066,8 +1094,8 @@ export function QuizShowcase() {
                 </div>
 
                 <div className="hidden lg:block">
-                  <AIInsightsPanel subject={subject} mastery={mastery} activeLang={activeLang}
-                    onLangChange={setActiveLang} isOffline={isOffline} onOfflineToggle={() => setIsOffline(!isOffline)} />
+                  <AIInsightsPanel subject={subject} mastery={mastery}
+                    isOffline={isOffline} onOfflineToggle={() => setIsOffline(!isOffline)} />
                 </div>
               </div>
             </motion.div>
@@ -1093,10 +1121,10 @@ export function QuizShowcase() {
           transition={{ duration: 0.5, delay: 0.5 }}
           className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { icon: Upload,  color: "var(--brand-primary)",   bg: "rgba(37,99,235,0.06)",  border: "var(--border-brand)",            label: "School Curriculum Upload", desc: "Ingests syllabus PDF → generates practice & quizzes" },
-            { icon: Cpu,     color: "var(--accent-violet)",   bg: "rgba(139,92,246,0.06)", border: "rgba(139,92,246,0.2)",           label: "AI Curriculum Builder",    desc: "Continuously adjusts path to child's quiz mastery" },
-            { icon: Globe,   color: "var(--accent-emerald)",  bg: "rgba(16,185,129,0.06)", border: "rgba(16,185,129,0.2)",           label: "7+ Regional Languages",   desc: "Every lesson & quiz available in native voice" },
-            { icon: WifiOff, color: "var(--text-secondary)",  bg: "var(--bg-muted)",       border: "var(--border-primary)",          label: "Offline First",            desc: "Practices without internet & syncs progress" },
+            { icon: Upload,  color: "var(--brand-primary)",   bg: "rgba(37,99,235,0.06)",  border: "var(--border-brand)",            label: t("quizShowcase.pills.curriculumUpload.label"), desc: t("quizShowcase.pills.curriculumUpload.desc") },
+            { icon: Cpu,     color: "var(--accent-violet)",   bg: "rgba(139,92,246,0.06)", border: "rgba(139,92,246,0.2)",           label: t("quizShowcase.pills.curriculumBuilder.label"),desc: t("quizShowcase.pills.curriculumBuilder.desc") },
+            { icon: Globe,   color: "var(--accent-emerald)",  bg: "rgba(16,185,129,0.06)", border: "rgba(16,185,129,0.2)",           label: t("quizShowcase.pills.regionalLanguages.label"), desc: t("quizShowcase.pills.regionalLanguages.desc") },
+            { icon: WifiOff, color: "var(--text-secondary)",  bg: "var(--bg-muted)",       border: "var(--border-primary)",          label: t("quizShowcase.pills.offlineFirst.label"),       desc: t("quizShowcase.pills.offlineFirst.desc") },
           ].map((f) => {
             const Icon = f.icon;
             return (

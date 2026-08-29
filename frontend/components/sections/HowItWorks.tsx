@@ -11,61 +11,63 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { SectionWrapper } from "@/components/shared/SectionWrapper";
-
-const timelineSteps = [
-  {
-    number: 1,
-    title: "Create Profile",
-    description: "Language, grade, device and accessibility needs in under two minutes.",
-    icon: UserPlus,
-    badgeBg: "bg-blue-500/10 border-blue-500/20 text-blue-600",
-    gradient: "var(--gradient-brand)",
-  },
-  {
-    number: 2,
-    title: "Learning Assessment",
-    description: "A playful 8-minute diagnostic maps strengths, gaps and learning style.",
-    icon: ClipboardCheck,
-    badgeBg: "bg-cyan-500/10 border-cyan-500/20 text-cyan-600",
-    gradient: "var(--gradient-cyan)",
-  },
-  {
-    number: 3,
-    title: "AI Builds the Journey",
-    description: "A personalized curriculum path is generated and cached for offline use.",
-    icon: Sparkles,
-    badgeBg: "bg-violet-500/10 border-violet-500/20 text-violet-600",
-    gradient: "var(--gradient-violet)",
-  },
-  {
-    number: 4,
-    title: "Student Learns",
-    description: "Adaptive lessons, narration and quizzes — with or without internet.",
-    icon: GraduationCap,
-    badgeBg: "bg-emerald-500/10 border-emerald-500/20 text-emerald-600",
-    gradient: "var(--gradient-emerald)",
-  },
-  {
-    number: 5,
-    title: "Teacher Insights",
-    description: "Classroom analytics and action cards land in the teacher copilot.",
-    icon: BarChart3,
-    badgeBg: "bg-amber-500/10 border-amber-500/20 text-amber-600",
-    gradient: "var(--gradient-amber)",
-  },
-  {
-    number: 6,
-    title: "Parent Updates",
-    description: "Weekly voice summaries, progress timeline, and gentle nudges — in home language.",
-    icon: MessageSquare,
-    badgeBg: "bg-rose-500/10 border-rose-500/20 text-rose-600",
-    gradient: "var(--gradient-rose)",
-  },
-];
+import { useTranslation } from "@/hooks/useTranslation";
 
 export function HowItWorks() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(containerRef, { once: true, margin: "-80px" });
+  const { t } = useTranslation();
+
+  const timelineSteps = [
+    {
+      number: 1,
+      title: t("howItWorks.steps.0.title"),
+      description: t("howItWorks.steps.0.desc"),
+      icon: UserPlus,
+      badgeBg: "bg-blue-500/10 border-blue-500/20 text-blue-600",
+      gradient: "var(--gradient-brand)",
+    },
+    {
+      number: 2,
+      title: t("howItWorks.steps.1.title"),
+      description: t("howItWorks.steps.1.desc"),
+      icon: ClipboardCheck,
+      badgeBg: "bg-cyan-500/10 border-cyan-500/20 text-cyan-600",
+      gradient: "var(--gradient-cyan)",
+    },
+    {
+      number: 3,
+      title: t("howItWorks.steps.2.title"),
+      description: t("howItWorks.steps.2.desc"),
+      icon: Sparkles,
+      badgeBg: "bg-violet-500/10 border-violet-500/20 text-violet-600",
+      gradient: "var(--gradient-violet)",
+    },
+    {
+      number: 4,
+      title: t("howItWorks.steps.3.title"),
+      description: t("howItWorks.steps.3.desc"),
+      icon: GraduationCap,
+      badgeBg: "bg-emerald-500/10 border-emerald-500/20 text-emerald-600",
+      gradient: "var(--gradient-emerald)",
+    },
+    {
+      number: 5,
+      title: t("howItWorks.steps.4.title"),
+      description: t("howItWorks.steps.4.desc"),
+      icon: BarChart3,
+      badgeBg: "bg-amber-500/10 border-amber-500/20 text-amber-600",
+      gradient: "var(--gradient-amber)",
+    },
+    {
+      number: 6,
+      title: t("howItWorks.steps.5.title"),
+      description: t("howItWorks.steps.5.desc"),
+      icon: MessageSquare,
+      badgeBg: "bg-rose-500/10 border-rose-500/20 text-rose-600",
+      gradient: "var(--gradient-rose)",
+    },
+  ];
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -92,7 +94,7 @@ export function HowItWorks() {
             }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-            HOW IT WORKS
+            {t("howItWorks.badge")}
           </motion.div>
 
           <motion.h2
@@ -102,9 +104,17 @@ export function HowItWorks() {
             className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl
                      font-bold tracking-tight leading-[1.15]"
           >
-            Six steps from first login to{" "}
-            <span className="gradient-text">a child who loves learning.</span>
+            {t("howItWorks.title")}{" "}
+            <span className="gradient-text">{t("howItWorks.titleHighlight")}</span>
           </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="mt-4 text-text-secondary text-base sm:text-lg"
+          >
+            {t("howItWorks.subtitle")}
+          </motion.p>
         </div>
 
         {/* Vertical Timeline Container */}

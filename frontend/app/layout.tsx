@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { LanguageProvider } from "@/components/providers/LanguageProvider";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -58,19 +59,29 @@ export default function RootLayout({
                 const theme = localStorage.getItem('theme') || 'dark';
                 document.documentElement.setAttribute('data-theme', theme);
               } catch(e) {}
+              try {
+                var lang = localStorage.getItem('preferred_language') || 'en';
+                document.documentElement.setAttribute('lang', lang);
+                document.documentElement.setAttribute('dir', lang === 'ur' ? 'rtl' : 'ltr');
+                document.documentElement.setAttribute('data-lang', lang);
+                if (lang === 'ur') document.documentElement.classList.add('font-urdu');
+                else if (lang !== 'en') document.documentElement.classList.add('font-indic');
+              } catch(e) {}
             `,
           }}
         />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider>
-          <AuthProvider>
-            {/* Skip to content link */}
-            <a href="#main-content" className="skip-link">
-              Skip to main content
-            </a>
-            {children}
-          </AuthProvider>
+          <LanguageProvider>
+            <AuthProvider>
+              {/* Skip to content link */}
+              <a href="#main-content" className="skip-link">
+                Skip to main content
+              </a>
+              {children}
+            </AuthProvider>
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

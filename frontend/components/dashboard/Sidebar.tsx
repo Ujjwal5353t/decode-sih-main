@@ -26,7 +26,9 @@ import {
 } from "lucide-react";
 import { Role, RolePermissionsResponse, DashboardPermissionItem } from "@/lib/api";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/hooks/useTranslation";
 
 // Map backend icon string names to Lucide-React icons
 const ICON_MAP: Record<string, any> = {
@@ -67,6 +69,7 @@ export function DashboardSidebar({
   onCloseMobile,
   logout,
 }: SidebarProps) {
+  const { t } = useTranslation();
   // The console surface language applies to the School Admin, Teacher and
   // Parent dashboards. Student and Super Admin fall through to the original
   // styling on every branch below, so their sidebar is byte-for-byte what it
@@ -76,21 +79,67 @@ export function DashboardSidebar({
   // Extract user display name & details based on role
   const getUserDisplayName = () => {
     if (!user) return "User";
-    if (role === "student") return user.full_name || `Student #${user.unique_number}`;
-    if (role === "teacher") return user.name || "Teacher";
-    if (role === "school") return user.school_name || "School Admin";
-    if (role === "parent") return user.full_name || "Parent";
-    if (role === "admin") return "Super Administrator";
-    return "Account";
+    if (role === "student") return user.full_name || `${t("sidebar.roleLabels.student")} #${user.unique_number}`;
+    if (role === "teacher") return user.name || t("sidebar.roleLabels.teacher");
+    if (role === "school") return user.school_name || t("sidebar.roleLabels.school");
+    if (role === "parent") return user.full_name || t("sidebar.roleLabels.parent");
+    if (role === "admin") return t("sidebar.roleLabels.admin");
+    return t("sidebar.roleLabels.fallback");
+  };
+
+  // Dynamic label helpers using i18n
+  const navItemKeyMap: Record<string, string> = {
+    overview: "dashboard.nav.overview",
+    modules: "dashboard.nav.learningModules",
+    assignments: "dashboard.nav.classAssignments",
+    practice: "dashboard.nav.practiceQuizzes",
+    quizzes: "dashboard.nav.practiceQuizzes",
+    grading: "dashboard.nav.grading",
+    "diagnostic-quiz": "dashboard.nav.diagnosticQuiz",
+    "gap-report": "dashboard.nav.gapReport",
+    classes: "dashboard.nav.classes",
+    teachers: "dashboard.nav.teachers",
+    students: "dashboard.nav.students",
+    subjects: "dashboard.nav.subjects",
+    curriculum: "dashboard.nav.curriculum",
+    analytics: "dashboard.nav.analytics",
+    "parent-connect": "dashboard.nav.parentConnect",
+    settings: "dashboard.nav.settings",
+    "admin-requests": "dashboard.nav.adminRequests",
+    "school-requests": "dashboard.nav.schoolRequests",
+  };
+
+  const getNavItemLabel = (item: DashboardPermissionItem) => {
+    if (role === "student" && item.id === "overview") {
+      return t("dashboard.nav.studentOverview");
+    }
+    const key = navItemKeyMap[item.id];
+    if (key) {
+      const translated = t(key as any);
+      if (translated && translated !== key) return translated;
+    }
+    return item.label;
+  };
+
+  const getCategoryLabel = (cat: string) => {
+    const key = `dashboard.categories.${cat.toLowerCase()}`;
+    const translated = t(key as any);
+    return translated && translated !== key ? translated : cat;
+  };
+
+  const getRoleBadgeLabel = () => {
+    const key = `dashboard.topbar.roles.${role}`;
+    const translated = t(key as any);
+    return translated && translated !== key ? translated : (permissions?.role_label || `${role} Role`);
   };
 
   const getUserSubtitle = () => {
     if (!user) return "";
-    if (role === "student") return user.branch_name === "SELF" ? "Self-Educated (NCERT)" : user.branch_name;
-    if (role === "teacher") return `${user.branch_name} Branch`;
+    if (role === "student") return user.branch_name === "SELF" ? t("sidebar.subtitles.selfEducated") : user.branch_name;
+    if (role === "teacher") return t("sidebar.subtitles.branch", { name: user.branch_name });
     if (role === "school") return `${user.branch_name} (${user.student_prefix})`;
-    if (role === "parent") return user.phone_number || user.email || "Guardian";
-    if (role === "admin") return "System Operations";
+    if (role === "parent") return user.phone_number || user.email || t("sidebar.subtitles.guardian");
+    if (role === "admin") return t("sidebar.subtitles.systemOps");
     return "";
   };
 
@@ -142,7 +191,7 @@ export function DashboardSidebar({
           <Link
             href="/"
             className="flex items-center group py-0.5"
-            aria-label="VidyaSetu — Go to home"
+            aria-label={t("nav.goToHome")}
           >
             <Image
               src="/vidyasetu-logo.png"
@@ -194,7 +243,7 @@ export function DashboardSidebar({
                 {getUserSubtitle()}
               </div>
               <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-brand/10 text-brand border border-border-brand">
-                {permissions?.role_label || `${role} Role`}
+                {getRoleBadgeLabel()}
               </span>
             </div>
           </div>
@@ -218,12 +267,13 @@ export function DashboardSidebar({
                       : "px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-text-tertiary"
                   }
                 >
-                  {cat}
+                  {getCategoryLabel(cat)}
                 </div>
 
                 {items.map((item: DashboardPermissionItem) => {
                   const Icon = ICON_MAP[item.icon] || LayoutDashboard;
                   const isActive = activeTab === item.id;
+                  const itemLabel = getNavItemLabel(item);
 
                   if (isConsole) {
                     return (
@@ -257,7 +307,7 @@ export function DashboardSidebar({
                                 : "text-text-tertiary group-hover:text-text-secondary"
                             }`}
                           />
-                          <span className="truncate">{item.label}</span>
+                          <span className="truncate">{itemLabel}</span>
                         </div>
 
                         <div className="flex shrink-0 items-center gap-1.5">
@@ -285,38 +335,34 @@ export function DashboardSidebar({
                         onSelectTab(item.id);
                         onCloseMobile();
                       }}
-                      className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-[var(--radius-md)] text-xs font-semibold transition-all cursor-pointer group ${
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-[var(--radius-md)] text-xs font-semibold transition-all duration-150 cursor-pointer ${
                         isActive
-                          ? "bg-brand text-white shadow-sm font-bold"
+                          ? "bg-brand text-white shadow-[var(--shadow-brand)]"
                           : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <Icon
-                          className={`w-4 h-4 shrink-0 transition-colors ${
-                            isActive ? "text-white" : "text-text-tertiary group-hover:text-brand"
+                          className={`w-4 h-4 shrink-0 ${
+                            isActive ? "text-white" : "text-text-tertiary"
                           }`}
                         />
-                        <span className="truncate">{item.label}</span>
+                        <span className="truncate">{itemLabel}</span>
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
                         {item.badge && (
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                            className={`px-1.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
                               isActive
                                 ? "bg-white/20 text-white"
-                                : "bg-brand/10 text-brand border border-border-brand"
+                                : "bg-brand/10 text-brand"
                             }`}
                           >
                             {item.badge}
                           </span>
                         )}
-                        <ChevronRight
-                          className={`w-3.5 h-3.5 opacity-60 ${
-                            isActive ? "text-white" : "text-text-tertiary"
-                          }`}
-                        />
+                        {isActive && <ChevronRight className="w-3.5 h-3.5 text-white/80" />}
                       </div>
                     </button>
                   );
@@ -335,8 +381,13 @@ export function DashboardSidebar({
           }
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-text-secondary">Interface Theme</span>
+            <span className="text-xs font-semibold text-text-secondary">{t("sidebar.interfaceTheme")}</span>
             <ThemeToggle />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-text-secondary">{t("languageSwitcher.label")}</span>
+            <LanguageSwitcher placement="up" />
           </div>
 
           <Button
@@ -346,7 +397,7 @@ export function DashboardSidebar({
             className="w-full justify-start text-xs font-semibold text-text-secondary hover:text-rose-500 hover:bg-rose-500/10 cursor-pointer"
           >
             <LogOut className="w-4 h-4 mr-2 text-rose-500" />
-            Sign Out
+            {t("sidebar.signOut")}
           </Button>
         </div>
       </aside>
