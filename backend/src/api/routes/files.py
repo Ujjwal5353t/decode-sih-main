@@ -12,6 +12,37 @@ router = APIRouter(prefix="/files", tags=["Files & Media"])
 async def view_pdf(url: str = Query(..., description="PDF URL or local path")):
     clean_url = url.strip()
 
+    # 0. Handle NCERT pre-loaded module URLs (/ncert/...)
+    if "/ncert/" in clean_url or clean_url.startswith("ncert/"):
+        import re
+        from src.services.ncert_pdf_service import generate_ncert_pdf_bytes
+
+        class_num = 3
+        num_match = re.search(r"class[-_ ]?(\d+)", clean_url, re.IGNORECASE)
+        if num_match:
+            class_num = int(num_match.group(1))
+
+        subject = "Mathematics"
+        if "evs" in clean_url.lower() or "environment" in clean_url.lower() or "looking" in clean_url.lower():
+            subject = "EVS"
+        elif "english" in clean_url.lower() or "marigold" in clean_url.lower():
+            subject = "English"
+        elif "hindi" in clean_url.lower() or "rimjhim" in clean_url.lower():
+            subject = "Hindi"
+        elif "math" in clean_url.lower():
+            subject = "Mathematics"
+
+        pdf_bytes = generate_ncert_pdf_bytes(subject, class_num)
+        filename = f"NCERT_Class_{class_num}_{subject}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}"',
+                "Cache-Control": "public, max-age=86400",
+            },
+        )
+
     # 1. Handle local uploads (/uploads/...)
     if "/uploads/" in clean_url:
         sub_path = clean_url.split("/uploads/", 1)[1]

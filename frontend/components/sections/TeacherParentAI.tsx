@@ -13,34 +13,27 @@ import {
 }
  from "lucide-react";
 import { SectionWrapper } from "@/components/shared/SectionWrapper";
+import { useTranslation } from "@/hooks/useTranslation";
 
-const insightCards = [
+const insightCardDefs = [
   {
-    id: "weak-concepts",
+    id: "weakConcepts",
     icon: AlertTriangle,
-    title: "Weak concepts detected",
-    subtitle: "Fractions & photosynthesis need re-teaching in 5B.",
     accent: "var(--brand-accent)",
   },
   {
-    id: "ai-suggestions",
+    id: "aiSuggestions",
     icon: Users,
-    title: "Student AI suggestions",
-    subtitle: "3 learners recommended for dyslexia-friendly mode.",
     accent: "var(--brand-primary)",
   },
   {
     id: "attendance",
     icon: Calendar,
-    title: "Attendance intelligence",
-    subtitle: "Absence patterns linked to falling mastery.",
     accent: "var(--brand-sky)",
   },
   {
-    id: "lesson-recap",
+    id: "lessonRecap",
     icon: Lightbulb,
-    title: "Lesson recommendations",
-    subtitle: "Auto-built 20-min recap deck, ready to project.",
     accent: "var(--brand-violet)",
   },
 ];
@@ -60,7 +53,8 @@ const masteryData = [
 export function TeacherParentAI() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
-  const [activeInsight, setActiveInsight] = useState<string>("weak-concepts");
+  const [activeInsight, setActiveInsight] = useState<string>("weakConcepts");
+  const { t } = useTranslation();
 
   return (
     <SectionWrapper id="teacher-parent" className="py-20 lg:py-26 overflow-hidden">
@@ -92,7 +86,7 @@ export function TeacherParentAI() {
               }}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-              TEACHER AI COPILOT
+              {t("teacherAI.badge")}
             </motion.div>
 
             {/* Main Heading */}
@@ -103,8 +97,8 @@ export function TeacherParentAI() {
               className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl
                        font-extrabold tracking-tight leading-[1.1] mb-4"
             >
-              Less time reading dashboards.{" "}
-              <span className="gradient-text">More time teaching.</span>
+              {t("teacherAI.title")}{" "}
+              <span className="gradient-text">{t("teacherAI.titleHighlight")}</span>
             </motion.h2>
 
             {/* Description */}
@@ -114,13 +108,12 @@ export function TeacherParentAI() {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="text-text-secondary text-base sm:text-lg leading-relaxed mb-6"
             >
-              AI helps teachers spend less time analyzing data and more time helping students —
-              surfacing weak concepts, at-risk learners and the next best lesson automatically.
+              {t("teacherAI.subtitle")}
             </motion.p>
 
             {/* Insight Cards Stack */}
             <div className="space-y-2.5">
-              {insightCards.map((card, i) => {
+              {insightCardDefs.map((card, i) => {
                 const Icon = card.icon;
                 const isActive = activeInsight === card.id;
 
@@ -149,10 +142,10 @@ export function TeacherParentAI() {
                     </div>
                     <div>
                       <h4 className="font-bold text-sm text-text-primary font-[family-name:var(--font-display)] mb-0.5">
-                        {card.title}
+                        {t(`teacherAI.insights.${card.id}.title`)}
                       </h4>
                       <p className="text-xs text-text-secondary leading-relaxed">
-                        {card.subtitle}
+                        {t(`teacherAI.insights.${card.id}.subtitle`)}
                       </p>
                     </div>
                   </motion.div>
@@ -174,11 +167,11 @@ export function TeacherParentAI() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-extrabold text-lg sm:text-xl text-text-primary font-[family-name:var(--font-display)]">
-                      Class 5B · Science
+                      {t("teacherAI.dashboard.classHeader")}
                     </h3>
                   </div>
                   <p className="text-xs text-text-tertiary mt-0.5 font-medium">
-                    32 students · Week 14
+                    {t("teacherAI.dashboard.studentsWeek")}
                   </p>
                 </div>
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 font-[family-name:var(--font-display)]">
@@ -191,7 +184,7 @@ export function TeacherParentAI() {
               <div className="grid grid-cols-3 gap-3 sm:gap-4 my-6">
                 <div className="p-4 rounded-[var(--radius-lg)] bg-muted/40 border border-border-secondary">
                   <span className="text-[10px] sm:text-xs font-semibold text-text-tertiary uppercase tracking-wider block mb-1 font-[family-name:var(--font-display)]">
-                    MASTERY
+                    {t("teacherAI.dashboard.mastery")}
                   </span>
                   <span className="text-xl sm:text-2xl md:text-3xl font-extrabold text-text-primary font-[family-name:var(--font-display)]">
                     78%
@@ -199,7 +192,7 @@ export function TeacherParentAI() {
                 </div>
                 <div className="p-4 rounded-[var(--radius-lg)] bg-muted/40 border border-border-secondary">
                   <span className="text-[10px] sm:text-xs font-semibold text-text-tertiary uppercase tracking-wider block mb-1 font-[family-name:var(--font-display)]">
-                    ATTENDANCE
+                    {t("teacherAI.dashboard.attendance")}
                   </span>
                   <span className="text-xl sm:text-2xl md:text-3xl font-extrabold text-text-primary font-[family-name:var(--font-display)]">
                     94%
@@ -207,7 +200,7 @@ export function TeacherParentAI() {
                 </div>
                 <div className="p-4 rounded-[var(--radius-lg)] bg-muted/40 border border-border-secondary">
                   <span className="text-[10px] sm:text-xs font-semibold text-text-tertiary uppercase tracking-wider block mb-1 font-[family-name:var(--font-display)]">
-                    AT RISK
+                    {t("teacherAI.dashboard.atRisk")}
                   </span>
                   <span className="text-xl sm:text-2xl md:text-3xl font-extrabold text-brand font-[family-name:var(--font-display)]">
                     4
@@ -219,10 +212,10 @@ export function TeacherParentAI() {
               <div className="p-5 rounded-[var(--radius-xl)] bg-muted/30 border border-border-secondary mb-6">
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-xs font-semibold text-text-secondary font-[family-name:var(--font-display)]">
-                    Concept mastery by topic
+                    {t("teacherAI.dashboard.conceptMastery")}
                   </span>
                   <span className="text-[11px] text-brand font-medium">
-                    Updated today
+                    {t("teacherAI.dashboard.updatedToday")}
                   </span>
                 </div>
                 {/* Bar Chart Visualization */}
@@ -249,7 +242,7 @@ export function TeacherParentAI() {
                 {/* Engagement Heatmap */}
                 <div className="p-5 rounded-[var(--radius-xl)] bg-muted/30 border border-border-secondary flex flex-col justify-between">
                   <span className="text-xs font-semibold text-text-secondary font-[family-name:var(--font-display)] mb-3 block">
-                    Engagement heatmap
+                    {t("teacherAI.dashboard.engagementHeatmap")}
                   </span>
                   <div className="grid grid-cols-6 gap-1.5 my-auto">
                     {Array.from({ length: 30 }).map((_, idx) => {
@@ -274,13 +267,13 @@ export function TeacherParentAI() {
                 >
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-white/90 uppercase tracking-wider mb-2 font-[family-name:var(--font-display)]">
                     <Sparkles className="w-3.5 h-3.5" />
-                    AI action card
+                    {t("teacherAI.dashboard.aiActionCard")}
                   </div>
                   <p className="text-sm sm:text-base font-bold text-white leading-snug my-2 font-[family-name:var(--font-display)]">
-                    Re-teach &ldquo;fractions&rdquo; to 7 students with a visual lesson.
+                    {t("teacherAI.dashboard.aiActionMsg")}
                   </p>
                   <button className="inline-flex items-center gap-1.5 text-xs font-bold text-white hover:underline mt-3 cursor-pointer font-[family-name:var(--font-display)]">
-                    Assign now
+                    {t("teacherAI.dashboard.assignNow")}
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </button>
                 </div>

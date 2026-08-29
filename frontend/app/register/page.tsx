@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BrandLogo } from "@/components/layout/BrandLogo";
@@ -116,6 +116,12 @@ export default function RegisterPage() {
   const [studentUniqueNumber, setStudentUniqueNumber] = useState("");
 
   const [localError, setLocalError] = useState<string | null>(null);
+
+  // Clear stale auth errors on mount or when switching options
+  useEffect(() => {
+    clearError();
+    setLocalError(null);
+  }, [selectedRole, studentEnrollment, contactMethod]);
 
   // Trigger Send Dummy OTP
   const handleSendOTP = async () => {

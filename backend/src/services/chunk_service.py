@@ -34,6 +34,8 @@ async def ingest_module_text(
     if not text:
         return []
 
+    clean_subject = (subject and subject.strip()) or "General"
+
     # If module_id specified, delete existing chunks first for idempotency
     if module_id:
         await session.execute(
@@ -57,7 +59,7 @@ async def ingest_module_text(
             ncert_book_id=ncert_book_id,
             branch_name=branch_name,
             class_number=class_number,
-            subject=subject,
+            subject=clean_subject,
             chapter_number=c_data["chapter_number"],
             chapter_title=c_data["chapter_title"],
             chunk_index=c_data["chunk_index"],
@@ -83,16 +85,72 @@ async def get_class_chapters(
 ) -> list[ChapterOut]:
     """
     Get all distinct chapters available for a branch, class, and subject.
-    Teachers view these when creating tests/quizzes.
+    Auto-ingests missing module chunks so every seeded module displays its chapters.
     """
+    from src.models.ncert import NCERTBook
+    from src.db.ncert_content import NCERT_CHAPTER_TEXT
+
+    # Clean subject filter (ignore generic placeholders like 'General', 'all', '')
+    filter_subject = (
+        subject.strip()
+        if (subject and subject.strip() and subject.strip().lower() not in ("general", "all", "none", "null"))
+        else None
+    )
+
+    # 1. Fetch all modules created by school admin for this branch & class
+    mod_stmt = select(Module).where(
+        Module.branch_name == branch_name,
+        Module.class_number == class_number,
+    )
+    if filter_subject:
+        mod_stmt = mod_stmt.where(Module.subject.ilike(f"%{filter_subject}%"))  # type: ignore[attr-defined]
+
+    mod_res = await session.execute(mod_stmt)
+    branch_modules = list(mod_res.scalars().all())
+
+    # 2. Auto-ingest chunks for any branch module that does not have chunks yet
+    for mod in branch_modules:
+        chk_check = await session.execute(
+            select(DocumentChunk).where(DocumentChunk.module_id == mod.id).limit(1)
+        )
+        if not chk_check.scalar_one_or_none():
+            # Module has no chunks yet — generate them now
+            full_text = None
+            if mod.ncert_book_id:
+                ncert_book = await session.get(NCERTBook, mod.ncert_book_id)
+                if ncert_book:
+                    full_text = NCERT_CHAPTER_TEXT.get((ncert_book.subject, ncert_book.class_number))
+                    if not full_text:
+                        full_text = f"Chapter 1: {ncert_book.title}\n\n{ncert_book.description or ncert_book.title}"
+
+            if not full_text:
+                full_text = f"Chapter 1: {mod.title}\n\n{mod.title}"
+
+            mod_sub = mod.subject or filter_subject or "General"
+            await ingest_module_text(
+                session=session,
+                branch_name=branch_name,
+                class_number=class_number,
+                subject=mod_sub,
+                text=full_text,
+                module_id=mod.id,
+                ncert_book_id=mod.ncert_book_id,
+                module_title=mod.title,
+            )
+
+    # 3. Query all document chunks for this branch & class
+    branch_mod_ids = [m.id for m in branch_modules]
+
     query = select(DocumentChunk).where(
-        (DocumentChunk.branch_name == branch_name) | (DocumentChunk.branch_name == "SELF")
+        (DocumentChunk.branch_name == branch_name)
+        | (DocumentChunk.branch_name == "SELF")
+        | (DocumentChunk.module_id.in_(branch_mod_ids) if branch_mod_ids else False)  # type: ignore[arg-type]
     ).where(
         DocumentChunk.class_number == class_number
     )
 
-    if subject and subject.strip():
-        query = query.where(DocumentChunk.subject.ilike(f"%{subject.strip()}%"))  # type: ignore[attr-defined]
+    if filter_subject:
+        query = query.where(DocumentChunk.subject.ilike(f"%{filter_subject}%"))  # type: ignore[attr-defined]
 
     query = query.order_by(DocumentChunk.chapter_number, DocumentChunk.chunk_index)
     result = await session.execute(query)

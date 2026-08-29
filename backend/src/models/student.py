@@ -46,4 +46,7 @@ class Student(SQLModel, table=True):
     # Set in the post-registration setup step (A/B/C/D or SELF for self-enrolled)
     section: Optional[str] = Field(default=None, max_length=10)
 
+    # Preferred language code (e.g. "en", "hi", "pa", "ur", "ta", "as")
+    preferred_language: str = Field(default="en", max_length=10)
+
     created_at: datetime = Field(default_factory=_utcnow)

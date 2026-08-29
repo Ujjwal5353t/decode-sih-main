@@ -17,10 +17,12 @@ import {
 import Image from "next/image";
 
 import { submitContactForm } from "@/lib/api";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export function CallToAction() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const { t } = useTranslation();
 
   /* ── Form state ── */
   const [formData, setFormData] = useState({ name: "", email: "", message: "" });
@@ -34,7 +36,7 @@ export function CallToAction() {
     setErrorMessage(null);
 
     if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
-      setErrorMessage("Please fill out all required fields.");
+      setErrorMessage(t("cta.form.requiredError"));
       return;
     }
 
@@ -44,7 +46,7 @@ export function CallToAction() {
       setSubmitted(true);
       setFormData({ name: "", email: "", message: "" });
     } catch (err: any) {
-      setErrorMessage(err?.message || "Failed to submit message. Please try again.");
+      setErrorMessage(err?.message || t("cta.form.failedError"));
     } finally {
       setSending(false);
     }
@@ -142,7 +144,7 @@ export function CallToAction() {
                        bg-white/10 backdrop-blur-md border border-white/20 text-white shadow-lg"
           >
             <Sparkles className="w-4 h-4 text-blue-300 animate-pulse" />
-            START A CONVERSATION
+            {t("cta.badge")}
           </motion.div>
 
           {/* Main Headline */}
@@ -153,9 +155,9 @@ export function CallToAction() {
             className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl lg:text-6xl
                        font-black tracking-tight leading-[1.1] text-white drop-shadow-md"
           >
-            Ready to make education{" "}
+            {t("cta.title")}{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-200 via-sky-300 to-indigo-200">
-              truly inclusive?
+              {t("cta.titleHighlight")}
             </span>
           </motion.h2>
 
@@ -167,8 +169,7 @@ export function CallToAction() {
             className="mt-6 text-blue-100/90 text-base sm:text-lg max-w-xl leading-relaxed drop-shadow-sm font-medium
                        mx-auto lg:mx-0"
           >
-            Join thousands of educators and parents transforming how every child learns.
-            Start for free — no credit card required.
+            {t("cta.subtitle")}
           </motion.p>
 
           {/* Trust Badges */}
@@ -180,17 +181,17 @@ export function CallToAction() {
           >
             <span className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              Free for individuals
+              {t("cta.trust1")}
             </span>
             <span className="hidden sm:inline text-white/25">•</span>
             <span className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-sky-300" />
-              School plans
+              {t("cta.trust2")}
             </span>
             <span className="hidden sm:inline text-white/25">•</span>
             <span className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-indigo-300" />
-              No credit card
+              {t("cta.trust3")}
             </span>
           </motion.div>
         </div>
@@ -230,7 +231,7 @@ export function CallToAction() {
                   transition={{ delay: 0.4 }}
                   className="text-blue-300/80 text-xs font-bold tracking-[0.2em] uppercase font-[family-name:var(--font-display)] mb-2"
                 >
-                  GET IN TOUCH
+                  {t("cta.form.eyebrow")}
                 </motion.p>
                 <motion.h3
                   initial={{ opacity: 0, y: 12 }}
@@ -238,7 +239,7 @@ export function CallToAction() {
                   transition={{ delay: 0.45, duration: 0.5 }}
                   className="text-2xl sm:text-3xl font-bold text-white font-[family-name:var(--font-display)] tracking-tight"
                 >
-                  We&apos;d love to hear from you
+                  {t("cta.form.title")}
                 </motion.h3>
                 <motion.p
                   initial={{ opacity: 0 }}
@@ -246,7 +247,7 @@ export function CallToAction() {
                   transition={{ delay: 0.5 }}
                   className="mt-2 text-sm text-blue-200/60 leading-relaxed"
                 >
-                  Whether you&apos;re an educator, a parent, or a school — reach out and let&apos;s build something inclusive together.
+                  {t("cta.form.subtitle")}
                 </motion.p>
               </div>
 
@@ -270,16 +271,16 @@ export function CallToAction() {
                       <CheckCircle2 className="w-8 h-8 text-emerald-400" />
                     </div>
                     <h4 className="text-xl font-bold text-white font-[family-name:var(--font-display)] mb-2">
-                      Message sent!
+                      {t("cta.form.successTitle")}
                     </h4>
                     <p className="text-sm text-blue-200/70 max-w-xs">
-                      Thank you for reaching out. We&apos;ll get back to you within 24 hours.
+                      {t("cta.form.successDesc")}
                     </p>
                     <button
                       onClick={() => setSubmitted(false)}
                       className="mt-6 text-xs text-blue-300/80 hover:text-blue-200 underline underline-offset-4 transition-colors cursor-pointer"
                     >
-                      Send another message
+                      {t("cta.form.sendAnother")}
                     </button>
                   </motion.div>
                 ) : (
@@ -302,7 +303,7 @@ export function CallToAction() {
                       </div>
                       <input
                         type="text"
-                        placeholder="Your name"
+                        placeholder={t("cta.form.namePlaceholder")}
                         required
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -323,7 +324,7 @@ export function CallToAction() {
                       </div>
                       <input
                         type="email"
-                        placeholder="you@example.com"
+                        placeholder={t("cta.form.emailPlaceholder")}
                         required
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -343,7 +344,7 @@ export function CallToAction() {
                         <MessageSquare className="w-4 h-4" />
                       </div>
                       <textarea
-                        placeholder="Tell us how we can help..."
+                        placeholder={t("cta.form.messagePlaceholder")}
                         required
                         rows={4}
                         value={formData.message}
@@ -388,12 +389,12 @@ export function CallToAction() {
                       {sending ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Sending...</span>
+                          <span>{t("cta.form.sending")}</span>
                         </>
                       ) : (
                         <>
                           <Send className="w-4 h-4" />
-                          <span>Send Message</span>
+                          <span>{t("cta.form.submitBtn")}</span>
                           <ArrowRight className="w-4 h-4 ml-1" />
                         </>
                       )}
@@ -401,7 +402,7 @@ export function CallToAction() {
 
                     {/* Privacy note */}
                     <p className="text-center text-[11px] text-blue-200/40 pt-1">
-                      We respect your privacy. No spam, ever.
+                      {t("cta.form.privacy")}
                     </p>
                   </motion.form>
                 )}

@@ -34,6 +34,7 @@ from src.schemas.teacher import (
     AssignmentCreateQuizRequest,
     AssignmentCreatePdfRequest,
     AssignmentUpdateRequest,
+    AssignmentQuizPreviewOut,
 )
 from src.utils.file_utils import delete_cloudinary_asset
 
@@ -238,6 +239,10 @@ async def create_quiz_assignment(
     session: AsyncSession,
 ) -> Assignment:
     await verify_teacher_class_access(teacher, class_number, section.upper(), session, subject=data.subject)
+    
+    mod_ids_str = json.dumps(data.module_ids) if data.module_ids else None
+    chap_nums_str = json.dumps(data.chapter_numbers) if data.chapter_numbers else None
+
     asgn = Assignment(
         teacher_id=teacher.id,
         branch_name=teacher.branch_name,
@@ -247,7 +252,8 @@ async def create_quiz_assignment(
         title=data.title,
         description=data.description,
         assignment_type="ai_quiz",
-        module_ids=json.dumps(data.module_ids),
+        module_ids=mod_ids_str,
+        chapter_numbers=chap_nums_str,
         deadline_at=_deadline_from_days(data.deadline_days),
     )
     session.add(asgn)
@@ -632,18 +638,30 @@ async def verify_teacher_class_access(
         TeacherClassAssignment.class_number == class_number,
         TeacherClassAssignment.section == section.upper(),
     )
-    if subject:
-        stmt = stmt.where(func.lower(TeacherClassAssignment.subject) == subject.strip().lower())
-
     result = await session.execute(stmt)
-    tca = result.scalars().first()
-    if not tca:
-        sub_msg = f" for '{subject}'" if subject else ""
+    assignments = list(result.scalars().all())
+    if not assignments:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"You are not assigned to Class {class_number}{section.upper()}{sub_msg}.",
+            detail=f"You are not assigned to Class {class_number}{section.upper()}.",
         )
-    return tca
+
+    if subject and subject.strip().lower() not in ("general", "all", "none", "null", ""):
+        match = next(
+            (
+                a for a in assignments
+                if a.subject and (a.subject.strip().lower() == subject.strip().lower() or a.subject.strip().lower() == "general")
+            ),
+            None,
+        )
+        if not match:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You are not assigned to Class {class_number}{section.upper()} for '{subject}'.",
+            )
+        return match
+
+    return assignments[0]
 
 
 async def _get_assignment_or_403(
@@ -664,10 +682,69 @@ async def _get_class_assignments(
     branch_name: str, class_number: int, section: str, session: AsyncSession
 ) -> list[Assignment]:
     result = await session.execute(
-        select(Assignment).where(
+        select(Assignment)
+        .where(
             Assignment.branch_name == branch_name,
             Assignment.class_number == class_number,
-            Assignment.section == section,
-        ).order_by(Assignment.created_at.desc())
+            Assignment.section == section.upper(),
+        )
+        .order_by(Assignment.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def get_assignment_quiz_preview(
+    assignment_id: uuid.UUID,
+    teacher: Teacher,
+    session: AsyncSession,
+) -> AssignmentQuizPreviewOut:
+    asgn = await _get_assignment_or_403(assignment_id, teacher, session)
+
+    chapter_nums = []
+    if asgn.chapter_numbers:
+        try:
+            chapter_nums = json.loads(asgn.chapter_numbers)
+        except Exception:
+            pass
+
+    from src.models.chunk import DocumentChunk
+    from src.ai.rag_quiz_generator import generate_rag_quiz_questions
+
+    stmt = select(DocumentChunk).where(
+        (DocumentChunk.branch_name == teacher.branch_name) | (DocumentChunk.branch_name == "SELF"),
+        DocumentChunk.class_number == asgn.class_number,
+    )
+    if chapter_nums:
+        stmt = stmt.where(DocumentChunk.chapter_number.in_(chapter_nums))
+    if asgn.subject and asgn.subject.strip().lower() not in ("general", "all", "none", ""):
+        stmt = stmt.where(DocumentChunk.subject.ilike(f"%{asgn.subject.strip()}%"))
+
+    stmt = stmt.order_by(DocumentChunk.chapter_number, DocumentChunk.chunk_index)
+    res = await session.execute(stmt)
+    chunks = list(res.scalars().all())
+
+    if not chunks:
+        fb_stmt = select(DocumentChunk).where(
+            (DocumentChunk.branch_name == teacher.branch_name) | (DocumentChunk.branch_name == "SELF"),
+            DocumentChunk.class_number == asgn.class_number,
+        ).limit(20)
+        res_fb = await session.execute(fb_stmt)
+        chunks = list(res_fb.scalars().all())
+
+    questions = generate_rag_quiz_questions(chunks, count=8)
+
+    chapter_titles = list(dict.fromkeys([c.chapter_title for c in chunks if c.chapter_title]))
+    if not chapter_titles:
+        chapter_titles = [f"Chapter {n}" for n in chapter_nums] if chapter_nums else ["General Chapter Overview"]
+
+    return AssignmentQuizPreviewOut(
+        assignment_id=asgn.id,
+        title=asgn.title,
+        subject=asgn.subject,
+        class_number=asgn.class_number,
+        section=asgn.section,
+        assignment_type=asgn.assignment_type,
+        chapters=chapter_titles,
+        total_questions=len(questions),
+        questions=questions,
+    )

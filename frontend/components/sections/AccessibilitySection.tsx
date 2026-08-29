@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { SectionWrapper } from "@/components/shared/SectionWrapper";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks/useTranslation";
 
 type AccessibilityFeatureId =
   | "dyslexia"
@@ -39,69 +40,41 @@ interface FeatureMode {
   afterLabel: string;
 }
 
-const ACCESSIBILITY_FEATURES: FeatureMode[] = [
+const BASE_ACCESSIBILITY_FEATURES = [
   {
-    id: "dyslexia",
-    label: "Dyslexia Support",
-    badge: "OpenDyslexic Font",
+    id: "dyslexia" as const,
+    key: "dyslexia" as const,
     icon: Type,
-    description: "Weighted character bottoms, wider letter spacing, and warm background tint to eliminate visual crowding.",
-    beforeLabel: "Standard Dense Text",
-    afterLabel: "Dyslexia-Adapted Format",
   },
   {
-    id: "adhd",
-    label: "ADHD Focus Mode",
-    badge: "Spotlight Ruler",
+    id: "adhd" as const,
+    key: "adhd" as const,
     icon: Focus,
-    description: "Dimmed background with an interactive reading spotlight ruler that tracks reading lines and removes clutter.",
-    beforeLabel: "Standard Full Page",
-    afterLabel: "Focused Reading Ruler",
   },
   {
-    id: "high-contrast",
-    label: "High Contrast",
-    badge: "WCAG AAA 21:1",
+    id: "high-contrast" as const,
+    key: "highContrast" as const,
     icon: Contrast,
-    description: "Ultra-high contrast color themes engineered for low vision, glare reduction, and outdoor sunlight reading.",
-    beforeLabel: "Standard Contrast (4.5:1)",
-    afterLabel: "WCAG AAA High Contrast (21:1)",
   },
   {
-    id: "color-blind",
-    label: "Color Blind Friendly",
-    badge: "Palette Adapted",
+    id: "color-blind" as const,
+    key: "colorBlind" as const,
     icon: Palette,
-    description: "Pattern fills, high-contrast borders, and adaptive color schemes tailored for Protanopia, Deuteranopia & Tritanopia.",
-    beforeLabel: "Standard Color Diagram",
-    afterLabel: "Adaptive Color & Pattern Diagram",
   },
   {
-    id: "large-text",
-    label: "Dynamic Sizing",
-    badge: "Scalable Typography",
+    id: "large-text" as const,
+    key: "largeText" as const,
     icon: Maximize2,
-    description: "Instant font magnification and customizable line height without breaking layout structure or button alignment.",
-    beforeLabel: "Standard 14px Text",
-    afterLabel: "Enhanced 22px Scaled Text",
   },
   {
-    id: "screen-reader",
-    label: "Audio Narration",
-    badge: "Live Word Sync",
+    id: "screen-reader" as const,
+    key: "audioNarration" as const,
     icon: Volume2,
-    description: "Natural AI voice narration with real-time karaoke-style word highlighting and audio speed control.",
-    beforeLabel: "Silent Reading Text",
-    afterLabel: "Animated Voice Narration",
   },
   {
-    id: "sign-language",
-    label: "Sign Language AI",
-    badge: "ISL/ASL Avatar",
+    id: "sign-language" as const,
+    key: "signLanguage" as const,
     icon: Hand,
-    description: "Integrated picture-in-picture sign language avatar interpreting key concepts for deaf and hard-of-hearing learners.",
-    beforeLabel: "Text Only Lesson",
-    afterLabel: "Text + Sign Language Avatar",
   },
 ];
 
@@ -122,8 +95,10 @@ const AudioKaraokeNarration = memo(function AudioKaraokeNarration({
   isPlayingAudio: boolean;
   setIsPlayingAudio: (val: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const [activeWordIdx, setActiveWordIdx] = useState(0);
-  const wordsList = LESSON_CONTENT.body.split(" ");
+  const lessonBody = t("accessibilitySection.lesson.body");
+  const wordsList = lessonBody.split(" ");
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -141,14 +116,14 @@ const AudioKaraokeNarration = memo(function AudioKaraokeNarration({
     <div>
       <div className="flex items-center justify-between mb-4">
         <h4 className="text-2xl font-extrabold text-text-primary font-[family-name:var(--font-display)]">
-          {LESSON_CONTENT.title}
+          {t("accessibilitySection.lesson.title")}
         </h4>
         <button
           onClick={() => setIsPlayingAudio(!isPlayingAudio)}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-rose-500 text-white font-bold text-xs cursor-pointer shadow-md hover:bg-rose-600 transition-colors"
         >
           {isPlayingAudio ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
-          <span>{isPlayingAudio ? "Pause Audio" : "Listen Live 🔊"}</span>
+          <span>{isPlayingAudio ? t("accessibilitySection.audio.pauseBtn") : t("accessibilitySection.audio.playBtn")}</span>
         </button>
       </div>
 
@@ -192,6 +167,7 @@ const AudioKaraokeNarration = memo(function AudioKaraokeNarration({
 
 // Isolated Indian Sign Language (ISL) Prototype Player Component
 const IndianSignLanguagePlayer = memo(function IndianSignLanguagePlayer() {
+  const { t } = useTranslation();
   const [selectedDialect, setSelectedDialect] = useState<"ISL" | "ASL">("ISL");
   const [activeConcept, setActiveConcept] = useState<"photosynthesis" | "chlorophyll" | "sunlight">("photosynthesis");
   const [isPlayingSign, setIsPlayingSign] = useState<boolean>(true);
@@ -222,7 +198,7 @@ const IndianSignLanguagePlayer = memo(function IndianSignLanguagePlayer() {
       <div className="lg:col-span-6 space-y-4">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-emerald-600 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-            ✓ ISL Synchronized Lesson Text
+            {t("accessibilitySection.isl.syncedText")}
           </span>
 
           {/* Dialect Switcher */}
@@ -249,12 +225,12 @@ const IndianSignLanguagePlayer = memo(function IndianSignLanguagePlayer() {
         </div>
 
         <h4 className="text-2xl font-extrabold text-text-primary font-[family-name:var(--font-display)]">
-          {LESSON_CONTENT.title}
+          {t("accessibilitySection.lesson.title")}
         </h4>
 
         {/* Concept Selector Pills */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-text-tertiary">Select Concept:</span>
+          <span className="text-xs font-bold text-text-tertiary">{t("accessibilitySection.isl.selectConcept")}</span>
           {concepts.map((c) => (
             <button
               key={c.id}
@@ -313,14 +289,14 @@ const IndianSignLanguagePlayer = memo(function IndianSignLanguagePlayer() {
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-xs font-bold text-indigo-200 uppercase tracking-wider font-[family-name:var(--font-display)]">
-              {selectedDialect} AI Avatar Interpreter
+              {selectedDialect} {t("accessibilitySection.isl.avatarInterpreter")}
             </span>
           </div>
           <button
             onClick={() => setShowCaptions(!showCaptions)}
             className="text-[11px] font-bold text-indigo-300 hover:text-white px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-400/30 cursor-pointer"
           >
-            {showCaptions ? "CC Captions ON" : "CC Captions OFF"}
+            {showCaptions ? t("accessibilitySection.isl.captionsOn") : t("accessibilitySection.isl.captionsOff")}
           </button>
         </div>
 
@@ -387,13 +363,29 @@ const IndianSignLanguagePlayer = memo(function IndianSignLanguagePlayer() {
 });
 
 export function AccessibilitySection() {
+  const { t } = useTranslation();
+  const ACCESSIBILITY_FEATURES: FeatureMode[] = BASE_ACCESSIBILITY_FEATURES.map((feature) => ({
+    id: feature.id,
+    label: t(`accessibilitySection.tabs.${feature.key}.label`),
+    badge: t(`accessibilitySection.tabs.${feature.key}.badge`),
+    icon: feature.icon,
+    description: t(`accessibilitySection.tabs.${feature.key}.description`),
+    beforeLabel: t(`accessibilitySection.tabs.${feature.key}.beforeLabel`),
+    afterLabel: t(`accessibilitySection.tabs.${feature.key}.afterLabel`),
+  }));
+
+  const LESSON_CONTENT = {
+    title: t("accessibilitySection.lesson.title"),
+    subtitle: t("accessibilitySection.lesson.subtitle"),
+    body: t("accessibilitySection.lesson.body"),
+    equation: t("accessibilitySection.lesson.equation"),
+    takeaway: t("accessibilitySection.lesson.takeaway"),
+  };
+
   const containerRef = useRef<HTMLDivElement>(null);
-  const isInView = useInView(containerRef, { once: true, margin: "-80px" });
+  const isInView = useInView(containerRef, { once: true, amount: 0.1 });
 
-  // Currently Selected Feature Mode
   const [activeFeature, setActiveFeature] = useState<AccessibilityFeatureId>("dyslexia");
-
-  // Comparison Slider State (0 to 100 percentage of AFTER side revealed)
   const [sliderPos, setSliderPos] = useState<number>(50);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const sliderContainerRef = useRef<HTMLDivElement>(null);
@@ -497,7 +489,7 @@ export function AccessibilitySection() {
             }}
           >
             <Sparkles className="w-3.5 h-3.5 text-brand animate-pulse" />
-            ACCESSIBILITY FIRST
+            {t("accessibilitySection.badge")}
           </motion.div>
 
           <motion.h2
@@ -507,7 +499,7 @@ export function AccessibilitySection() {
             className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl
                      font-bold tracking-tight leading-[1.15]"
           >
-            Education without <span className="gradient-text">barriers.</span>
+            {t("accessibilitySection.title")} <span className="gradient-text">{t("accessibilitySection.titleHighlight")}</span>
           </motion.h2>
 
           <motion.p
@@ -516,7 +508,7 @@ export function AccessibilitySection() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="mt-4 text-text-secondary text-base sm:text-lg leading-relaxed"
           >
-            Experience every accessibility feature in real time. Drag the interactive comparison slider to compare standard content with the accessibility-enhanced version.
+            {t("accessibilitySection.subtitle")}
           </motion.p>
         </div>
 
@@ -573,7 +565,7 @@ export function AccessibilitySection() {
               <div className="flex items-center gap-2.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-brand animate-pulse" />
                 <h3 className="text-xl sm:text-2xl font-bold text-text-primary font-[family-name:var(--font-display)]">
-                  {activeModeObj.label} Interactive Demo
+                  {activeModeObj.label} {t("accessibilitySection.interactiveDemo")}
                 </h3>
               </div>
               <p className="text-sm text-text-secondary mt-1 max-w-2xl">
@@ -584,7 +576,7 @@ export function AccessibilitySection() {
             {/* Instruction Badge */}
             <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-brand/10 border border-brand/20 text-brand text-xs font-bold font-[family-name:var(--font-display)] shrink-0 self-start sm:self-center">
               <ArrowLeftRight className="w-4 h-4" />
-              <span>Drag slider left / right</span>
+              <span>{t("accessibilitySection.dragPrompt")}</span>
             </div>
           </div>
 
@@ -603,7 +595,7 @@ export function AccessibilitySection() {
               <div className="max-w-3xl mx-auto w-full">
                 {/* Before Badge */}
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-[11px] font-bold uppercase tracking-wider font-[family-name:var(--font-display)] mb-6">
-                  <span>BEFORE</span> · <span>{activeModeObj.beforeLabel}</span>
+                  <span>{t("accessibilitySection.before")}</span> · <span>{activeModeObj.beforeLabel}</span>
                 </div>
 
                 {/* Standard Content Render */}
@@ -631,8 +623,8 @@ export function AccessibilitySection() {
               </div>
 
               <div className="mt-8 pt-4 border-t border-border-secondary flex items-center justify-between text-xs text-text-tertiary">
-                <span>Standard Unadapted Display</span>
-                <span className="font-semibold">Slide right to reveal accessibility enhancements ➔</span>
+                <span>{t("accessibilitySection.standardDisplay")}</span>
+                <span className="font-semibold">{t("accessibilitySection.slideRight")}</span>
               </div>
             </div>
 
@@ -667,7 +659,7 @@ export function AccessibilitySection() {
                     )}
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>AFTER</span> · <span>{activeModeObj.afterLabel}</span>
+                    <span>{t("accessibilitySection.after")}</span> · <span>{activeModeObj.afterLabel}</span>
                   </div>
 
                   {/* ── DYSLEXIA MODE RENDER ── */}
@@ -677,7 +669,7 @@ export function AccessibilitySection() {
                         {LESSON_CONTENT.title}
                       </h4>
                       <p className="text-xs text-[#665c40] font-bold uppercase tracking-widest mb-6">
-                        {LESSON_CONTENT.subtitle} · Dyslexia Adapted
+                        {LESSON_CONTENT.subtitle} · {activeModeObj.afterLabel}
                       </p>
                       <p className="text-lg sm:text-xl text-[#1a1a1a] leading-loose tracking-wide font-sans mb-6">
                         {LESSON_CONTENT.body}
@@ -700,7 +692,7 @@ export function AccessibilitySection() {
                         style={{ top: `${spotlightY}%`, transform: "translateY(-50%)", willChange: "top" }}
                       >
                         <div className="absolute top-1 right-2 px-2 py-0.5 rounded text-[10px] font-bold bg-brand text-white">
-                          Spotlight Focus Line
+                          {t("accessibilitySection.adhd.spotlightFocus")}
                         </div>
                       </div>
 
@@ -708,7 +700,7 @@ export function AccessibilitySection() {
                         {LESSON_CONTENT.title}
                       </h4>
                       <p className="text-xs text-brand font-bold uppercase tracking-wider mb-6">
-                        ADHD Reading Ruler Active (Move mouse up/down)
+                        {t("accessibilitySection.adhd.rulerActive")}
                       </p>
                       <p className="text-base sm:text-lg text-text-secondary leading-relaxed mb-6 font-medium opacity-80">
                         {LESSON_CONTENT.body}
@@ -829,8 +821,8 @@ export function AccessibilitySection() {
                       : "border-border-secondary text-brand"
                   )}
                 >
-                  <span className="font-bold">✓ Active Feature: {activeModeObj.label}</span>
-                  <span className="font-semibold">Drag handle left to compare standard view</span>
+                  <span className="font-bold">{t("accessibilitySection.activeFeature")} {activeModeObj.label}</span>
+                  <span className="font-semibold">{t("accessibilitySection.dragLeft")}</span>
                 </div>
               </div>
             </div>
@@ -855,11 +847,11 @@ export function AccessibilitySection() {
                 onClick={() => setSliderPos(sliderPos === 50 ? 90 : 50)}
                 className="px-3.5 py-1.5 rounded-xl border border-border-primary bg-muted/40 hover:border-brand/40 text-xs font-semibold text-text-secondary cursor-pointer transition-all font-[family-name:var(--font-display)]"
               >
-                Reset Split (50/50)
+                {t("accessibilitySection.resetSplit")}
               </button>
 
               <span className="text-xs font-bold text-text-tertiary">
-                Slider: <span className="text-brand">{Math.round(sliderPos)}%</span>
+                {t("accessibilitySection.sliderLabel")} <span className="text-brand">{Math.round(sliderPos)}%</span>
               </span>
             </div>
 
@@ -867,7 +859,7 @@ export function AccessibilitySection() {
             <div className="flex flex-wrap items-center gap-4">
               {activeFeature === "large-text" && (
                 <div className="flex items-center gap-3 bg-muted/40 px-3 py-1.5 rounded-xl border border-border-secondary text-xs">
-                  <span className="font-bold text-text-secondary">Font Size:</span>
+                  <span className="font-bold text-text-secondary">{t("accessibilitySection.fontSizeLabel")}</span>
                   <input
                     type="range"
                     min={14}
@@ -882,7 +874,7 @@ export function AccessibilitySection() {
 
               {activeFeature === "color-blind" && (
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="font-bold text-text-secondary">Deficiency Filter:</span>
+                  <span className="font-bold text-text-secondary">{t("accessibilitySection.deficiencyFilter")}</span>
                   {(["deuteranopia", "protanopia", "tritanopia"] as const).map((type) => (
                     <button
                       key={type}
@@ -906,7 +898,7 @@ export function AccessibilitySection() {
                   className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 font-bold text-xs cursor-pointer hover:bg-rose-500/20"
                 >
                   <Volume2 className="w-3.5 h-3.5" />
-                  <span>{isPlayingAudio ? "Pause Audio" : "Play Narration"}</span>
+                  <span>{isPlayingAudio ? t("accessibilitySection.pauseAudio") : t("accessibilitySection.playNarration")}</span>
                 </button>
               )}
             </div>

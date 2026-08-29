@@ -1,4 +1,35 @@
+/* ── Regional Language Fonts (Lazy-Loaded via CSS) ────────────────────────────
+   Fonts are only downloaded by the browser when actually applied to visible text.
+   The class selectors (font-indic / font-urdu) are toggled by LanguageProvider
+   and the inline FOUC-prevention script in layout.tsx.
+   NOTE: @import url() MUST come before @import "tailwindcss" because the CSS
+   spec requires @import rules to precede all other rules, and Tailwind expands
+   into rules.
+   ──────────────────────────────────────────────────────────────────────────── */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Sans+Gurmukhi:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;600;700&display=swap");
+
 @import "tailwindcss";
+
+/* Indic script font stack (Hindi, Punjabi, Tamil, Assamese) */
+html.font-indic {
+  --font-body: "Noto Sans Devanagari", "Noto Sans Gurmukhi", "Noto Sans Tamil", "Noto Sans Bengali", "Inter", system-ui, sans-serif;
+}
+html.font-indic body {
+  line-height: 1.7;
+}
+
+/* Urdu (RTL, Nastaliq) */
+html.font-urdu {
+  --font-body: "Noto Nastaliq Urdu", "Noto Sans Arabic", system-ui, serif;
+}
+html.font-urdu body {
+  line-height: 1.9;
+}
+
+/* ── RTL Utility: manual icon flip when dir="rtl" ─────────────────────────── */
+[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
+}
 
 /* ════════════════════════════════════════════════════════════
    DESIGN SYSTEM v4 — "Vibrant Sapphire & Multi-Accents"

@@ -11,19 +11,21 @@
  * pdf.js is imported lazily so it only ships to routes that actually use it.
  */
 
-import type { PDFDocumentProxy, TextItem } from "pdfjs-dist/types/src/display/api";
+// @ts-ignore
+import type { PDFDocumentProxy, TextItem } from "pdfjs-dist";
 
-export type PdfDocument = PDFDocumentProxy;
+export type PdfDocument = any;
 
 /** Longest edge, in CSS pixels, of a page rasterised for OCR. */
 const OCR_PAGE_WIDTH = 1700;
 /** JPEG quality used for rasterised pages — high enough for reliable OCR. */
 const OCR_PAGE_QUALITY = 0.92;
 
-let pdfjsModule: Promise<typeof import("pdfjs-dist")> | null = null;
+let pdfjsModule: Promise<any> | null = null;
 
 async function getPdfjs() {
   if (!pdfjsModule) {
+    // @ts-ignore
     pdfjsModule = import("pdfjs-dist")
       .then((pdfjs) => {
         pdfjs.GlobalWorkerOptions.workerSrc = new URL(

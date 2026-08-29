@@ -5,23 +5,27 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Sparkles, LayoutDashboard, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/layout/BrandLogo";
 
 
-const navLinks = [
-  { label: "Product",    href: "#how-it-works" },
-  { label: "Features",  href: "#features" },
-  { label: "Playground", href: "#quiz-showcase" },
-  { label: "About",     href: "#why" },
-  { label: "Contact",   href: "#cta" },
+// Translation keys mapped to anchor hrefs
+const navLinkDefs = [
+  { tKey: "nav.product",    href: "#how-it-works" },
+  { tKey: "nav.features",   href: "#features" },
+  { tKey: "nav.playground", href: "#quiz-showcase" },
+  { tKey: "nav.about",      href: "#why" },
+  { tKey: "nav.contact",    href: "#cta" },
 ];
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, role, logout } = useAuth();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -69,15 +73,15 @@ export function Navbar() {
 
           {/* Desktop Nav Links */}
           <div className="hidden lg:flex items-center gap-1">
-            {navLinks.map((link) => (
+            {navLinkDefs.map((link) => (
               <a
-                key={link.label}
+                key={link.tKey}
                 href={link.href}
                 className="px-4 py-2 text-sm font-medium text-text-secondary
                          hover:text-text-primary transition-colors duration-200 rounded-[var(--radius-md)]
                          hover:bg-surface-hover relative group"
               >
-                {link.label}
+                {t(link.tKey)}
                 <span
                   className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 rounded-full
                                bg-brand transition-all duration-300 group-hover:w-6"
@@ -88,6 +92,7 @@ export function Navbar() {
 
           {/* Desktop Right Actions */}
           <div className="hidden lg:flex items-center gap-3">
+            <LanguageSwitcher />
             <ThemeToggle />
 
             {user && role ? (
@@ -102,14 +107,14 @@ export function Navbar() {
                     style={{ background: "var(--gradient-brand)" }}
                   >
                     <LayoutDashboard className="w-4 h-4" />
-                    Dashboard
+                    {t("nav.dashboard")}
                   </motion.div>
                 </Link>
                 <button
                   onClick={logout}
                   className="p-2.5 rounded-[var(--radius-lg)] text-text-secondary hover:text-rose-500
                            hover:bg-surface-hover transition-colors duration-200 cursor-pointer"
-                  aria-label="Log out"
+                  aria-label={t("actions.logOut")}
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -121,7 +126,7 @@ export function Navbar() {
                   className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary
                            transition-colors duration-200 font-[family-name:var(--font-display)]"
                 >
-                  Log in
+                  {t("nav.login")}
                 </Link>
                 <Link href="/register">
                   <motion.div
@@ -132,21 +137,22 @@ export function Navbar() {
                              hover:shadow-[0_6px_24px_rgba(37,99,235,0.3)] transition-shadow duration-300"
                     style={{ background: "var(--gradient-brand)" }}
                   >
-                    Sign Up
+                    {t("nav.signup")}
                   </motion.div>
                 </Link>
               </>
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="flex lg:hidden items-center gap-3">
+          {/* Mobile Menu Button & Controls */}
+          <div className="flex lg:hidden items-center gap-2">
+            <LanguageSwitcher />
             <ThemeToggle />
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
               className="w-10 h-10 rounded-[var(--radius-md)] flex items-center justify-center
                        hover:bg-surface-hover transition-colors cursor-pointer"
-              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              aria-label={mobileOpen ? t("nav.closeMenu") : t("nav.openMenu")}
               aria-expanded={mobileOpen}
             >
               {mobileOpen ? (
@@ -184,9 +190,9 @@ export function Navbar() {
               className="absolute right-0 top-0 bottom-0 w-[300px] bg-surface border-l border-border-primary
                        shadow-[var(--shadow-xl)] p-6 pt-24 flex flex-col gap-2"
             >
-              {navLinks.map((link, i) => (
+              {navLinkDefs.map((link, i) => (
                 <motion.a
-                  key={link.label}
+                  key={link.tKey}
                   href={link.href}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -196,7 +202,7 @@ export function Navbar() {
                            hover:text-text-primary hover:bg-surface-hover rounded-[var(--radius-md)]
                            transition-colors duration-200"
                 >
-                  {link.label}
+                  {t(link.tKey)}
                 </motion.a>
               ))}
 
@@ -212,7 +218,7 @@ export function Navbar() {
                       style={{ background: "var(--gradient-brand)" }}
                     >
                       <LayoutDashboard className="w-4 h-4" />
-                      Dashboard
+                      {t("nav.dashboard")}
                     </Link>
                     <button
                       onClick={() => {
@@ -223,7 +229,7 @@ export function Navbar() {
                                border border-border-primary rounded-[var(--radius-lg)]
                                hover:border-rose-500 hover:text-rose-500 transition-colors duration-200 cursor-pointer"
                     >
-                      Sign Out
+                      {t("nav.signout")}
                     </button>
                   </>
                 ) : (
@@ -235,7 +241,7 @@ export function Navbar() {
                                border border-border-primary rounded-[var(--radius-lg)]
                                hover:border-[var(--border-brand)] transition-colors duration-200 font-[family-name:var(--font-display)]"
                     >
-                      Log in
+                      {t("nav.login")}
                     </Link>
                     <Link
                       href="/register"
@@ -245,7 +251,7 @@ export function Navbar() {
                                font-[family-name:var(--font-display)] flex items-center justify-center"
                       style={{ background: "var(--gradient-brand)" }}
                     >
-                      Sign Up
+                      {t("nav.signup")}
                     </Link>
                   </>
                 )}

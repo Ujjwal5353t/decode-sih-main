@@ -4,58 +4,60 @@ import { motion, useInView, AnimatePresence } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 import { Camera, FileText, BookOpen, CheckCircle } from "lucide-react";
 import { SectionWrapper } from "@/components/shared/SectionWrapper";
-
-const steps = [
-  {
-    icon: Camera,
-    title: "Capture",
-    subtitle: "Point camera at textbook",
-    content: [
-      "Chapter 5: Photosynthesis",
-      "Plants use sunlight, water, and carbon dioxide",
-      "to produce glucose and oxygen.",
-      "6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂",
-    ],
-  },
-  {
-    icon: FileText,
-    title: "Extract",
-    subtitle: "AI reads & understands",
-    content: [
-      "✓ Topic: Photosynthesis",
-      "✓ Grade Level: 6th Standard",
-      "✓ Key Concepts: 4 identified",
-      "✓ Formula: 1 detected",
-    ],
-  },
-  {
-    icon: BookOpen,
-    title: "Generate",
-    subtitle: "Interactive lesson created",
-    content: [
-      "🌱 What is Photosynthesis?",
-      "📊 Visual diagram of the process",
-      "🧪 Interactive equation builder",
-      "📝 Practice quiz: 5 questions",
-    ],
-  },
-  {
-    icon: CheckCircle,
-    title: "Learn",
-    subtitle: "Adapted to your needs",
-    content: [
-      "🗣️ Available in Hindi, Tamil, Bengali",
-      "📖 Dyslexia-friendly format",
-      "🎮 Gamified quiz ready",
-      "📱 Saved for offline access",
-    ],
-  },
-];
+import { useTranslation } from "@/hooks/useTranslation";
 
 export function SnapAndLearn() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
   const [activeStep, setActiveStep] = useState(0);
+  const { t } = useTranslation();
+
+  const steps = [
+    {
+      icon: Camera,
+      title: t("snapAndLearn.steps.capture.title"),
+      subtitle: t("snapAndLearn.steps.capture.subtitle"),
+      content: [
+        "Chapter 5: Photosynthesis",
+        "Plants use sunlight, water, and carbon dioxide",
+        "to produce glucose and oxygen.",
+        "6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂",
+      ],
+    },
+    {
+      icon: FileText,
+      title: t("snapAndLearn.steps.extract.title"),
+      subtitle: t("snapAndLearn.steps.extract.subtitle"),
+      content: [
+        "✓ Topic: Photosynthesis",
+        "✓ Grade Level: 6th Standard",
+        "✓ Key Concepts: 4 identified",
+        "✓ Formula: 1 detected",
+      ],
+    },
+    {
+      icon: BookOpen,
+      title: t("snapAndLearn.steps.generate.title"),
+      subtitle: t("snapAndLearn.steps.generate.subtitle"),
+      content: [
+        "🌱 What is Photosynthesis?",
+        "📊 Visual diagram of the process",
+        "🧪 Interactive equation builder",
+        "📝 Practice quiz: 5 questions",
+      ],
+    },
+    {
+      icon: CheckCircle,
+      title: t("snapAndLearn.steps.learn.title"),
+      subtitle: t("snapAndLearn.steps.learn.subtitle"),
+      content: [
+        "🗣️ Available in Hindi, Tamil, Bengali",
+        "📖 Dyslexia-friendly format",
+        "🎮 Gamified quiz ready",
+        "📱 Saved for offline access",
+      ],
+    },
+  ];
 
   useEffect(() => {
     if (!isInView) return;
@@ -63,7 +65,7 @@ export function SnapAndLearn() {
       setActiveStep((prev) => (prev + 1) % steps.length);
     }, 3500);
     return () => clearInterval(interval);
-  }, [isInView]);
+  }, [isInView, steps.length]);
 
   return (
     <SectionWrapper id="snap-learn" className="py-20 lg:py-26 overflow-hidden">
@@ -76,7 +78,7 @@ export function SnapAndLearn() {
             className="text-brand text-sm font-semibold uppercase tracking-[0.2em] mb-4
                      font-[family-name:var(--font-display)]"
           >
-            Snap & Learn
+            {t("snapAndLearn.badge")}
           </motion.p>
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
@@ -85,8 +87,8 @@ export function SnapAndLearn() {
             className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl md:text-5xl
                      font-bold tracking-tight"
           >
-            From textbook to{" "}
-            <span className="gradient-text">interactive lesson</span>
+            {t("snapAndLearn.title")}{" "}
+            <span className="gradient-text">{t("snapAndLearn.titleHighlight")}</span>
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 16 }}
@@ -94,7 +96,7 @@ export function SnapAndLearn() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="mt-4 text-text-secondary text-base sm:text-lg max-w-2xl mx-auto"
           >
-            Just point your camera. AI does the rest.
+            {t("snapAndLearn.subtitle")}
           </motion.p>
         </div>
 
@@ -194,7 +196,7 @@ export function SnapAndLearn() {
                     <div className="w-2 h-2 rounded-full bg-brand animate-pulse" />
                     <span className="text-xs font-semibold text-brand uppercase tracking-wider
                                    font-[family-name:var(--font-display)]">
-                      Step {activeStep + 1}: {steps[activeStep].title}
+                      {steps[activeStep].title}
                     </span>
                   </div>
 

@@ -10,6 +10,7 @@ class ParentProfile(BaseModel):
     full_name: Optional[str] = None
     email: Optional[str] = None
     phone_number: Optional[str] = None
+    preferred_language: str = "en"
     created_at: datetime
 
     model_config = {"from_attributes": True}
