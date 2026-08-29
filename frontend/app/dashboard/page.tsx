@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -27,6 +27,7 @@ import {
   Edit,
   Trash2,
   Upload,
+  Loader2,
   Brain,
   Award,
   MessageSquare,
@@ -42,7 +43,42 @@ import {
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { DashboardSidebar } from "@/components/dashboard/Sidebar";
+import { LearningProgressPanel } from "@/components/dashboard/LearningProgressPanel";
+import { ClassLearningProgress } from "@/components/dashboard/ClassLearningProgress";
+import {
+  AnimatedNumber,
+  ConsoleMotion,
+  EASE,
+  Item,
+  QUICK,
+  Reveal,
+  Stagger,
+} from "@/components/dashboard/console/motion";
+import {
+  Chip,
+  Code,
+  EmptyState,
+  Fact,
+  Field,
+  FieldLabel,
+  IdentityBar,
+  Loading,
+  Meter,
+  MetaDot,
+  Modal,
+  Notice,
+  Panel,
+  PanelHead,
+  SectionHead,
+  Segmented,
+  StatRow,
+  Table,
+  Td,
+  Th,
+  inputClass,
+} from "@/components/dashboard/console/primitives";
 import { DeleteModuleDialog } from "@/components/school/DeleteModuleDialog";
+import { TeacherSearchModal } from "@/components/school/TeacherSearchModal";
 import { AdminRequestsPanel } from "@/components/school/registration/AdminRequestsPanel";
 import { SchoolRequestsPanel } from "@/components/admin/SchoolRequestsPanel";
 import { SubjectSetupGate } from "@/components/school/SubjectSetupGate";
@@ -191,6 +227,11 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
 
+  // The console surface language (see globals.css) applies to the School
+  // Admin, Teacher and Parent dashboards only. Student and Super Admin never
+  // carry the class, so their shell renders exactly as it did before.
+  const isConsole = role === "school" || role === "teacher" || role === "parent";
+
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!loading && (!user || !role)) {
@@ -204,7 +245,12 @@ export default function DashboardPage() {
       getRolePermissions(role)
         .then((res) => {
           setPermissions(res);
+          const tabParam =
+            typeof window !== "undefined"
+              ? new URLSearchParams(window.location.search).get("tab")
+              : null;
           const defaultTab =
+            tabParam ||
             res.navigation.find((i) => i.is_default)?.id ||
             res.navigation[0]?.id ||
             "overview";
@@ -215,6 +261,13 @@ export default function DashboardPage() {
         });
     }
   }, [role]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const tabParam = new URLSearchParams(window.location.search).get("tab");
+      if (tabParam) setActiveTab(tabParam);
+    }
+  }, []);
 
   if (loading || !user || !role) {
     return (
@@ -234,7 +287,7 @@ export default function DashboardPage() {
     permissions?.navigation[0];
 
   return (
-    <div className="min-h-screen bg-background relative flex">
+    <div className={`min-h-screen bg-background relative flex ${isConsole ? "console" : ""}`}>
       {/* Left Dynamic RBAC Permissions Sidebar */}
       <DashboardSidebar
         permissions={permissions}
@@ -250,7 +303,13 @@ export default function DashboardPage() {
       {/* Main Content Area */}
       <div className="lg:pl-72 flex-1 flex flex-col min-w-0 min-h-screen">
         {/* Top Navbar Header */}
-        <header className="sticky top-0 z-30 glass border-b border-border-primary px-4 sm:px-6 py-3.5 flex items-center justify-between">
+        <header
+          className={
+            isConsole
+              ? "sticky top-0 z-30 flex items-center justify-between border-b border-[var(--c-line)] bg-[var(--c-panel)] px-4 py-3 sm:px-6"
+              : "sticky top-0 z-30 glass border-b border-border-primary px-4 sm:px-6 py-3.5 flex items-center justify-between"
+          }
+        >
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setMobileSidebarOpen(true)}
@@ -262,7 +321,13 @@ export default function DashboardPage() {
 
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-bold text-text-primary truncate">
+                <h1
+                  className={
+                    isConsole
+                      ? "truncate text-[15px] font-semibold tracking-[-0.01em] text-text-primary font-[family-name:var(--font-display)]"
+                      : "text-base sm:text-lg font-bold text-text-primary truncate"
+                  }
+                >
                   {activePermissionItem?.label || `${role?.toUpperCase()} Dashboard`}
                 </h1>
                 {activePermissionItem?.badge && (
@@ -307,7 +372,13 @@ export default function DashboardPage() {
         </header>
 
         {/* Dashboard Body with Dynamic View Routing */}
-        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+        <main
+          className={
+            isConsole
+              ? "mx-auto w-full max-w-[1440px] flex-1 space-y-6 p-4 sm:p-6 lg:p-8"
+              : "flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6"
+          }
+        >
           {role === "student" && (
             <StudentDashboardView
               student={user as StudentProfile}
@@ -588,6 +659,14 @@ function StudentDashboardView({
               <span className="text-[11px] text-emerald-500 block">PDF Reader & AI Diagnostic Quizzes</span>
             </div>
           </div>
+
+          {/* Learning progress — hidden only when we positively know the
+              mandatory diagnostic is still outstanding (lessons are locked
+              until then). Offline, quizStatus is null and the panel still
+              renders from this device's cached progress. */}
+          {!needsSetup && quizStatus?.completed !== false && (
+            <LearningProgressPanel student={student} />
+          )}
         </div>
       )}
 
@@ -928,6 +1007,11 @@ function SchoolDashboardView({
   const router = useRouter();
   const { jobFor, unwatch, completionNonce } = useModuleProcessing();
   const [selectedClass, setSelectedClass] = useState<number>(1);
+  const [curriculumSection, setCurriculumSection] = useState<"ncert" | "upload">("ncert");
+  const [ncertBooks, setNcertBooks] = useState<NCERTBookOut[]>([]);
+  const [loadingNcert, setLoadingNcert] = useState<boolean>(false);
+  const [attachingNcertId, setAttachingNcertId] = useState<string | null>(null);
+  const [ncertActionMsg, setNcertActionMsg] = useState<string | null>(null);
   const [modules, setModules] = useState<ModuleOut[]>([]);
   const [loadingModules, setLoadingModules] = useState<boolean>(false);
   const [schoolSubjects, setSchoolSubjects] = useState<SchoolSubjectDetail[]>([]);
@@ -935,6 +1019,28 @@ function SchoolDashboardView({
   const [moduleToDelete, setModuleToDelete] = useState<ModuleOut | null>(null);
   const [quizSummaries, setQuizSummaries] = useState<StudentQuizSummaryOut[]>([]);
   const [loadingQuizSummaries, setLoadingQuizSummaries] = useState<boolean>(false);
+
+  const fetchNcertBooks = () => {
+    setLoadingNcert(true);
+    getNCERTBooksForClass(selectedClass)
+      .then((res) => setNcertBooks(res))
+      .catch((err) => console.log("NCERT books fetch note:", err.message))
+      .finally(() => setLoadingNcert(false));
+  };
+
+  const handleAddNcertToSchool = async (book: NCERTBookOut) => {
+    setAttachingNcertId(book.id);
+    try {
+      await addNCERTModuleToSchool(book.class_number, book.id, book.title);
+      setNcertActionMsg(`"${book.title}" imported to Class ${book.class_number} school modules!`);
+      fetchModules();
+      setTimeout(() => setNcertActionMsg(null), 4000);
+    } catch (err: any) {
+      alert(err.message || "Failed to import NCERT book to modules.");
+    } finally {
+      setAttachingNcertId(null);
+    }
+  };
 
   const fetchModules = () => {
     setLoadingModules(true);
@@ -967,6 +1073,7 @@ function SchoolDashboardView({
       fetchModules();
       fetchSubjects();
       fetchQuizSummaries();
+      fetchNcertBooks();
     }
   }, [selectedClass, activeTab, completionNonce]);
 
@@ -984,478 +1091,598 @@ function SchoolDashboardView({
   );
 
   return (
-    <div className="space-y-6">
-      {/* TAB: OVERVIEW */}
-      {activeTab === "overview" && (
-        <div className="space-y-6">
-          <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold text-text-primary">
-                    {school.school_name}
-                  </h1>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand">
-                    {school.branch_name}
+    <ConsoleMotion>
+      <div className="space-y-6">
+        {/* TAB: OVERVIEW */}
+        {activeTab === "overview" && (
+          <div className="space-y-6">
+            <IdentityBar
+              monogram={school.student_prefix}
+              title={school.school_name}
+              badge={<Chip tone="brand">{school.branch_name}</Chip>}
+              meta={
+                <>
+                  <span>
+                    Prefix:{" "}
+                    <span className="font-mono font-semibold text-brand">
+                      {school.student_prefix}
+                    </span>
                   </span>
-                </div>
-                <p className="text-sm text-text-secondary mt-1">
-                  Prefix: <span className="font-mono font-bold text-brand">{school.student_prefix}</span> | {school.email} | {school.state}
-                </p>
-              </div>
+                  <MetaDot />
+                  <span>{school.email}</span>
+                  <MetaDot />
+                  <span>{school.state}</span>
+                </>
+              }
+              aside={<Fact label="Registered Branch">{school.branch_name}</Fact>}
+            />
 
-              <div className="flex items-center gap-3">
-                <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
-                  <span className="text-text-tertiary block">Registered Branch</span>
-                  <span className="font-semibold text-text-primary">{school.branch_name}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+            <StatRow
+              stats={[
+                {
+                  label: "Institution Prefix",
+                  icon: Building2,
+                  value: <span className="font-mono text-brand">{school.student_prefix}</span>,
+                  hint: "Student ID auto-prefix",
+                },
+                {
+                  label: "Curriculum Grades",
+                  icon: Layers,
+                  value: "Classes 1–5",
+                  hint: "Active Syllabus",
+                  hintTone: "emerald",
+                },
+                {
+                  label: "Branch Location",
+                  icon: Building2,
+                  value: school.state || "India",
+                  hint: school.email,
+                },
+              ]}
+            />
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
-              <span className="text-xs text-text-tertiary block">Institution Prefix</span>
-              <span className="text-lg font-bold text-brand font-mono">{school.student_prefix}</span>
-              <span className="text-[11px] text-text-secondary">Student ID auto-prefix</span>
-            </div>
+            {/* Class Diagnostic Quiz Roster — class teacher view of each student's result */}
+            <div>
+              <SectionHead icon={Target} title={`Class ${selectedClass} Diagnostic Results`} />
 
-            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
-              <span className="text-xs text-text-tertiary block">Curriculum Grades</span>
-              <span className="text-lg font-bold text-text-primary">Classes 1–5</span>
-              <span className="text-[11px] text-emerald-500">Active Syllabus</span>
-            </div>
+              <Panel flush className="overflow-hidden">
+                {loadingQuizSummaries ? (
+                  <Loading />
+                ) : quizSummaries.length > 0 ? (
+                  <Stagger className="divide-y divide-[var(--c-line)]">
+                    {quizSummaries.map((s) => (
+                      <Item key={s.student_unique_number} className="console-row px-5 py-4">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <Code>{s.student_unique_number}</Code>
+                            <span className="truncate text-xs text-text-secondary">
+                              {s.student_email}
+                            </span>
+                          </div>
 
-            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
-              <span className="text-xs text-text-tertiary block">Branch Location</span>
-              <span className="text-lg font-bold text-text-primary">{school.state || "India"}</span>
-              <span className="text-[11px] text-text-secondary">{school.email}</span>
-            </div>
-          </div>
-
-          {/* Class Diagnostic Quiz Roster — class teacher view of each student's result */}
-          <div>
-            <h2 className="text-lg font-bold text-text-primary flex items-center gap-2 mb-4">
-              <Target className="w-5 h-5 text-brand" />
-              <span>Class {selectedClass} Diagnostic Results</span>
-            </h2>
-
-            {loadingQuizSummaries ? (
-              <div className="py-12 flex justify-center">
-                <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : quizSummaries.length > 0 ? (
-              <div className="space-y-3">
-                {quizSummaries.map((s) => (
-                  <div
-                    key={s.student_unique_number}
-                    className="glass rounded-[var(--radius-md)] p-4 border border-border-primary"
-                  >
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface border border-border-primary font-bold text-brand">
-                          {s.student_unique_number}
-                        </span>
-                        <span className="text-xs text-text-secondary">{s.student_email}</span>
-                      </div>
-                      {s.completed ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-text-primary">
-                            {s.overall_score !== null ? `${s.overall_score}%` : "—"}
-                          </span>
-                          {s.gaps_found > 0 && (
-                            <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                              {s.gaps_found} gap{s.gaps_found === 1 ? "" : "s"}
+                          {s.completed ? (
+                            <div className="flex items-center gap-3">
+                              {s.gaps_found > 0 && (
+                                <Chip tone="amber">
+                                  {s.gaps_found} gap{s.gaps_found === 1 ? "" : "s"}
+                                </Chip>
+                              )}
+                              {s.overall_score !== null && (
+                                <Meter
+                                  className="w-24"
+                                  value={s.overall_score}
+                                  tone={
+                                    s.overall_score >= 70
+                                      ? "emerald"
+                                      : s.overall_score >= 40
+                                      ? "amber"
+                                      : "rose"
+                                  }
+                                />
+                              )}
+                              <span className="console-num w-12 text-right text-sm font-semibold text-text-primary font-[family-name:var(--font-display)]">
+                                {s.overall_score !== null ? `${s.overall_score}%` : "—"}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs italic text-text-tertiary">
+                              Not completed yet
                             </span>
                           )}
                         </div>
-                      ) : (
-                        <span className="text-xs text-text-tertiary italic">Not completed yet</span>
-                      )}
-                    </div>
-                    {s.ai_summary_status === "ready" && s.ai_summary && (
-                      <p className="text-xs text-text-secondary mt-2.5 pt-2.5 border-t border-border-primary/50 leading-relaxed">
-                        {s.ai_summary}
-                      </p>
-                    )}
-                    {s.completed && s.ai_summary_status === "pending" && (
-                      <p className="text-[10px] text-text-tertiary mt-2 italic">Summary generating...</p>
+
+                        {s.ai_summary_status === "ready" && s.ai_summary && (
+                          <p className="mt-3 border-t border-[var(--c-line)] pt-3 text-xs leading-relaxed text-text-secondary">
+                            {s.ai_summary}
+                          </p>
+                        )}
+                        {s.completed && s.ai_summary_status === "pending" && (
+                          <p className="mt-2 text-[10px] italic text-text-tertiary">
+                            Summary generating...
+                          </p>
+                        )}
+                      </Item>
+                    ))}
+                  </Stagger>
+                ) : (
+                  <EmptyState icon={Target} title={`No Students in Class ${selectedClass} Yet`}>
+                    Once students register under this branch and set their class, their diagnostic
+                    quiz results will appear here.
+                  </EmptyState>
+                )}
+              </Panel>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: MODULES */}
+        {activeTab === "modules" && (
+          <div>
+            <SectionHead
+              icon={Building2}
+              title="Class Curriculum & Learning Modules"
+              description="Manage official NCERT textbooks, upload school-specific syllabus modules, and view extracted OCR content for students."
+              actions={
+                <Segmented
+                  idPrefix="school-class"
+                  value={selectedClass}
+                  onChange={(cls) => setSelectedClass(cls)}
+                  options={[1, 2, 3, 4, 5].map((cls) => ({
+                    value: cls,
+                    label: `Class ${cls}`,
+                  }))}
+                />
+              }
+            />
+
+            {/* SUB-SECTIONS: A. NCERT BOOKS  vs  B. UPLOAD MODULES */}
+            <div className="border-b border-[var(--c-line)] pb-4 mb-5">
+              <Segmented
+                idPrefix="curriculum-subtab"
+                value={curriculumSection}
+                onChange={(val) => setCurriculumSection(val as "ncert" | "upload")}
+                options={[
+                  { value: "ncert", label: `NCERT Books (Class ${selectedClass})` },
+                  { value: "upload", label: `Upload Modules (Class ${selectedClass})` },
+                ]}
+              />
+            </div>
+
+            {/* SECTION A: NCERT BOOKS */}
+            {curriculumSection === "ncert" && (
+              <div className="space-y-4">
+                {ncertActionMsg && (
+                  <div className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-xs text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 shrink-0" />
+                      {ncertActionMsg}
+                    </span>
+                    <button
+                      onClick={() => setNcertActionMsg(null)}
+                      className="cursor-pointer text-emerald-500 hover:text-emerald-400"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {loadingNcert ? (
+                  <Panel flush>
+                    <Loading label={`Loading Class ${selectedClass} NCERT books…`} />
+                  </Panel>
+                ) : ncertBooks.length > 0 ? (
+                  <Panel flush className="overflow-hidden">
+                    <PanelHead
+                      icon={BookOpen}
+                      title={`Official NCERT Textbooks for Class ${selectedClass}`}
+                      description={`${ncertBooks.length} pre-loaded syllabus books available from the national curriculum`}
+                    />
+                    <Stagger className="divide-y divide-[var(--c-line)]">
+                      {ncertBooks.map((book) => {
+                        const isAttached = modules.some(
+                          (m) =>
+                            m.ncert_book_id === book.id ||
+                            (m.source_type === "ncert" &&
+                              m.title.trim().toLowerCase() === book.title.trim().toLowerCase())
+                        );
+
+                        return (
+                          <Item
+                            key={book.id}
+                            className="console-row group flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:gap-4"
+                          >
+                            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-[var(--c-line)] bg-[var(--c-sunken)] text-text-tertiary">
+                              <BookOpen className="h-4.5 w-4.5 text-brand" />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2 mb-1">
+                                <Chip tone="brand">{book.subject}</Chip>
+                                <Chip tone="neutral">Class {book.class_number}</Chip>
+                                {book.file_url ? (
+                                  <Chip tone="emerald">PDF Document Available</Chip>
+                                ) : (
+                                  <Chip tone="neutral">Official Standard</Chip>
+                                )}
+                              </div>
+                              <h4 className="truncate text-sm font-semibold text-text-primary font-[family-name:var(--font-display)]">
+                                {book.title}
+                              </h4>
+                              {book.description && (
+                                <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">
+                                  {book.description}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex shrink-0 flex-wrap items-center gap-3 pt-2 lg:pt-0">
+                              {book.file_url ? (
+                                <a
+                                  href={formatPdfUrl(book.file_url)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline"
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                  View PDF
+                                </a>
+                              ) : (
+                                <span className="text-[11px] italic text-text-tertiary">
+                                  Text Only
+                                </span>
+                              )}
+
+                              {isAttached ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  In School Modules
+                                </span>
+                              ) : (
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  disabled={attachingNcertId === book.id}
+                                  onClick={() => handleAddNcertToSchool(book)}
+                                  className="text-xs"
+                                >
+                                  {attachingNcertId === book.id ? (
+                                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Plus className="mr-1.5 h-3.5 w-3.5 text-brand" />
+                                  )}
+                                  Import to School Modules
+                                </Button>
+                              )}
+                            </div>
+                          </Item>
+                        );
+                      })}
+                    </Stagger>
+                  </Panel>
+                ) : (
+                  <Panel flush>
+                    <EmptyState
+                      icon={BookOpen}
+                      title={`No NCERT Books for Class ${selectedClass}`}
+                    >
+                      No pre-loaded NCERT textbooks were found for Class {selectedClass}.
+                    </EmptyState>
+                  </Panel>
+                )}
+              </div>
+            )}
+
+            {/* SECTION B: UPLOAD MODULES */}
+            {curriculumSection === "upload" && (
+              <div className="space-y-4">
+                {/* Subject-Wise Curriculum Sections */}
+                {loadingModules || loadingSubjects ? (
+                  <Panel flush>
+                    <Loading label={`Loading Class ${selectedClass} subjects & modules…`} />
+                  </Panel>
+                ) : classSubjects.length > 0 ? (
+                  <div className="space-y-4">
+                    {classSubjects.map((sub) => {
+                      const subModules = modules.filter(
+                        (m) =>
+                          (m.subject || "").trim().toLowerCase() === sub.subject.trim().toLowerCase()
+                      );
+
+                      return (
+                        <Reveal key={sub.id || sub.subject}>
+                          <Panel flush className="overflow-hidden">
+                            <PanelHead
+                              title={
+                                <span className="flex flex-wrap items-center gap-2">
+                                  <span>{sub.subject}</span>
+                                  {sub.publisher_name && (
+                                    <Chip tone="brand">{sub.publisher_name}</Chip>
+                                  )}
+                                </span>
+                              }
+                              description={
+                                <>
+                                  Class {selectedClass} · {subModules.length}{" "}
+                                  {subModules.length === 1 ? "Chapter / PDF" : "Chapters / PDFs"}{" "}
+                                  uploaded
+                                </>
+                              }
+                              icon={BookOpen}
+                              actions={
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() =>
+                                    router.push(
+                                      `/dashboard/modules/upload?class=${selectedClass}&subject=${encodeURIComponent(
+                                        sub.subject
+                                      )}`
+                                    )
+                                  }
+                                  className="text-xs"
+                                >
+                                  <Plus className="mr-1 h-3.5 w-3.5 text-brand" />
+                                  Upload PDF for {sub.subject}
+                                </Button>
+                              }
+                            />
+
+                            {/* Modules Under This Subject */}
+                            {subModules.length > 0 ? (
+                              <Stagger className="divide-y divide-[var(--c-line)]">
+                                {subModules.map((mod) => {
+                                  const status = statusOf(mod);
+                                  const job = jobFor(mod.id);
+                                  const ocrPdfUrl = job?.ocrPdfUrl ?? mod.ocr_pdf_url ?? null;
+
+                                  return (
+                                    <Item
+                                      key={mod.id}
+                                      className="console-row group flex flex-col gap-3 px-5 py-3.5 lg:flex-row lg:items-center lg:gap-4"
+                                    >
+                                      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-[var(--c-line)] bg-[var(--c-sunken)] text-text-tertiary">
+                                        <FileText className="h-4 w-4" />
+                                      </div>
+
+                                      <div className="min-w-0 flex-1">
+                                        <span className="console-eyebrow">Chapter / Material</span>
+                                        <h4 className="mt-0.5 truncate text-[13px] font-semibold text-text-primary font-[family-name:var(--font-display)]">
+                                          {mod.title}
+                                        </h4>
+                                        {status === "failed" && (
+                                          <p className="mt-1 text-[11px] leading-relaxed text-text-secondary">
+                                            Text could not be extracted. Re-upload to run extraction
+                                            again.
+                                          </p>
+                                        )}
+                                      </div>
+
+                                      <div className="flex shrink-0 flex-wrap items-center gap-3">
+                                        <ModuleStatusBadge
+                                          status={status}
+                                          title={job?.message ?? undefined}
+                                        />
+
+                                        {mod.file_url ? (
+                                          <a
+                                            href={formatPdfUrl(mod.file_url)}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline"
+                                          >
+                                            <FileText className="h-3 w-3" />
+                                            View PDF
+                                          </a>
+                                        ) : (
+                                          <span className="text-[11px] italic text-text-tertiary">
+                                            No File
+                                          </span>
+                                        )}
+
+                                        {status === "done" && ocrPdfUrl && (
+                                          <a
+                                            href={formatPdfUrl(ocrPdfUrl)}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline"
+                                          >
+                                            <Layers className="h-3 w-3" />
+                                            Extracted Text
+                                          </a>
+                                        )}
+
+                                        {status === "failed" && (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                              router.push(
+                                                `/dashboard/modules/upload?class=${mod.class_number}&replace=${mod.id}`
+                                              )
+                                            }
+                                            className="px-2 py-1 text-[10px]"
+                                          >
+                                            <RefreshCw className="mr-1 h-3 w-3" />
+                                            Retry
+                                          </Button>
+                                        )}
+
+                                        <button
+                                          onClick={() => setModuleToDelete(mod)}
+                                          className="cursor-pointer rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-rose-500/10 hover:text-rose-500 lg:opacity-0 lg:focus-visible:opacity-100 lg:group-hover:opacity-100"
+                                          title={`Delete "${mod.title}"`}
+                                          aria-label={`Delete ${mod.title}`}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
+                                    </Item>
+                                  );
+                                })}
+                              </Stagger>
+                            ) : (
+                              <div
+                                onClick={() =>
+                                  router.push(
+                                    `/dashboard/modules/upload?class=${selectedClass}&subject=${encodeURIComponent(
+                                      sub.subject
+                                    )}`
+                                  )
+                                }
+                                className="group m-4 cursor-pointer space-y-2 rounded-[var(--c-radius)] border border-dashed border-[var(--c-line-strong)] bg-[var(--c-sunken)] p-6 text-center transition-colors hover:border-brand/50 hover:bg-brand/[0.03]"
+                              >
+                                <div className="mx-auto grid h-8 w-8 place-items-center rounded-full border border-[var(--c-line)] bg-[var(--c-panel)] text-text-tertiary transition-colors group-hover:border-brand/40 group-hover:text-brand">
+                                  <Upload className="h-4 w-4" />
+                                </div>
+                                <p className="text-xs font-semibold text-text-secondary group-hover:text-text-primary">
+                                  No PDF chapters uploaded yet for {sub.subject}
+                                </p>
+                                <p className="mx-auto max-w-xs text-[11px] text-text-tertiary">
+                                  Click to upload textbook chapters or study notes for Class{" "}
+                                  {selectedClass} students.
+                                </p>
+                              </div>
+                            )}
+                          </Panel>
+                        </Reveal>
+                      );
+                    })}
+
+                    {/* Unassigned / General Modules Section if any */}
+                    {unassignedModules.length > 0 && (
+                      <Reveal>
+                        <Panel flush className="overflow-hidden">
+                          <PanelHead
+                            icon={Layers}
+                            title="Additional / General Modules"
+                            description={`${unassignedModules.length} module(s) not mapped to specific registered subjects`}
+                          />
+
+                          <Stagger className="divide-y divide-[var(--c-line)]">
+                            {unassignedModules.map((mod) => {
+                              const status = statusOf(mod);
+                              const job = jobFor(mod.id);
+                              const ocrPdfUrl = job?.ocrPdfUrl ?? mod.ocr_pdf_url ?? null;
+
+                              return (
+                                <Item
+                                  key={mod.id}
+                                  className="console-row group flex flex-col gap-3 px-5 py-3.5 lg:flex-row lg:items-center lg:gap-4"
+                                >
+                                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-[var(--c-line)] bg-[var(--c-sunken)] text-text-tertiary">
+                                    <FileText className="h-4 w-4" />
+                                  </div>
+
+                                  <div className="min-w-0 flex-1">
+                                    <span className="console-eyebrow">{mod.subject || "General"}</span>
+                                    <h4 className="mt-0.5 truncate text-[13px] font-semibold text-text-primary font-[family-name:var(--font-display)]">
+                                      {mod.title}
+                                    </h4>
+                                  </div>
+
+                                  <div className="flex shrink-0 flex-wrap items-center gap-3">
+                                    <ModuleStatusBadge
+                                      status={status}
+                                      title={job?.message ?? undefined}
+                                    />
+
+                                    {mod.file_url ? (
+                                      <a
+                                        href={formatPdfUrl(mod.file_url)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline"
+                                      >
+                                        <FileText className="h-3 w-3" />
+                                        View PDF
+                                      </a>
+                                    ) : (
+                                      <span className="text-[11px] italic text-text-tertiary">
+                                        No File
+                                      </span>
+                                    )}
+
+                                    {status === "done" && ocrPdfUrl && (
+                                      <a
+                                        href={formatPdfUrl(ocrPdfUrl)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline"
+                                      >
+                                        <Layers className="h-3 w-3" />
+                                        Extracted Text
+                                      </a>
+                                    )}
+
+                                    <button
+                                      onClick={() => setModuleToDelete(mod)}
+                                      className="cursor-pointer rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-rose-500/10 hover:text-rose-500 lg:opacity-0 lg:focus-visible:opacity-100 lg:group-hover:opacity-100"
+                                      title={`Delete "${mod.title}"`}
+                                      aria-label={`Delete ${mod.title}`}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </Item>
+                              );
+                            })}
+                          </Stagger>
+                        </Panel>
+                      </Reveal>
                     )}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
-                <Target className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-                <h3 className="text-sm font-semibold text-text-primary">
-                  No Students in Class {selectedClass} Yet
-                </h3>
-                <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
-                  Once students register under this branch and set their class, their diagnostic quiz results will appear here.
-                </p>
+                ) : (
+                  <Panel flush>
+                    <EmptyState
+                      icon={BookOpen}
+                      title={`No Subjects Registered for Class ${selectedClass}`}
+                      action={
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() =>
+                            router.push(`/dashboard/modules/upload?class=${selectedClass}`)
+                          }
+                          className="text-xs"
+                        >
+                          <Upload className="mr-1 h-3.5 w-3.5" />
+                          Upload Module
+                        </Button>
+                      }
+                    >
+                      Upload your curriculum books or worksheets as PDFs to make content available for
+                      Class {selectedClass} students &amp; AI quizzes.
+                    </EmptyState>
+                  </Panel>
+                )}
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* TAB: MODULES */}
-      {activeTab === "modules" && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-brand" />
-                <span>Class Curriculum & Learning Modules</span>
-              </h2>
-              <p className="text-xs text-text-secondary mt-0.5">
-                Manage PDF modules, textbook chapters, and OCR documents for each registered subject.
-              </p>
-            </div>
+        {/* TAB: ADMINISTRATOR REQUESTS (school verification — owner approval) */}
+        {activeTab === "admin-requests" && <AdminRequestsPanel />}
 
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() =>
-                  router.push(`/dashboard/modules/upload?class=${selectedClass}`)
-                }
-                className="text-xs"
-              >
-                <Upload className="w-3.5 h-3.5 mr-1" />
-                Upload Module
-              </Button>
+        {/* TAB: TEACHER MANAGEMENT */}
+        {activeTab === "teachers" && <SchoolTeacherManagement />}
 
-              {/* Class Tabs */}
-              <div className="flex items-center gap-1 bg-surface-hover p-1 rounded-[var(--radius-md)] border border-border-primary">
-                {[1, 2, 3, 4, 5].map((cls) => (
-                  <button
-                    key={cls}
-                    onClick={() => setSelectedClass(cls)}
-                    className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
-                      selectedClass === cls
-                        ? "bg-brand text-white shadow-sm"
-                        : "text-text-secondary hover:text-text-primary hover:bg-surface"
-                    }`}
-                  >
-                    Class {cls}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Subject-Wise Curriculum Sections */}
-          {loadingModules || loadingSubjects ? (
-            <div className="py-16 flex flex-col items-center justify-center gap-3">
-              <div className="w-8 h-8 border-3 border-brand border-t-transparent rounded-full animate-spin" />
-              <p className="text-xs text-text-tertiary">Loading Class {selectedClass} subjects &amp; modules…</p>
-            </div>
-          ) : classSubjects.length > 0 ? (
-            <div className="space-y-6">
-              {classSubjects.map((sub) => {
-                const subModules = modules.filter(
-                  (m) =>
-                    (m.subject || "").trim().toLowerCase() === sub.subject.trim().toLowerCase()
-                );
-
-                return (
-                  <div
-                    key={sub.id || sub.subject}
-                    className="glass rounded-[var(--radius-lg)] border border-border-primary p-5 space-y-4"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border-primary/60">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-[var(--radius-md)] bg-brand/10 text-brand flex items-center justify-center shrink-0">
-                          <BookOpen className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-sm font-bold text-text-primary">
-                              {sub.subject}
-                            </h3>
-                            {sub.publisher_name && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-brand/10 text-brand border border-border-brand">
-                                {sub.publisher_name}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-text-tertiary mt-0.5">
-                            Class {selectedClass} · {subModules.length}{" "}
-                            {subModules.length === 1 ? "Chapter / PDF" : "Chapters / PDFs"} uploaded
-                          </p>
-                        </div>
-                      </div>
-
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() =>
-                          router.push(
-                            `/dashboard/modules/upload?class=${selectedClass}&subject=${encodeURIComponent(
-                              sub.subject
-                            )}`
-                          )
-                        }
-                        className="text-xs self-start sm:self-auto"
-                      >
-                        <Plus className="w-3.5 h-3.5 mr-1 text-brand" />
-                        Upload PDF for {sub.subject}
-                      </Button>
-                    </div>
-
-                    {/* Modules Under This Subject */}
-                    {subModules.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-                        {subModules.map((mod) => {
-                          const status = statusOf(mod);
-                          const job = jobFor(mod.id);
-                          const ocrPdfUrl = job?.ocrPdfUrl ?? mod.ocr_pdf_url ?? null;
-
-                          return (
-                            <div
-                              key={mod.id}
-                              className="rounded-[var(--radius-md)] border border-border-primary bg-surface/60 hover:border-brand p-4 transition-all flex flex-col justify-between gap-3"
-                            >
-                              <div>
-                                <div className="flex items-center justify-between gap-2 mb-1.5">
-                                  <span className="text-[10px] font-bold text-brand uppercase tracking-wide">
-                                    Chapter / Material
-                                  </span>
-                                  <button
-                                    onClick={() => setModuleToDelete(mod)}
-                                    className="text-text-tertiary hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-500/10 cursor-pointer"
-                                    title={`Delete "${mod.title}"`}
-                                    aria-label={`Delete ${mod.title}`}
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                                <h4 className="text-xs font-bold text-text-primary line-clamp-2">
-                                  {mod.title}
-                                </h4>
-
-                                <div className="mt-2.5">
-                                  <ModuleStatusBadge
-                                    status={status}
-                                    title={job?.message ?? undefined}
-                                  />
-                                </div>
-
-                                {status === "failed" && (
-                                  <p className="text-[10px] text-text-secondary mt-1.5 leading-relaxed">
-                                    Text could not be extracted. Re-upload to run extraction again.
-                                  </p>
-                                )}
-                              </div>
-
-                              <div className="pt-2.5 border-t border-border-primary/50 flex items-center justify-between gap-2 text-xs">
-                                {mod.file_url ? (
-                                  <a
-                                    href={formatPdfUrl(mod.file_url)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline"
-                                  >
-                                    <FileText className="w-3 h-3" />
-                                    View PDF
-                                  </a>
-                                ) : (
-                                  <span className="text-[11px] text-text-tertiary italic">No File</span>
-                                )}
-
-                                {status === "done" && ocrPdfUrl && (
-                                  <a
-                                    href={formatPdfUrl(ocrPdfUrl)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline"
-                                  >
-                                    <Layers className="w-3 h-3" />
-                                    Extracted Text
-                                  </a>
-                                )}
-
-                                {status === "failed" && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      router.push(
-                                        `/dashboard/modules/upload?class=${mod.class_number}&replace=${mod.id}`
-                                      )
-                                    }
-                                    className="text-[10px] py-1 px-2"
-                                  >
-                                    <RefreshCw className="w-3 h-3 mr-1" />
-                                    Retry
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div
-                        onClick={() =>
-                          router.push(
-                            `/dashboard/modules/upload?class=${selectedClass}&subject=${encodeURIComponent(
-                              sub.subject
-                            )}`
-                          )
-                        }
-                        className="rounded-[var(--radius-md)] border border-dashed border-border-primary/80 bg-surface/30 p-6 text-center hover:bg-surface-hover/50 hover:border-brand transition-colors cursor-pointer space-y-2 group"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-surface border border-border-primary flex items-center justify-center mx-auto text-text-tertiary group-hover:text-brand group-hover:border-brand transition-colors">
-                          <Upload className="w-4 h-4" />
-                        </div>
-                        <p className="text-xs font-semibold text-text-secondary group-hover:text-text-primary">
-                          No PDF chapters uploaded yet for {sub.subject}
-                        </p>
-                        <p className="text-[11px] text-text-tertiary max-w-xs mx-auto">
-                          Click to upload textbook chapters or study notes for Class {selectedClass} students.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Unassigned / General Modules Section if any */}
-              {unassignedModules.length > 0 && (
-                <div className="glass rounded-[var(--radius-lg)] border border-border-primary p-5 space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-border-primary/60">
-                    <div>
-                      <h3 className="text-sm font-bold text-text-primary">
-                        Additional / General Modules
-                      </h3>
-                      <p className="text-[11px] text-text-tertiary mt-0.5">
-                        {unassignedModules.length} module(s) not mapped to specific registered subjects
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {unassignedModules.map((mod) => {
-                      const status = statusOf(mod);
-                      const job = jobFor(mod.id);
-                      const ocrPdfUrl = job?.ocrPdfUrl ?? mod.ocr_pdf_url ?? null;
-
-                      return (
-                        <div
-                          key={mod.id}
-                          className="rounded-[var(--radius-md)] border border-border-primary bg-surface/60 p-4 flex flex-col justify-between gap-3"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between gap-2 mb-1.5">
-                              <span className="text-[10px] font-bold text-brand uppercase tracking-wide">
-                                {mod.subject || "General"}
-                              </span>
-                              <button
-                                onClick={() => setModuleToDelete(mod)}
-                                className="text-text-tertiary hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-500/10 cursor-pointer"
-                                title={`Delete "${mod.title}"`}
-                                aria-label={`Delete ${mod.title}`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                            <h4 className="text-xs font-bold text-text-primary line-clamp-2">
-                              {mod.title}
-                            </h4>
-
-                            <div className="mt-2.5">
-                              <ModuleStatusBadge
-                                status={status}
-                                title={job?.message ?? undefined}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="pt-2.5 border-t border-border-primary/50 flex items-center justify-between text-xs">
-                            {mod.file_url ? (
-                              <a
-                                href={formatPdfUrl(mod.file_url)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline"
-                              >
-                                <FileText className="w-3 h-3" />
-                                View PDF
-                              </a>
-                            ) : (
-                              <span className="text-[11px] text-text-tertiary italic">No File</span>
-                            )}
-
-                            {status === "done" && ocrPdfUrl && (
-                              <a
-                                href={formatPdfUrl(ocrPdfUrl)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline"
-                              >
-                                <Layers className="w-3 h-3" />
-                                Extracted Text
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed space-y-3">
-              <BookOpen className="w-10 h-10 text-text-tertiary mx-auto opacity-50" />
-              <h3 className="text-sm font-semibold text-text-primary">
-                No Subjects Registered for Class {selectedClass}
-              </h3>
-              <p className="text-xs text-text-secondary max-w-sm mx-auto">
-                Upload your curriculum books or worksheets as PDFs to make content available for Class {selectedClass} students &amp; AI quizzes.
-              </p>
-              <div className="flex justify-center pt-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() =>
-                    router.push(`/dashboard/modules/upload?class=${selectedClass}`)
-                  }
-                  className="text-xs"
-                >
-                  <Upload className="w-3.5 h-3.5 mr-1" />
-                  Upload Module
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB: ADMINISTRATOR REQUESTS (school verification — owner approval) */}
-      {activeTab === "admin-requests" && <AdminRequestsPanel />}
-
-      {/* TAB: TEACHER MANAGEMENT */}
-      {activeTab === "teachers" && <SchoolTeacherManagement />}
-
-      {/* DELETE MODULE CONFIRMATION */}
-      {moduleToDelete && (
-        <DeleteModuleDialog
-          module={moduleToDelete}
-          classNumber={moduleToDelete.class_number}
-          isProcessing={isProcessing(statusOf(moduleToDelete))}
-          onClose={() => setModuleToDelete(null)}
-          onDeleted={(moduleId) => {
-            unwatch(moduleId);
-            setModuleToDelete(null);
-            setModules((prev) => prev.filter((m) => m.id !== moduleId));
-            fetchModules();
-          }}
-        />
-      )}
-    </div>
+        {/* DELETE MODULE CONFIRMATION */}
+        {moduleToDelete && (
+          <DeleteModuleDialog
+            module={moduleToDelete}
+            classNumber={moduleToDelete.class_number}
+            isProcessing={isProcessing(statusOf(moduleToDelete))}
+            onClose={() => setModuleToDelete(null)}
+            onDeleted={(moduleId) => {
+              unwatch(moduleId);
+              setModuleToDelete(null);
+              setModules((prev) => prev.filter((m) => m.id !== moduleId));
+              fetchModules();
+            }}
+          />
+        )}
+      </div>
+    </ConsoleMotion>
   );
 }
 
@@ -1505,286 +1732,273 @@ function ParentDashboardView({
   };
 
   return (
-    <div className="space-y-6">
-      {/* TAB: OVERVIEW */}
-      {activeTab === "overview" && (
-        <div className="space-y-6">
-          <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-xl font-bold text-text-primary">
-                  Welcome, {parent.full_name || "Parent"}
-                </h1>
-                <p className="text-sm text-text-secondary mt-1 flex items-center gap-2">
+    <ConsoleMotion>
+      <div className="space-y-6">
+        {/* TAB: OVERVIEW */}
+        {activeTab === "overview" && (
+          <div className="space-y-6">
+            <IdentityBar
+              icon={Users}
+              title={`Welcome, ${parent.full_name || "Parent"}`}
+              meta={
+                <>
                   <span>Guardian Account:</span>
-                  <span className="font-medium text-text-primary font-mono">{parent.phone_number || parent.email || "Registered Guardian"}</span>
-                </p>
-              </div>
+                  <span className="font-mono font-medium text-text-primary">
+                    {parent.phone_number || parent.email || "Registered Guardian"}
+                  </span>
+                </>
+              }
+              aside={
+                <Fact label="Linked Wards">
+                  <span className="text-brand">{childrenList.length} Child(ren)</span>
+                </Fact>
+              }
+            />
 
-              <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
-                <span className="text-text-tertiary block">Linked Wards</span>
-                <span className="font-semibold text-brand text-sm">{childrenList.length} Child(ren)</span>
-              </div>
-            </div>
-          </div>
+            {/* Quick Metrics */}
+            <StatRow
+              stats={[
+                {
+                  label: "Monitored Wards",
+                  icon: Users,
+                  value: <AnimatedNumber value={childrenList.length} />,
+                  hint: "Registered Students",
+                  hintTone: "brand",
+                },
+                {
+                  label: "Progress Tracking",
+                  icon: RefreshCw,
+                  value: <span className="text-emerald-500">Active</span>,
+                  hint: "Syncing School & NCERT Modules",
+                },
+                {
+                  label: "Guardian Feedback",
+                  icon: MessageSquare,
+                  value: <span className="text-violet-500">Connected</span>,
+                  hint: "Direct Teacher Remarks & Alerts",
+                  hintTone: "violet",
+                },
+              ]}
+            />
 
-          {/* Quick Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
-              <span className="text-xs text-text-tertiary block">Monitored Wards</span>
-              <span className="text-2xl font-bold text-text-primary">{childrenList.length}</span>
-              <span className="text-[11px] text-brand">Registered Students</span>
-            </div>
+            {/* Wards Overview Section */}
+            <div>
+              <SectionHead
+                icon={Users}
+                title="Your Wards / Children"
+                actions={
+                  childrenList.length > 0 ? (
+                    <span className="text-xs text-text-tertiary">
+                      Showing {childrenList.length} linked student(s)
+                    </span>
+                  ) : undefined
+                }
+              />
 
-            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
-              <span className="text-xs text-text-tertiary block">Progress Tracking</span>
-              <span className="text-2xl font-bold text-emerald-500">Active</span>
-              <span className="text-[11px] text-text-secondary">Syncing School & NCERT Modules</span>
-            </div>
-
-            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
-              <span className="text-xs text-text-tertiary block">Guardian Feedback</span>
-              <span className="text-2xl font-bold text-purple-500">Connected</span>
-              <span className="text-[11px] text-purple-400">Direct Teacher Remarks & Alerts</span>
-            </div>
-          </div>
-
-          {/* Wards Overview Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
-                <Users className="w-5 h-5 text-brand" />
-                <span>Your Wards / Children</span>
-              </h2>
-              {childrenList.length > 0 && (
-                <span className="text-xs text-text-tertiary">
-                  Showing {childrenList.length} linked student(s)
-                </span>
-              )}
-            </div>
-
-            {loadingChildren ? (
-              <div className="py-12 flex justify-center">
-                <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : childrenList.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {childrenList.map((child) => (
-                  <div
-                    key={child.id}
-                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand/40 transition-all flex flex-col justify-between space-y-4"
-                  >
-                    <div>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-sm shrink-0 border border-border-brand">
-                            <GraduationCap className="w-5 h-5" />
+              {loadingChildren ? (
+                <Panel flush>
+                  <Loading />
+                </Panel>
+              ) : childrenList.length > 0 ? (
+                <Stagger className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {childrenList.map((child) => (
+                    <Item key={child.id}>
+                      <Panel flush className="console-lift flex h-full flex-col overflow-hidden">
+                        <div className="flex items-center gap-3 px-5 py-4">
+                          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--c-radius)] border border-brand/20 bg-brand/8 text-brand">
+                            <GraduationCap className="h-5 w-5" />
                           </div>
-                          <div>
-                            <h3 className="font-bold text-base text-text-primary leading-tight">
+                          <div className="min-w-0">
+                            <h3 className="truncate text-sm font-semibold leading-tight text-text-primary font-[family-name:var(--font-display)]">
                               {child.full_name || `Student #${child.student_unique_number}`}
                             </h3>
-                            <span className="inline-block mt-0.5 text-xs font-mono font-bold text-brand bg-brand/5 px-2 py-0.5 rounded border border-border-brand">
-                              {child.student_unique_number}
-                            </span>
+                            <div className="mt-1">
+                              <Code>{child.student_unique_number}</Code>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="mt-4 pt-3 border-t border-border-primary/50 space-y-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-text-tertiary">Class & Section:</span>
-                          <span className="font-semibold text-text-primary">
+                        <div className="flex-1 divide-y divide-[var(--c-line)] border-t border-[var(--c-line)] px-5 py-2">
+                          <Field label="Class & Section:">
                             {child.class_number
                               ? child.enrollment_type === "self" || child.branch_name === "SELF"
                                 ? `Class ${child.class_number} (Self)`
                                 : `Class ${child.class_number} - Section ${child.section || "A"}`
                               : "Class not set"}
-                          </span>
-                        </div>
+                          </Field>
 
-                        <div className="flex items-center justify-between">
-                          <span className="text-text-tertiary">School / Branch:</span>
-                          <span className="font-medium text-text-secondary text-right truncate max-w-[180px]">
+                          <Field label="School / Branch:">
                             {child.enrollment_type === "self" || child.branch_name === "SELF"
                               ? "NCERT Self-Educated"
                               : `${child.school_name || "School"} (${child.branch_name || "Branch"})`}
+                          </Field>
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-[var(--c-line)] bg-[var(--c-sunken)] px-5 py-2.5 text-[11px] text-text-tertiary">
+                          <span className="console-num">
+                            Linked {new Date(child.created_at).toLocaleDateString()}
+                          </span>
+                          <span className="flex items-center gap-1.5 font-medium text-emerald-500">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Monitoring
                           </span>
                         </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-3 border-t border-border-primary/40 flex items-center justify-between text-[11px] text-text-tertiary">
-                      <span>Linked {new Date(child.created_at).toLocaleDateString()}</span>
-                      <span className="text-emerald-500 font-medium flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Monitoring
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
-                <Users className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-                <h3 className="text-sm font-semibold text-text-primary">No Wards Linked Yet</h3>
-                <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
-                  Students who register with your mobile number will automatically appear here. You can also link a child directly using their Unique Student ID.
-                </p>
-              </div>
-            )}
+                      </Panel>
+                    </Item>
+                  ))}
+                </Stagger>
+              ) : (
+                <Panel flush>
+                  <EmptyState icon={Users} title="No Wards Linked Yet">
+                    Students who register with your mobile number will automatically appear here.
+                    You can also link a child directly using their Unique Student ID.
+                  </EmptyState>
+                </Panel>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* TAB: CHILDREN */}
-      {activeTab === "children" && (
-        <div className="space-y-6">
-          {/* Add Child Link Form */}
-          <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
-            <h2 className="text-sm font-bold text-text-primary mb-1">Link an Additional Child</h2>
-            <p className="text-xs text-text-secondary mb-4">
-              Enter your child's Unique Student ID (e.g. LKD0001) to link their learning progress to your dashboard.
-            </p>
-
-            {linkError && (
-              <div className="mb-4 p-2.5 rounded bg-rose-500/10 text-rose-500 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{linkError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleAddChild} className="flex gap-3 max-w-md">
-              <input
-                type="text"
-                placeholder="Unique Student ID (e.g. LKD0001)"
-                value={newStudentId}
-                onChange={(e) => setNewStudentId(e.target.value.toUpperCase())}
-                className="flex-1 px-3.5 py-2 bg-surface text-text-primary text-xs uppercase rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none font-mono"
-                required
+        {/* TAB: CHILDREN */}
+        {activeTab === "children" && (
+          <div className="space-y-6">
+            {/* Add Child Link Form */}
+            <Panel flush className="overflow-hidden">
+              <PanelHead
+                icon={Plus}
+                title="Link an Additional Child"
+                description="Enter your child's Unique Student ID (e.g. LKD0001) to link their learning progress to your dashboard."
               />
-              <Button type="submit" variant="primary" size="sm" disabled={isLinking}>
-                {isLinking ? "Linking..." : "Link Child"}
-              </Button>
-            </form>
-          </div>
 
-          {/* Linked Children List */}
-          <div>
-            <h2 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
-              <Users className="w-5 h-5 text-brand" />
-              <span>Your Linked Children & Wards</span>
-            </h2>
+              <div className="p-5">
+                <AnimatePresence>
+                  {linkError && (
+                    <div className="mb-4">
+                      <Notice tone="rose" icon={AlertCircle}>
+                        {linkError}
+                      </Notice>
+                    </div>
+                  )}
+                </AnimatePresence>
 
-            {loadingChildren ? (
-              <div className="py-12 flex justify-center">
-                <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                <form onSubmit={handleAddChild} className="flex max-w-md gap-3">
+                  <input
+                    type="text"
+                    placeholder="Unique Student ID (e.g. LKD0001)"
+                    value={newStudentId}
+                    onChange={(e) => setNewStudentId(e.target.value.toUpperCase())}
+                    className={`${inputClass} font-mono uppercase tracking-wide`}
+                    required
+                  />
+                  <Button type="submit" variant="primary" size="sm" disabled={isLinking}>
+                    {isLinking ? "Linking..." : "Link Child"}
+                  </Button>
+                </form>
               </div>
-            ) : childrenList.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {childrenList.map((child) => (
-                  <div
-                    key={child.id}
-                    className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-4 hover:border-brand/40 transition-all"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-base shrink-0 border border-border-brand">
-                          <GraduationCap className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-base text-text-primary leading-tight">
-                            {child.full_name || `Student #${child.student_unique_number}`}
-                          </h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs font-mono font-bold text-brand bg-brand/5 px-2 py-0.5 rounded border border-border-brand">
-                              {child.student_unique_number}
-                            </span>
-                            <span className="text-[11px] px-2 py-0.5 rounded bg-surface border border-border-primary text-text-secondary font-medium">
-                              {child.enrollment_type === "self" || child.branch_name === "SELF" ? "Self Enrolled" : "School Enrolled"}
-                            </span>
+            </Panel>
+
+            {/* Linked Children List */}
+            <div>
+              <SectionHead icon={Users} title="Your Linked Children & Wards" />
+
+              {loadingChildren ? (
+                <Panel flush>
+                  <Loading />
+                </Panel>
+              ) : childrenList.length > 0 ? (
+                <Stagger className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {childrenList.map((child) => (
+                    <Item key={child.id}>
+                      <Panel flush className="console-lift flex h-full flex-col overflow-hidden">
+                        <div className="flex items-start gap-3 px-5 py-4">
+                          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--c-radius)] border border-brand/20 bg-brand/8 text-brand">
+                            <GraduationCap className="h-6 w-6" />
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="truncate text-sm font-semibold leading-tight text-text-primary font-[family-name:var(--font-display)]">
+                              {child.full_name || `Student #${child.student_unique_number}`}
+                            </h3>
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                              <Code>{child.student_unique_number}</Code>
+                              <Chip tone="neutral">
+                                {child.enrollment_type === "self" || child.branch_name === "SELF"
+                                  ? "Self Enrolled"
+                                  : "School Enrolled"}
+                              </Chip>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
 
-                    <div className="pt-3 border-t border-border-primary/50 space-y-2 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-text-tertiary">Enrolled Class:</span>
-                        <span className="font-semibold text-text-primary">
-                          {child.class_number
-                            ? child.enrollment_type === "self" || child.branch_name === "SELF"
-                              ? `Class ${child.class_number}`
-                              : `Class ${child.class_number} - Section ${child.section || "A"}`
-                            : "Not Configured"}
-                        </span>
-                      </div>
+                        <div className="flex-1 divide-y divide-[var(--c-line)] border-t border-[var(--c-line)] px-5 py-2">
+                          <Field label="Enrolled Class:">
+                            {child.class_number
+                              ? child.enrollment_type === "self" || child.branch_name === "SELF"
+                                ? `Class ${child.class_number}`
+                                : `Class ${child.class_number} - Section ${child.section || "A"}`
+                              : "Not Configured"}
+                          </Field>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-text-tertiary">School / Institution:</span>
-                        <span className="font-medium text-text-secondary truncate max-w-[170px]">
-                          {child.enrollment_type === "self" || child.branch_name === "SELF"
-                            ? "NCERT Self-Educated"
-                            : `${child.school_name || "School"} (${child.branch_name || "Branch"})`}
-                        </span>
-                      </div>
+                          <Field label="School / Institution:">
+                            {child.enrollment_type === "self" || child.branch_name === "SELF"
+                              ? "NCERT Self-Educated"
+                              : `${child.school_name || "School"} (${child.branch_name || "Branch"})`}
+                          </Field>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-text-tertiary">Linked Date:</span>
-                        <span className="text-text-secondary">
-                          {new Date(child.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                          <Field label="Linked Date:">
+                            <span className="console-num text-text-secondary">
+                              {new Date(child.created_at).toLocaleDateString()}
+                            </span>
+                          </Field>
+                        </div>
+                      </Panel>
+                    </Item>
+                  ))}
+                </Stagger>
+              ) : (
+                <Panel flush>
+                  <EmptyState icon={Users} title="No Linked Children Found">
+                    Link your child using their Unique Student ID above to monitor their academic
+                    performance and adaptive learning progress.
+                  </EmptyState>
+                </Panel>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB: REPORTS */}
+        {activeTab === "reports" && (
+          <div className="space-y-6">
+            <SectionHead
+              icon={Award}
+              title="Academic Reports & Progress Analytics"
+              description="Diagnostic quiz performance, gap topics, and AI-generated summaries for each linked child."
+            />
+
+            {loadingChildren ? (
+              <Panel flush>
+                <Loading />
+              </Panel>
+            ) : childrenList.length > 0 ? (
+              <Stagger className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {childrenList.map((child) => (
+                  <Item key={child.id}>
+                    <ChildCard child={child} />
+                  </Item>
                 ))}
-              </div>
+              </Stagger>
             ) : (
-              <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
-                <Users className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-                <h3 className="text-sm font-semibold text-text-primary">No Linked Children Found</h3>
-                <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
-                  Link your child using their Unique Student ID above to monitor their academic performance and adaptive learning progress.
-                </p>
-              </div>
+              <Panel flush>
+                <EmptyState icon={Users} title="No Wards Linked Yet">
+                  Link a child from the Children tab to see their diagnostic assessment results
+                  here.
+                </EmptyState>
+              </Panel>
             )}
           </div>
-        </div>
-      )}
-
-      {/* TAB: REPORTS */}
-      {activeTab === "reports" && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-2">
-            <Award className="w-5 h-5 text-brand" />
-            <h2 className="text-base font-bold text-text-primary">Academic Reports & Progress Analytics</h2>
-          </div>
-          <p className="text-xs text-text-secondary max-w-md">
-            Diagnostic quiz performance, gap topics, and AI-generated summaries for each linked child.
-          </p>
-
-          {loadingChildren ? (
-            <div className="py-12 flex justify-center">
-              <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : childrenList.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {childrenList.map((child) => (
-                <ChildCard key={child.id} child={child} />
-              ))}
-            </div>
-          ) : (
-            <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
-              <Users className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-              <h3 className="text-sm font-semibold text-text-primary">No Wards Linked Yet</h3>
-              <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
-                Link a child from the Children tab to see their diagnostic assessment results here.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </ConsoleMotion>
   );
 }
 
@@ -1802,66 +2016,79 @@ function ChildCard({ child }: { child: ChildLinkOut }) {
   }, [child.student_unique_number]);
 
   return (
-    <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all">
-      <div className="flex items-center justify-between mb-3">
-        <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-xs">
+    <Panel flush className="console-lift flex h-full flex-col overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--c-line)] px-5 py-3.5">
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-brand/20 bg-brand/8 text-[10px] font-bold text-brand">
           ID
         </div>
-        <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface border border-border-primary font-bold text-brand">
-          {child.student_unique_number}
-        </span>
+        <Code>{child.student_unique_number}</Code>
       </div>
-      <p className="text-xs text-text-secondary mb-3">
-        Linked on {new Date(child.created_at).toLocaleDateString()}
-      </p>
 
-      <div className="pt-3 border-t border-border-primary/50">
-        <span className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
-          Gap Identification Quiz
-        </span>
-        {loadingResult ? (
-          <div className="mt-2 h-4 w-24 rounded bg-surface-hover animate-pulse" />
-        ) : result === null ? (
-          <p className="text-xs text-text-secondary mt-1.5">Not completed yet.</p>
-        ) : (
-          <div className="mt-1.5">
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-bold text-text-primary">
-                {result.overall_score !== null ? `${result.overall_score}%` : "—"}
-              </span>
-              <span className="text-[10px] text-text-tertiary">overall score</span>
-            </div>
-            {result.gaps.length === 0 ? (
-              <p className="text-xs text-emerald-500 mt-1">No gaps found.</p>
-            ) : (
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {result.gaps.slice(0, 3).map((gap) => (
-                  <span
-                    key={gap.topic_code}
-                    className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded"
-                  >
-                    {gap.subject}: Class {gap.originating_class}
-                  </span>
-                ))}
-                {result.gaps.length > 3 && (
-                  <span className="text-[10px] text-text-tertiary px-1.5 py-0.5">
-                    +{result.gaps.length - 3} more
-                  </span>
-                )}
+      <div className="flex flex-1 flex-col p-5">
+        <p className="text-xs text-text-secondary">
+          Linked on {new Date(child.created_at).toLocaleDateString()}
+        </p>
+
+        <div className="mt-4 border-t border-[var(--c-line)] pt-4">
+          <span className="console-eyebrow">Gap Identification Quiz</span>
+
+          {loadingResult ? (
+            <div className="mt-2 h-4 w-24 animate-pulse rounded bg-[var(--c-sunken)]" />
+          ) : result === null ? (
+            <p className="mt-1.5 text-xs text-text-secondary">Not completed yet.</p>
+          ) : (
+            <div className="mt-2">
+              <div className="flex items-baseline gap-2">
+                <span className="console-num text-2xl font-semibold tracking-[-0.02em] text-text-primary font-[family-name:var(--font-display)]">
+                  {result.overall_score !== null ? `${result.overall_score}%` : "—"}
+                </span>
+                <span className="text-[10px] text-text-tertiary">overall score</span>
               </div>
-            )}
-            {result.ai_summary_status === "ready" && result.ai_summary && (
-              <p className="text-xs text-text-secondary mt-2.5 pt-2.5 border-t border-border-primary/50 leading-relaxed">
-                {result.ai_summary}
-              </p>
-            )}
-            {result.ai_summary_status === "pending" && (
-              <p className="text-[10px] text-text-tertiary mt-2 italic">Summary generating...</p>
-            )}
-          </div>
-        )}
+
+              {result.overall_score !== null && (
+                <Meter
+                  className="mt-2"
+                  value={result.overall_score}
+                  tone={
+                    result.overall_score >= 70
+                      ? "emerald"
+                      : result.overall_score >= 40
+                      ? "amber"
+                      : "rose"
+                  }
+                />
+              )}
+
+              {result.gaps.length === 0 ? (
+                <p className="mt-2 text-xs font-medium text-emerald-500">No gaps found.</p>
+              ) : (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {result.gaps.slice(0, 3).map((gap) => (
+                    <Chip key={gap.topic_code} tone="amber">
+                      {gap.subject}: Class {gap.originating_class}
+                    </Chip>
+                  ))}
+                  {result.gaps.length > 3 && (
+                    <span className="self-center text-[10px] text-text-tertiary">
+                      +{result.gaps.length - 3} more
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {result.ai_summary_status === "ready" && result.ai_summary && (
+                <p className="mt-3 border-t border-[var(--c-line)] pt-3 text-xs leading-relaxed text-text-secondary">
+                  {result.ai_summary}
+                </p>
+              )}
+              {result.ai_summary_status === "pending" && (
+                <p className="mt-2 text-[10px] italic text-text-tertiary">Summary generating...</p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -2087,6 +2314,7 @@ function TeacherDashboardView({
     try {
       const formData = new FormData();
       formData.append("title", pdfTitle.trim());
+      if (selectedClass.subject) formData.append("subject", selectedClass.subject);
       if (pdfDesc.trim()) formData.append("description", pdfDesc.trim());
       if (pdfDeadlineDays !== "") formData.append("deadline_days", pdfDeadlineDays.toString());
       formData.append("file", pdfFile);
@@ -2118,6 +2346,7 @@ function TeacherDashboardView({
     try {
       await createAiQuizAssignment(selectedClass.class_number, selectedClass.section, {
         title: quizTitle.trim(),
+        subject: selectedClass.subject || undefined,
         description: quizDesc.trim() || undefined,
         module_ids: selectedModuleIds,
         deadline_days: quizDeadlineDays !== "" ? Number(quizDeadlineDays) : undefined,
@@ -2177,377 +2406,349 @@ function TeacherDashboardView({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Main Content: Unassigned vs Assigned State */}
-      {loading ? (
-        <div className="py-12 flex justify-center">
-          <div className="w-8 h-8 border-3 border-brand border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : assignedClasses.length === 0 ? (
-        /* Empty State: No Class Assigned by Admin */
-        <div className="glass rounded-[var(--radius-xl)] p-12 text-center border border-border-primary space-y-4">
-          <div className="w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
-            <AlertCircle className="w-8 h-8" />
-          </div>
-          <h2 className="text-xl font-bold text-text-primary">No Class Assigned Yet</h2>
-          <p className="text-sm text-text-secondary max-w-md mx-auto leading-relaxed">
-            You can't perform any actions since no class has been assigned to you yet. Please contact your school branch administrator to assign your class (e.g. 4th A).
-          </p>
-          <div className="p-4 rounded-[var(--radius-md)] bg-surface border border-border-primary max-w-md mx-auto text-xs text-text-tertiary">
-            Once assigned, you will be able to view student lists, upload PDF assignments, generate adaptive AI quizzes, and track student progress with feedback.
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {/* Active Class Switcher (only shown if teacher has multiple classes) */}
-          {assignedClasses.length > 1 && (
-            <div className="flex items-center gap-2 p-1.5 glass rounded-[var(--radius-md)] border border-border-primary w-fit">
-              <span className="text-[11px] font-bold text-text-tertiary uppercase px-2">
-                Active Class:
-              </span>
-              {assignedClasses.map((c) => {
-                const isSelected = selectedClass?.id === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => setSelectedClass(c)}
-                    className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      isSelected
-                        ? "bg-brand text-white shadow-sm"
-                        : "text-text-secondary hover:text-text-primary hover:bg-surface"
-                    }`}
-                  >
-                    <BookOpen className="w-3.5 h-3.5" />
-                    <span>Class {c.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+    <ConsoleMotion>
+      <div className="space-y-6">
+        {/* Main Content: Unassigned vs Assigned State */}
+        {loading ? (
+          <Loading />
+        ) : assignedClasses.length === 0 ? (
+          /* Empty State: No Class Assigned by Admin */
+          <Panel flush>
+            <EmptyState
+              icon={AlertCircle}
+              title="No Class Assigned Yet"
+              action={
+                <div className="max-w-md rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-4 text-xs leading-relaxed text-text-tertiary">
+                  Once assigned, you will be able to view student lists, upload PDF assignments,
+                  generate adaptive AI quizzes, and track student progress with feedback.
+                </div>
+              }
+            >
+              You can&apos;t perform any actions since no class has been assigned to you yet. Please
+              contact your school branch administrator to assign your class (e.g. 4th A).
+            </EmptyState>
+          </Panel>
+        ) : (
+          <div className="space-y-6">
+            {/* Active Class Switcher (only shown if teacher has multiple classes) */}
+            {assignedClasses.length > 1 && (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="console-eyebrow">Active Class:</span>
+                <Segmented
+                  idPrefix="teacher-class"
+                  value={selectedClass?.id ?? assignedClasses[0].id}
+                  onChange={(id) => {
+                    const found = assignedClasses.find((c) => c.id === id);
+                    if (found) setSelectedClass(found);
+                  }}
+                  options={assignedClasses.map((c) => ({
+                    value: c.id,
+                    label: `Class ${c.label}`,
+                  }))}
+                />
+              </div>
+            )}
 
-          {/* TAB: OVERVIEW */}
-          {activeTab === "overview" && selectedClass && (
-            <div className="space-y-6">
-              <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h1 className="text-xl font-bold text-text-primary">{teacher.name}</h1>
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand">
-                        Educator
+            {/* TAB: OVERVIEW */}
+            {activeTab === "overview" && selectedClass && (
+              <div className="space-y-4">
+                <IdentityBar
+                  icon={UserCog}
+                  title={teacher.name}
+                  badge={<Chip tone="brand">Educator</Chip>}
+                  meta={
+                    <>
+                      <span>
+                        School:{" "}
+                        <span className="font-medium text-text-primary">
+                          {teacher.school_name}
+                        </span>
                       </span>
-                    </div>
-                    <p className="text-sm text-text-secondary mt-1">
-                      School: <span className="font-semibold text-text-primary">{teacher.school_name}</span> • Branch:{" "}
-                      <span className="font-mono font-bold text-brand">{teacher.branch_name}</span>
-                    </p>
-                  </div>
+                      <MetaDot />
+                      <span>
+                        Branch: <span className="font-mono font-semibold text-brand">{teacher.branch_name}</span>
+                      </span>
+                    </>
+                  }
+                  aside={
+                    <Fact label="Current Class">
+                      <span className="text-brand">Class {selectedClass.label}</span>
+                    </Fact>
+                  }
+                />
 
-                  <div className="flex items-center gap-3">
-                    <div className="px-4 py-2 rounded-[var(--radius-md)] bg-surface border border-border-primary text-xs">
-                      <span className="text-text-tertiary block">Current Class</span>
-                      <span className="font-semibold text-brand">Class {selectedClass.label}</span>
-                    </div>
-                  </div>
-                </div>
+                {/* Quick Summary Cards */}
+                <StatRow
+                  stats={[
+                    {
+                      label: "Enrolled Students",
+                      icon: Users,
+                      value: <AnimatedNumber value={students.length} />,
+                      hint: `Class ${selectedClass.label}`,
+                    },
+                    {
+                      label: "Active Assignments",
+                      icon: FileText,
+                      value: <AnimatedNumber value={assignments.length} />,
+                      hint: "PDF & AI Quizzes",
+                    },
+                    {
+                      label: "Curriculum Modules",
+                      icon: Layers,
+                      value: <AnimatedNumber value={classModules.length} />,
+                      hint: "Available for AI Quiz",
+                    },
+                  ]}
+                />
               </div>
+            )}
 
-              {/* Quick Summary Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
-                  <div className="flex items-center justify-between text-text-tertiary text-xs">
-                    <span>Enrolled Students</span>
-                    <Users className="w-4 h-4 text-brand" />
-                  </div>
-                  <div className="text-2xl font-bold text-text-primary">{students.length}</div>
-                  <span className="text-[11px] text-text-secondary">Class {selectedClass.label}</span>
-                </div>
+            {/* TAB: ASSIGNED CLASSES / STUDENTS ROSTER */}
+            {activeTab === "classes" && selectedClass && (
+              <Panel flush className="overflow-hidden">
+                <PanelHead
+                  icon={Users}
+                  title={`Students Enrolled in Class ${selectedClass.label}`}
+                  actions={<Chip tone="brand">{students.length} Student(s)</Chip>}
+                />
 
-                <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
-                  <div className="flex items-center justify-between text-text-tertiary text-xs">
-                    <span>Active Assignments</span>
-                    <FileText className="w-4 h-4 text-purple-500" />
-                  </div>
-                  <div className="text-2xl font-bold text-text-primary">{assignments.length}</div>
-                  <span className="text-[11px] text-text-secondary">PDF & AI Quizzes</span>
-                </div>
-
-                <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
-                  <div className="flex items-center justify-between text-text-tertiary text-xs">
-                    <span>Curriculum Modules</span>
-                    <Layers className="w-4 h-4 text-emerald-500" />
-                  </div>
-                  <div className="text-2xl font-bold text-text-primary">{classModules.length}</div>
-                  <span className="text-[11px] text-text-secondary">Available for AI Quiz</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB: ASSIGNED CLASSES / STUDENTS ROSTER */}
-          {activeTab === "classes" && selectedClass && (
-            <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                  <Users className="w-4 h-4 text-brand" />
-                  <span>Students Enrolled in Class {selectedClass.label}</span>
-                </h3>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand">
-                  {students.length} Student(s)
-                </span>
-              </div>
-
-              {loadingStudents ? (
-                <div className="py-8 flex justify-center">
-                  <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : students.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                {loadingStudents ? (
+                  <Loading />
+                ) : students.length > 0 ? (
+                  <Table>
                     <thead>
-                      <tr className="border-b border-border-primary text-text-tertiary uppercase font-bold text-[10px]">
-                        <th className="py-2.5 px-3">Unique ID</th>
-                        <th className="py-2.5 px-3">Student Name / Email</th>
-                        <th className="py-2.5 px-3">Enrollment Mode</th>
-                        <th className="py-2.5 px-3">Joined Date</th>
+                      <tr>
+                        <Th>Unique ID</Th>
+                        <Th>Student Name / Email</Th>
+                        <Th>Enrollment Mode</Th>
+                        <Th>Joined Date</Th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border-primary/50">
+                    <Stagger as="tbody" className="divide-y divide-[var(--c-line)]">
                       {students.map((s) => (
-                        <tr key={s.id} className="hover:bg-surface/50 transition-colors">
-                          <td className="py-3 px-3 font-mono font-bold text-brand">{s.unique_number}</td>
-                          <td className="py-3 px-3 font-medium text-text-primary">
+                        <Item as="tr" key={s.id} className="console-row">
+                          <Td>
+                            <Code>{s.unique_number}</Code>
+                          </Td>
+                          <Td className="font-medium text-text-primary">
                             {s.full_name || s.email}
-                          </td>
-                          <td className="py-3 px-3 capitalize text-text-secondary">{s.enrollment_type}</td>
-                          <td className="py-3 px-3 text-text-tertiary">
+                          </Td>
+                          <Td className="capitalize text-text-secondary">{s.enrollment_type}</Td>
+                          <Td className="console-num text-text-tertiary">
                             {new Date(s.created_at).toLocaleDateString()}
-                          </td>
-                        </tr>
+                          </Td>
+                        </Item>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="p-8 text-center text-text-tertiary text-xs">
-                  No students enrolled in Class {selectedClass.label} yet.
-                </div>
-              )}
-            </div>
-          )}
+                    </Stagger>
+                  </Table>
+                ) : (
+                  <EmptyState
+                    icon={Users}
+                    title={`No students enrolled in Class ${selectedClass.label} yet.`}
+                  />
+                )}
+              </Panel>
+            )}
 
-          {/* TAB: ASSIGNMENTS & QUIZZES */}
-          {activeTab === "assignments" && selectedClass && (
-            <div className="space-y-6">
-              {/* Action Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-brand" />
-                    <span>Class {selectedClass.label} Assignments & Quizzes</span>
-                  </h3>
-                  <p className="text-xs text-text-secondary mt-0.5">
-                    Upload homework documents or generate automatic AI quizzes from curriculum modules.
-                  </p>
-                </div>
+            {/* TAB: ASSIGNED CLASSES — learning-module progress for the roster above */}
+            {activeTab === "classes" && selectedClass && (
+              <ClassLearningProgress
+                classNumber={selectedClass.class_number}
+                section={selectedClass.section}
+              />
+            )}
 
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setPdfError(null);
-                      setShowPdfModal(true);
-                    }}
-                    className="text-xs"
-                  >
-                    <Upload className="w-3.5 h-3.5 mr-1.5" />
-                    Upload PDF Assignment (Max 5MB)
-                  </Button>
+            {/* TAB: ASSIGNMENTS & QUIZZES */}
+            {activeTab === "assignments" && selectedClass && (
+              <div>
+                {/* Action Bar */}
+                <SectionHead
+                  icon={FileText}
+                  title={`Class ${selectedClass.label} Assignments & Quizzes`}
+                  description="Upload homework documents or generate automatic AI quizzes from curriculum modules."
+                  actions={
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setPdfError(null);
+                          setShowPdfModal(true);
+                        }}
+                        className="text-xs"
+                      >
+                        <Upload className="mr-1.5 h-3.5 w-3.5" />
+                        Upload PDF Assignment (Max 5MB)
+                      </Button>
 
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      setQuizError(null);
-                      setShowQuizModal(true);
-                    }}
-                    className="text-xs"
-                  >
-                    <Brain className="w-3.5 h-3.5 mr-1.5" />
-                    Generate AI Quiz from Modules
-                  </Button>
-                </div>
-              </div>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => {
+                          setQuizError(null);
+                          setShowQuizModal(true);
+                        }}
+                        className="text-xs"
+                      >
+                        <Brain className="mr-1.5 h-3.5 w-3.5" />
+                        Generate AI Quiz from Modules
+                      </Button>
+                    </>
+                  }
+                />
 
-              {/* Assignments List */}
-              {loadingAssignments ? (
-                <div className="py-8 flex justify-center">
-                  <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : assignments.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {assignments.map((asgn) => (
-                    <div
-                      key={asgn.id}
-                      className="glass rounded-[var(--radius-lg)] p-5 border border-border-primary space-y-3 relative group"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                asgn.assignment_type === "pdf_upload"
-                                  ? "bg-sky-500/10 text-sky-500 border border-sky-500/20"
-                                  : "bg-purple-500/10 text-purple-500 border border-purple-500/20"
-                              }`}
-                            >
-                              {asgn.assignment_type === "pdf_upload" ? "PDF Upload" : "AI Quiz"}
-                            </span>
+                {/* Assignments List */}
+                <Panel flush className="overflow-hidden">
+                  {loadingAssignments ? (
+                    <Loading />
+                  ) : assignments.length > 0 ? (
+                    <Stagger className="divide-y divide-[var(--c-line)]">
+                      {assignments.map((asgn) => (
+                        <Item
+                          key={asgn.id}
+                          className="console-row group flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-start lg:justify-between"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Chip tone={asgn.assignment_type === "pdf_upload" ? "sky" : "violet"}>
+                                {asgn.assignment_type === "pdf_upload" ? "PDF Upload" : "AI Quiz"}
+                              </Chip>
 
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                asgn.is_locked
-                                  ? "bg-rose-500/10 text-rose-500 border border-rose-500/20"
-                                  : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                              }`}
-                            >
-                              {asgn.is_locked ? "Locked" : "Active"}
-                            </span>
+                              <Chip tone={asgn.is_locked ? "rose" : "emerald"}>
+                                {asgn.is_locked ? "Locked" : "Active"}
+                              </Chip>
+                            </div>
+
+                            <h4 className="mt-2 text-[13px] font-semibold text-text-primary font-[family-name:var(--font-display)]">
+                              {asgn.title}
+                            </h4>
+                            {asgn.description && (
+                              <p className="mt-1 line-clamp-2 max-w-2xl text-xs leading-relaxed text-text-secondary">
+                                {asgn.description}
+                              </p>
+                            )}
+
+                            {asgn.file_url && (
+                              <a
+                                href={formatPdfUrl(asgn.file_url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline"
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                                View Assignment PDF
+                              </a>
+                            )}
                           </div>
 
-                          <h4 className="font-bold text-text-primary text-sm mt-2">{asgn.title}</h4>
-                          {asgn.description && (
-                            <p className="text-xs text-text-secondary line-clamp-2 mt-1">
-                              {asgn.description}
-                            </p>
-                          )}
-                        </div>
+                          <div className="flex shrink-0 items-center gap-5">
+                            <div className="space-y-1 text-right text-[11px] text-text-tertiary">
+                              <span className="console-num flex items-center justify-end gap-1.5">
+                                <Calendar className="h-3.5 w-3.5" />
+                                {new Date(asgn.created_at).toLocaleDateString()}
+                              </span>
 
-                        <button
-                          onClick={() => handleDeleteAssignment(asgn.id)}
-                          className="text-text-tertiary hover:text-rose-500 transition-colors p-1.5 rounded hover:bg-rose-500/10 cursor-pointer"
-                          title="Delete assignment"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                              {asgn.deadline_at ? (
+                                <span className="console-num flex items-center justify-end gap-1.5 font-medium text-amber-500">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  Deadline: {new Date(asgn.deadline_at).toLocaleDateString()}
+                                </span>
+                              ) : (
+                                <span className="block">No Deadline Set</span>
+                              )}
+                            </div>
 
-                      <div className="pt-2 border-t border-border-primary/50 flex items-center justify-between text-xs text-text-tertiary">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5" />
-                          {new Date(asgn.created_at).toLocaleDateString()}
-                        </span>
-
-                        {asgn.deadline_at ? (
-                          <span className="flex items-center gap-1 text-amber-500 font-medium">
-                            <Clock className="w-3.5 h-3.5" />
-                            Deadline: {new Date(asgn.deadline_at).toLocaleDateString()}
-                          </span>
-                        ) : (
-                          <span>No Deadline Set</span>
-                        )}
-                      </div>
-
-                      {asgn.file_url && (
-                        <a
-                          href={formatPdfUrl(asgn.file_url)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-brand font-semibold hover:underline mt-1"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                          View Assignment PDF
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="glass rounded-[var(--radius-lg)] p-8 text-center border border-border-primary border-dashed">
-                  <FileText className="w-8 h-8 text-text-tertiary mx-auto mb-2 opacity-50" />
-                  <h4 className="text-sm font-semibold text-text-primary">No Assignments Created Yet</h4>
-                  <p className="text-xs text-text-secondary mt-1 max-w-sm mx-auto">
-                    Use the buttons above to upload a manual PDF assignment (max 5MB) or generate an adaptive AI quiz from your class modules.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB: SUBMISSIONS & GRADING */}
-          {activeTab === "grading" && selectedClass && (
-            <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                    <Award className="w-4 h-4 text-brand" />
-                    <span>Student Progress & Assessment Scores</span>
-                  </h3>
-                  <p className="text-xs text-text-secondary mt-0.5">
-                    Select an assignment to view student scores and give individual feedback.
-                  </p>
-                </div>
-
-                {assignments.length > 0 && (
-                  <select
-                    value={selectedAssignmentId}
-                    onChange={(e) => setSelectedAssignmentId(e.target.value)}
-                    className="px-3.5 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none font-medium"
-                  >
-                    {assignments.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.title} ({a.assignment_type === "pdf_upload" ? "PDF" : "AI Quiz"})
-                      </option>
-                    ))}
-                  </select>
-                )}
+                            <button
+                              onClick={() => handleDeleteAssignment(asgn.id)}
+                              className="cursor-pointer rounded-md p-2 text-text-tertiary transition-all hover:bg-rose-500/10 hover:text-rose-500 lg:opacity-0 lg:focus-visible:opacity-100 lg:group-hover:opacity-100"
+                              title="Delete assignment"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </Item>
+                      ))}
+                    </Stagger>
+                  ) : (
+                    <EmptyState icon={FileText} title="No Assignments Created Yet">
+                      Use the buttons above to upload a manual PDF assignment (max 5MB) or generate
+                      an adaptive AI quiz from your class modules.
+                    </EmptyState>
+                  )}
+                </Panel>
               </div>
+            )}
 
-              {feedbackMsg && (
-                <div className="p-3 rounded bg-emerald-500/10 text-emerald-500 text-xs font-semibold flex items-center gap-2">
-                  <Check className="w-4 h-4" />
-                  <span>{feedbackMsg}</span>
-                </div>
-              )}
+            {/* TAB: SUBMISSIONS & GRADING */}
+            {activeTab === "grading" && selectedClass && (
+              <Panel flush className="overflow-hidden">
+                <PanelHead
+                  icon={Award}
+                  title="Student Progress & Assessment Scores"
+                  description="Select an assignment to view student scores and give individual feedback."
+                  actions={
+                    assignments.length > 0 ? (
+                      <select
+                        value={selectedAssignmentId}
+                        onChange={(e) => setSelectedAssignmentId(e.target.value)}
+                        className={`${inputClass} w-auto font-medium`}
+                      >
+                        {assignments.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.title} ({a.assignment_type === "pdf_upload" ? "PDF" : "AI Quiz"})
+                          </option>
+                        ))}
+                      </select>
+                    ) : undefined
+                  }
+                />
 
-              {loadingSubmissions ? (
-                <div className="py-8 flex justify-center">
-                  <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : submissions.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
+                <AnimatePresence>
+                  {feedbackMsg && (
+                    <div className="px-5 pt-4">
+                      <Notice tone="emerald" icon={Check}>
+                        {feedbackMsg}
+                      </Notice>
+                    </div>
+                  )}
+                </AnimatePresence>
+
+                {loadingSubmissions ? (
+                  <Loading />
+                ) : submissions.length > 0 ? (
+                  <div>
+                    <Table>
                       <thead>
-                        <tr className="border-b border-border-primary text-text-tertiary uppercase font-bold text-[10px]">
-                          <th className="py-2.5 px-3">Student ID</th>
-                          <th className="py-2.5 px-3">Attempt Status</th>
-                          <th className="py-2.5 px-3">Score / Max</th>
-                          <th className="py-2.5 px-3">Last Attempted</th>
-                          <th className="py-2.5 px-3 text-right">Actions</th>
+                        <tr>
+                          <Th>Student ID</Th>
+                          <Th>Attempt Status</Th>
+                          <Th>Score / Max</Th>
+                          <Th>Last Attempted</Th>
+                          <Th className="text-right">Actions</Th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-border-primary/50">
+                      <Stagger as="tbody" className="divide-y divide-[var(--c-line)]">
                         {submissions.map((sub) => {
                           const isEditing = editingStudentId === sub.student_id;
                           return (
-                            <tr key={sub.id} className="hover:bg-surface/50 transition-colors">
-                              <td className="py-3 px-3 font-mono font-bold text-brand">
-                                {sub.student_unique_number}
-                              </td>
-                              <td className="py-3 px-3">
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                                  Attempted
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 font-bold text-text-primary">
+                            <Item
+                              as="tr"
+                              key={sub.id}
+                              className={`console-row ${isEditing ? "bg-brand/[0.04]" : ""}`}
+                            >
+                              <Td>
+                                <Code>{sub.student_unique_number}</Code>
+                              </Td>
+                              <Td>
+                                <Chip tone="emerald">Attempted</Chip>
+                              </Td>
+                              <Td className="console-num font-semibold text-text-primary">
                                 {sub.score !== null ? `${sub.score} / ${sub.max_score}` : "Not Graded"}
-                              </td>
-                              <td className="py-3 px-3 text-text-tertiary">
+                              </Td>
+                              <Td className="console-num text-text-tertiary">
                                 {new Date(sub.last_attempted_at).toLocaleString()}
-                              </td>
-                              <td className="py-3 px-3 text-right">
+                              </Td>
+                              <Td className="text-right">
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -2558,334 +2759,346 @@ function TeacherDashboardView({
                                   }}
                                   className="text-xs"
                                 >
-                                  <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                                  <MessageSquare className="mr-1 h-3.5 w-3.5" />
                                   {isEditing ? "Close" : "Grade / Feedback"}
                                 </Button>
-                              </td>
-                            </tr>
+                              </Td>
+                            </Item>
                           );
                         })}
-                      </tbody>
-                    </table>
+                      </Stagger>
+                    </Table>
+
+                    {/* Inline Feedback / Score Form for Selected Student */}
+                    <AnimatePresence initial={false}>
+                      {editingStudentId && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.22, ease: EASE }}
+                          className="overflow-hidden border-t border-[var(--c-line)] bg-[var(--c-sunken)]"
+                        >
+                          <div className="space-y-4 p-5">
+                            <h4 className="flex items-center gap-1.5 text-xs font-semibold text-text-primary font-[family-name:var(--font-display)]">
+                              <Edit className="h-4 w-4 text-brand" />
+                              <span>Grade &amp; Feedback for Student</span>
+                            </h4>
+
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              <div>
+                                <FieldLabel>Score (Out of 100)</FieldLabel>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  placeholder="e.g. 85"
+                                  value={scoreInput}
+                                  onChange={(e) => setScoreInput(e.target.value)}
+                                  className={inputClass}
+                                />
+                              </div>
+
+                              <div className="sm:col-span-2">
+                                <FieldLabel>Feedback / Guidance Message</FieldLabel>
+                                <textarea
+                                  rows={2}
+                                  placeholder="Enter feedback or advice for this student..."
+                                  value={feedbackInput}
+                                  onChange={(e) => setFeedbackInput(e.target.value)}
+                                  className={inputClass}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEditingStudentId(null)}
+                                className="text-xs"
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                disabled={savingScore}
+                                onClick={() => handleSaveScoreAndFeedback(editingStudentId)}
+                                className="text-xs"
+                              >
+                                {savingScore ? "Saving..." : "Save Score & Feedback"}
+                              </Button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
+                ) : (
+                  <EmptyState
+                    icon={Award}
+                    title="No student submissions yet for this assignment."
+                  />
+                )}
+              </Panel>
+            )}
 
-                  {/* Inline Feedback / Score Form for Selected Student */}
-                  {editingStudentId && (
-                    <div className="p-4 rounded-[var(--radius-lg)] bg-surface border border-border-brand space-y-4 animate-in fade-in duration-200">
-                      <h4 className="text-xs font-bold text-text-primary flex items-center gap-1.5">
-                        <Edit className="w-4 h-4 text-brand" />
-                        <span>Grade & Feedback for Student</span>
-                      </h4>
+            {/* TAB: CURRICULUM & BOOKS */}
+            {activeTab === "curriculum" && selectedClass && (
+              <Panel flush className="overflow-hidden">
+                <PanelHead
+                  icon={BookOpen}
+                  title={`Curriculum Modules for Class ${selectedClass.label}`}
+                  actions={
+                    <span className="text-xs text-text-tertiary">
+                      {classModules.length} Module(s)
+                    </span>
+                  }
+                />
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-text-secondary mb-1">
-                            Score (Out of 100)
-                          </label>
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
-                            placeholder="e.g. 85"
-                            value={scoreInput}
-                            onChange={(e) => setScoreInput(e.target.value)}
-                            className="w-full px-3 py-2 bg-background text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
-                          />
+                {classModules.length > 0 ? (
+                  <Stagger className="divide-y divide-[var(--c-line)]">
+                    {classModules.map((mod) => (
+                      <Item
+                        key={mod.id}
+                        className="console-row flex items-center gap-4 px-5 py-3.5"
+                      >
+                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-[var(--c-line)] bg-[var(--c-sunken)] text-text-tertiary">
+                          <FileText className="h-4 w-4" />
                         </div>
 
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-text-secondary mb-1">
-                            Feedback / Guidance Message
-                          </label>
-                          <textarea
-                            rows={2}
-                            placeholder="Enter feedback or advice for this student..."
-                            value={feedbackInput}
-                            onChange={(e) => setFeedbackInput(e.target.value)}
-                            className="w-full px-3 py-2 bg-background text-text-primary text-xs rounded border border-border-primary outline-none focus:border-brand"
-                          />
+                        <div className="min-w-0 flex-1">
+                          <h4 className="truncate text-[13px] font-semibold text-text-primary font-[family-name:var(--font-display)]">
+                            {mod.title}
+                          </h4>
+                          <div className="mt-1">
+                            <Chip tone="brand">{mod.subject}</Chip>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setEditingStudentId(null)}
-                          className="text-xs"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          disabled={savingScore}
-                          onClick={() => handleSaveScoreAndFeedback(editingStudentId)}
-                          className="text-xs"
-                        >
-                          {savingScore ? "Saving..." : "Save Score & Feedback"}
-                        </Button>
-                      </div>
+                        {mod.file_url ? (
+                          <a
+                            href={formatPdfUrl(mod.file_url)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand hover:underline"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                            View Module PDF
+                          </a>
+                        ) : (
+                          <span className="shrink-0 text-xs italic text-text-tertiary">
+                            NCERT Module
+                          </span>
+                        )}
+                      </Item>
+                    ))}
+                  </Stagger>
+                ) : (
+                  <EmptyState
+                    icon={BookOpen}
+                    title={`No curriculum modules found for Class ${selectedClass.label}.`}
+                  />
+                )}
+              </Panel>
+            )}
+          </div>
+        )}
+
+        {/* PDF UPLOAD MODAL */}
+        <AnimatePresence>
+          {showPdfModal && (
+            <Modal
+              title="Upload PDF Assignment"
+              icon={Upload}
+              onClose={() => setShowPdfModal(false)}
+            >
+              {pdfError && (
+                <div className="mb-4">
+                  <Notice tone="rose" icon={AlertCircle}>
+                    {pdfError}
+                  </Notice>
+                </div>
+              )}
+
+              <form onSubmit={handleCreatePdfAssignment} className="space-y-4">
+                <div>
+                  <FieldLabel>Assignment Title *</FieldLabel>
+                  <input
+                    type="text"
+                    placeholder="e.g. Chapter 1 Worksheet"
+                    value={pdfTitle}
+                    onChange={(e) => setPdfTitle(e.target.value)}
+                    className={inputClass}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <FieldLabel>Description / Instructions</FieldLabel>
+                  <textarea
+                    rows={2}
+                    placeholder="Instructions for students..."
+                    value={pdfDesc}
+                    onChange={(e) => setPdfDesc(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
+                  <FieldLabel>Deadline (Days Active)</FieldLabel>
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="e.g. 7 (leave empty for no deadline)"
+                    value={pdfDeadlineDays}
+                    onChange={(e) =>
+                      setPdfDeadlineDays(e.target.value ? Number(e.target.value) : "")
+                    }
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
+                  <FieldLabel>Select PDF Document (Max 5 MB) *</FieldLabel>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                    className="w-full cursor-pointer text-xs text-text-secondary file:mr-3 file:rounded-md file:border-0 file:bg-brand/10 file:px-4 file:py-2 file:text-xs file:font-semibold file:text-brand hover:file:bg-brand/20"
+                    required
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-[var(--c-line)] pt-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    onClick={() => setShowPdfModal(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button variant="primary" size="sm" type="submit" disabled={isSubmittingPdf}>
+                    {isSubmittingPdf ? "Uploading..." : "Upload Assignment"}
+                  </Button>
+                </div>
+              </form>
+            </Modal>
+          )}
+        </AnimatePresence>
+
+        {/* AI QUIZ GENERATION MODAL */}
+        <AnimatePresence>
+          {showQuizModal && (
+            <Modal
+              title="Generate Adaptive AI Quiz"
+              icon={Brain}
+              iconTone="violet"
+              onClose={() => setShowQuizModal(false)}
+            >
+              {quizError && (
+                <div className="mb-4">
+                  <Notice tone="rose" icon={AlertCircle}>
+                    {quizError}
+                  </Notice>
+                </div>
+              )}
+
+              <form onSubmit={handleCreateQuizAssignment} className="space-y-4">
+                <div>
+                  <FieldLabel>Quiz Title *</FieldLabel>
+                  <input
+                    type="text"
+                    placeholder="e.g. Adaptive Math Quiz"
+                    value={quizTitle}
+                    onChange={(e) => setQuizTitle(e.target.value)}
+                    className={inputClass}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <FieldLabel>Select Modules / Chapters *</FieldLabel>
+                  {classModules.length > 0 ? (
+                    <div className="max-h-40 space-y-0.5 overflow-y-auto rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-1.5 text-xs">
+                      {classModules.map((m) => {
+                        const isChecked = selectedModuleIds.includes(m.id);
+                        return (
+                          <label
+                            key={m.id}
+                            className={`flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors ${
+                              isChecked ? "bg-brand/8" : "hover:bg-[var(--c-panel)]"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedModuleIds([...selectedModuleIds, m.id]);
+                                } else {
+                                  setSelectedModuleIds(
+                                    selectedModuleIds.filter((id) => id !== m.id)
+                                  );
+                                }
+                              }}
+                              className="rounded border-border-primary text-brand focus:ring-brand"
+                            />
+                            <span className="min-w-0 truncate font-medium text-text-primary">
+                              {m.title}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-3 text-xs italic text-text-tertiary">
+                      No uploaded modules found for this class. Upload modules first in the School
+                      dashboard to generate adaptive quizzes.
                     </div>
                   )}
                 </div>
-              ) : (
-                <div className="p-8 text-center text-text-tertiary text-xs">
-                  No student submissions yet for this assignment.
+
+                <div>
+                  <FieldLabel>Deadline (Days Active)</FieldLabel>
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="e.g. 7 (leave empty for no deadline)"
+                    value={quizDeadlineDays}
+                    onChange={(e) =>
+                      setQuizDeadlineDays(e.target.value ? Number(e.target.value) : "")
+                    }
+                    className={inputClass}
+                  />
                 </div>
-              )}
-            </div>
+
+                <div className="flex justify-end gap-3 border-t border-[var(--c-line)] pt-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    onClick={() => setShowQuizModal(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    type="submit"
+                    disabled={isSubmittingQuiz || classModules.length === 0}
+                  >
+                    {isSubmittingQuiz ? "Generating..." : "Generate Quiz"}
+                  </Button>
+                </div>
+              </form>
+            </Modal>
           )}
-
-          {/* TAB: CURRICULUM & BOOKS */}
-          {activeTab === "curriculum" && selectedClass && (
-            <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-brand" />
-                  <span>Curriculum Modules for Class {selectedClass.label}</span>
-                </h3>
-                <span className="text-xs text-text-tertiary">
-                  {classModules.length} Module(s)
-                </span>
-              </div>
-
-              {classModules.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {classModules.map((mod) => (
-                    <div
-                      key={mod.id}
-                      className="glass rounded-[var(--radius-md)] p-4 border border-border-primary space-y-2 flex flex-col justify-between"
-                    >
-                      <div>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                          {mod.subject}
-                        </span>
-                        <h4 className="font-bold text-sm text-text-primary mt-1">{mod.title}</h4>
-                      </div>
-                      {mod.file_url ? (
-                        <a
-                          href={formatPdfUrl(mod.file_url)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-semibold text-brand hover:underline inline-flex items-center gap-1 mt-2"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                          View Module PDF
-                        </a>
-                      ) : (
-                        <span className="text-xs text-text-tertiary italic mt-2">NCERT Module</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-8 text-center text-text-tertiary text-xs">
-                  No curriculum modules found for Class {selectedClass.label}.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* PDF UPLOAD MODAL */}
-      {showPdfModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass rounded-[var(--radius-xl)] p-6 max-w-md w-full border border-border-primary space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
-                <Upload className="w-5 h-5 text-brand" />
-                <span>Upload PDF Assignment</span>
-              </h3>
-              <button
-                onClick={() => setShowPdfModal(false)}
-                className="text-text-tertiary hover:text-text-primary cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {pdfError && (
-              <div className="p-3 rounded bg-rose-500/10 text-rose-500 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{pdfError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleCreatePdfAssignment} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">
-                  Assignment Title *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Chapter 1 Worksheet"
-                  value={pdfTitle}
-                  onChange={(e) => setPdfTitle(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">
-                  Description / Instructions
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Instructions for students..."
-                  value={pdfDesc}
-                  onChange={(e) => setPdfDesc(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">
-                  Deadline (Days Active)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  placeholder="e.g. 7 (leave empty for no deadline)"
-                  value={pdfDeadlineDays}
-                  onChange={(e) => setPdfDeadlineDays(e.target.value ? Number(e.target.value) : "")}
-                  className="w-full px-3.5 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">
-                  Select PDF Document (Max 5 MB) *
-                </label>
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-                  className="w-full text-xs text-text-secondary file:mr-3 file:py-2 file:px-4 file:rounded-[var(--radius-md)] file:border-0 file:text-xs file:font-semibold file:bg-brand/10 file:text-brand hover:file:bg-brand/20 cursor-pointer"
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <Button variant="ghost" size="sm" type="button" onClick={() => setShowPdfModal(false)}>
-                  Cancel
-                </Button>
-                <Button variant="primary" size="sm" type="submit" disabled={isSubmittingPdf}>
-                  {isSubmittingPdf ? "Uploading..." : "Upload Assignment"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* AI QUIZ GENERATION MODAL */}
-      {showQuizModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass rounded-[var(--radius-xl)] p-6 max-w-md w-full border border-border-primary space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
-                <Brain className="w-5 h-5 text-purple-500" />
-                <span>Generate Adaptive AI Quiz</span>
-              </h3>
-              <button
-                onClick={() => setShowQuizModal(false)}
-                className="text-text-tertiary hover:text-text-primary cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {quizError && (
-              <div className="p-3 rounded bg-rose-500/10 text-rose-500 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{quizError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleCreateQuizAssignment} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">
-                  Quiz Title *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Adaptive Math Quiz"
-                  value={quizTitle}
-                  onChange={(e) => setQuizTitle(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">
-                  Select Modules / Chapters *
-                </label>
-                {classModules.length > 0 ? (
-                  <div className="max-h-40 overflow-y-auto space-y-2 p-2 rounded bg-surface border border-border-primary text-xs">
-                    {classModules.map((m) => {
-                      const isChecked = selectedModuleIds.includes(m.id);
-                      return (
-                        <label key={m.id} className="flex items-center gap-2 cursor-pointer hover:bg-surface-hover p-1.5 rounded">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedModuleIds([...selectedModuleIds, m.id]);
-                              } else {
-                                setSelectedModuleIds(selectedModuleIds.filter((id) => id !== m.id));
-                              }
-                            }}
-                            className="rounded border-border-primary text-brand focus:ring-brand"
-                          />
-                          <span className="font-medium text-text-primary">{m.title}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="p-3 rounded bg-surface text-xs text-text-tertiary italic">
-                    No uploaded modules found for this class. Upload modules first in the School dashboard to generate adaptive quizzes.
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">
-                  Deadline (Days Active)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  placeholder="e.g. 7 (leave empty for no deadline)"
-                  value={quizDeadlineDays}
-                  onChange={(e) => setQuizDeadlineDays(e.target.value ? Number(e.target.value) : "")}
-                  className="w-full px-3.5 py-2 bg-surface text-text-primary text-xs rounded-[var(--radius-md)] border border-border-primary focus:border-brand outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <Button variant="ghost" size="sm" type="button" onClick={() => setShowQuizModal(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  type="submit"
-                  disabled={isSubmittingQuiz || classModules.length === 0}
-                >
-                  {isSubmittingQuiz ? "Generating..." : "Generate Quiz"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+        </AnimatePresence>
+      </div>
+    </ConsoleMotion>
   );
 }
 
@@ -3539,177 +3752,854 @@ function NCERTBookManagementPanel({ onModuleAttached }: { onModuleAttached?: () 
 
 // ── School Teacher Management Panel (for SchoolDashboardView) ─────────────────
 
+const DEFAULT_PRIMARY_SUBJECTS = ["Mathematics", "English", "Hindi", "Environmental Studies (EVS)", "Computer", "Science", "Social Studies"];
+
+function parseSubjectMeta(raw: string): { title: string; subtitle: string; color: string } {
+  if (!raw) return { title: "General", subtitle: "", color: "bg-blue-500/10 text-blue-500 border-blue-500/20" };
+  const trimmed = raw.trim();
+  const match = trimmed.match(/^([^(]+)(?:\((.*)\))?$/);
+  const title = match ? match[1].trim() : trimmed;
+  const subtitle = match && match[2] ? match[2].trim() : "";
+
+  const lower = title.toLowerCase();
+  let color = "bg-blue-500/10 text-blue-500 border-blue-500/20";
+  if (lower.includes("math")) {
+    color = "bg-sky-500/10 text-sky-500 border-sky-500/20";
+  } else if (lower.includes("english")) {
+    color = "bg-amber-500/10 text-amber-500 border-amber-500/20";
+  } else if (lower.includes("hindi") || lower.includes("urdu")) {
+    color = "bg-orange-500/10 text-orange-500 border-orange-500/20";
+  } else if (lower.includes("env") || lower.includes("evs") || lower.includes("science")) {
+    color = "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+  } else if (lower.includes("computer")) {
+    color = "bg-purple-500/10 text-purple-500 border-purple-500/20";
+  } else if (lower.includes("art")) {
+    color = "bg-pink-500/10 text-pink-500 border-pink-500/20";
+  }
+
+  return { title, subtitle, color };
+}
+
+function normalizeSubjectKey(s: string): string {
+  if (!s) return "";
+  const clean = s.toLowerCase().trim();
+  if (clean.includes("environmental") || clean.includes("evs")) return "evs";
+  if (clean.includes("mathematics") || clean.includes("math")) return "mathematics";
+  if (clean.includes("english")) return "english";
+  if (clean.includes("hindi")) return "hindi";
+  if (clean.includes("science") && !clean.includes("social")) return "science";
+  if (clean.includes("social")) return "social studies";
+  if (clean.includes("computer")) return "computer";
+  if (clean.includes("art")) return "art & craft";
+  if (clean.includes("urdu")) return "urdu";
+  return clean.replace(/\s*\([^)]*\)/g, "").trim();
+}
+
+function isMatchingSubject(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const strA = a.toLowerCase().trim();
+  const strB = b.toLowerCase().trim();
+  if (strA === strB) return true;
+  const normA = normalizeSubjectKey(a);
+  const normB = normalizeSubjectKey(b);
+  if (normA && normB && normA === normB) return true;
+  return strA.includes(strB) || strB.includes(strA);
+}
+
 function SchoolTeacherManagement() {
   const [teachers, setTeachers] = useState<TeacherListItem[]>([]);
+  const [allSubjects, setAllSubjects] = useState<SchoolSubjectDetail[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
-  const [assignClassNum, setAssignClassNum] = useState<number>(4);
-  const [assignSec, setAssignSec] = useState<string>("A");
-  const [isAssigning, setIsAssigning] = useState<boolean>(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"hierarchy" | "directory">("hierarchy");
 
-  const fetchTeachers = () => {
+  // Hierarchy filter state
+  const [selectedClassNum, setSelectedClassNum] = useState<number>(1);
+  const [selectedSection, setSelectedSection] = useState<string>("A");
+
+  // Search & Filter Teacher Selection Modal state
+  const [showTeacherModal, setShowTeacherModal] = useState<boolean>(false);
+  const [modalClassNum, setModalClassNum] = useState<number>(1);
+  const [modalSection, setModalSection] = useState<string>("A");
+  const [modalSubject, setModalSubject] = useState<string>("");
+  const [modalInitialTeacherId, setModalInitialTeacherId] = useState<string>("");
+  const [isAssigning, setIsAssigning] = useState<boolean>(false);
+
+  // Directory search & filter state
+  const [directorySearch, setDirectorySearch] = useState<string>("");
+  const [directoryFilter, setDirectoryFilter] = useState<"all" | "assigned" | "unassigned" | "active">("all");
+
+  // Status message
+  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const fetchTeachersAndSubjects = async () => {
     setLoading(true);
-    getSchoolTeachers()
-      .then((res) => setTeachers(res))
-      .catch((err) => console.log("Fetch teachers note:", err.message))
-      .finally(() => setLoading(false));
+    try {
+      const [teacherList, subjectList] = await Promise.all([
+        getSchoolTeachers(),
+        getSchoolSubjects().catch(() => [] as SchoolSubjectDetail[]),
+      ]);
+      setTeachers(teacherList);
+      setAllSubjects(subjectList);
+    } catch (err: any) {
+      console.error("Fetch teachers/subjects error:", err.message);
+      setMsg({ type: "error", text: "Failed to load teacher data. Please refresh the page." });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchTeachers();
+    fetchTeachersAndSubjects();
   }, []);
 
-  const handleAssign = async (teacherId: string) => {
+  // Helper: get configured subjects for a class, or fallback to defaults
+  const getSubjectsForClass = (classNum: number): string[] => {
+    const configured = (allSubjects || [])
+      .filter((s) => s && Number(s.class_number) === Number(classNum) && s.subject)
+      .map((s) => s.subject.trim());
+    if (configured.length > 0) {
+      return Array.from(new Set(configured));
+    }
+    return DEFAULT_PRIMARY_SUBJECTS;
+  };
+
+  // Helper: find teacher assigned to a specific (class, section, subject)
+  const getAssignedTeacherForSubject = (classNum: number, sec: string, subj: string) => {
+    if (!subj) return null;
+    const targetSec = (sec || "").toUpperCase().trim();
+    const targetNum = Number(classNum);
+
+    // Direct or matching subject assignment
+    for (const t of (teachers || [])) {
+      const assigned = t?.assigned_classes || [];
+      const match = assigned.find(
+        (c) =>
+          c &&
+          Number(c.class_number) === targetNum &&
+          (c.section || "").toUpperCase().trim() === targetSec &&
+          isMatchingSubject(c.subject || "", subj)
+      );
+      if (match) {
+        return { teacher: t, assignment: match };
+      }
+    }
+
+    return null;
+  };
+
+  const handleAssign = async (teacherId: string, classNum: number, sec: string, rawSubj: string) => {
+    if (!teacherId) {
+      setMsg({ type: "error", text: "Please select a teacher to assign." });
+      return;
+    }
+    const cleanSubj = rawSubj.trim();
+    if (!cleanSubj) {
+      setMsg({ type: "error", text: "Subject is required. A teacher cannot be assigned without a subject." });
+      return;
+    }
+
+    const normalizedSec = (sec || "A").toUpperCase().trim();
+    const normalizedClassNum = Number(classNum);
+
     setIsAssigning(true);
     setMsg(null);
     try {
-      await assignClassToTeacher(teacherId, assignClassNum, assignSec);
-      setMsg(`Assigned Class ${assignClassNum}${assignSec} successfully!`);
-      setSelectedTeacherId(null);
-      fetchTeachers();
-      setTimeout(() => setMsg(null), 3000);
+      const res = await assignClassToTeacher(teacherId, normalizedClassNum, normalizedSec, cleanSubj);
+
+      // Optimistically update React state immediately so UI updates instantaneously
+      setTeachers((prevTeachers) =>
+        prevTeachers.map((t) => {
+          const isTargetTeacher = String(t.id) === String(teacherId);
+          const filteredAssignments = (t.assigned_classes || []).filter(
+            (c) =>
+              !(
+                Number(c.class_number) === normalizedClassNum &&
+                (c.section || "").toUpperCase().trim() === normalizedSec &&
+                isMatchingSubject(c.subject || "", cleanSubj)
+              )
+          );
+
+          if (isTargetTeacher) {
+            const newAssignment: TeacherClassOut = res || {
+              id: String(Date.now()),
+              teacher_id: teacherId,
+              class_number: normalizedClassNum,
+              section: normalizedSec,
+              subject: cleanSubj,
+              label: `${normalizedClassNum}${normalizedSec} • ${cleanSubj}`,
+              assigned_at: new Date().toISOString(),
+            };
+            return {
+              ...t,
+              assigned_classes: [...filteredAssignments, newAssignment],
+            };
+          }
+          return {
+            ...t,
+            assigned_classes: filteredAssignments,
+          };
+        })
+      );
+
+      // Ensure active view displays the assigned class and section
+      setSelectedClassNum(normalizedClassNum);
+      setSelectedSection(normalizedSec);
+
+      setMsg({
+        type: "success",
+        text: `Assigned Class ${normalizedClassNum}${normalizedSec} (${parseSubjectMeta(cleanSubj).title}) successfully!`,
+      });
+      setShowTeacherModal(false);
+      await fetchTeachersAndSubjects();
+      setTimeout(() => setMsg(null), 4000);
     } catch (err: any) {
-      alert(err.message || "Failed to assign class.");
+      const errMsg: string = err.message || "";
+      // If server says teacher is already assigned (409), it means the DB is already correct.
+      if (errMsg.toLowerCase().includes("already assigned") || String(err.status) === "409") {
+        await fetchTeachersAndSubjects();
+        setShowTeacherModal(false);
+        setMsg({
+          type: "success",
+          text: `Teacher is already assigned to Class ${normalizedClassNum}${normalizedSec} for this subject.`,
+        });
+      } else {
+        setMsg({
+          type: "error",
+          text: errMsg || "Failed to assign teacher to class and subject.",
+        });
+      }
     } finally {
       setIsAssigning(false);
     }
   };
 
-  const handleDeassign = async (teacherId: string, classNum: number, sec: string) => {
-    if (!confirm(`De-assign Class ${classNum}${sec} from this teacher?`)) return;
+  const handleDeassign = async (
+    teacherId: string,
+    classNum: number,
+    sec: string,
+    subj: string,
+    assignmentId?: string
+  ) => {
+    const displaySubj = parseSubjectMeta(subj || "").title;
+    if (
+      !confirm(
+        `De-assign Class ${classNum}${sec} (${displaySubj}) from this teacher?`
+      )
+    ) {
+      return;
+    }
+    const normalizedSec = (sec || "").toUpperCase().trim();
+    const normalizedClassNum = Number(classNum);
+
+    setMsg(null);
     try {
-      await deassignClassFromTeacher(teacherId, classNum, sec);
-      fetchTeachers();
+      await deassignClassFromTeacher(teacherId, normalizedClassNum, normalizedSec, subj, assignmentId);
+
+      // Optimistic removal
+      setTeachers((prevTeachers) =>
+        prevTeachers.map((t) => {
+          if (String(t.id) === String(teacherId)) {
+            return {
+              ...t,
+              assigned_classes: (t.assigned_classes || []).filter(
+                (c) =>
+                  !(
+                    Number(c.class_number) === normalizedClassNum &&
+                    (c.section || "").toUpperCase().trim() === normalizedSec &&
+                    isMatchingSubject(c.subject || "", subj)
+                  ) && (!assignmentId || c.id !== assignmentId)
+              ),
+            };
+          }
+          return t;
+        })
+      );
+
+      setMsg({
+        type: "success",
+        text: `De-assigned Class ${normalizedClassNum}${normalizedSec} (${displaySubj}) successfully.`,
+      });
+      await fetchTeachersAndSubjects();
+      setTimeout(() => setMsg(null), 3000);
     } catch (err: any) {
-      alert(err.message || "Failed to de-assign class.");
+      setMsg({
+        type: "error",
+        text: err.message || "Failed to de-assign class subject.",
+      });
     }
   };
 
+  // Filtered teachers for Directory View
+  const filteredDirectoryTeachers = useMemo(() => {
+    let list = [...teachers];
+
+    // Filter by tab
+    if (directoryFilter === "assigned") {
+      list = list.filter((t) => (t.assigned_classes || []).length > 0);
+    } else if (directoryFilter === "unassigned") {
+      list = list.filter((t) => (t.assigned_classes || []).length === 0);
+    } else if (directoryFilter === "active") {
+      list = list.filter((t) => t.is_active);
+    }
+
+    // Search query
+    if (directorySearch.trim()) {
+      const q = directorySearch.toLowerCase().trim();
+      list = list.filter((t) => {
+        const nameMatch = (t.name || "").toLowerCase().includes(q);
+        const phoneMatch = (t.phone_number || "").toLowerCase().includes(q);
+        const subjectMatch = (t.assigned_classes || []).some((c) =>
+          (c.subject || "").toLowerCase().includes(q) ||
+          `class ${c.class_number}${c.section}`.toLowerCase().includes(q)
+        );
+        return nameMatch || phoneMatch || subjectMatch;
+      });
+    }
+
+    return list;
+  }, [teachers, directoryFilter, directorySearch]);
+
+  const directoryCounts = useMemo(() => {
+    let assigned = 0;
+    let unassigned = 0;
+    let active = 0;
+    teachers.forEach((t) => {
+      if ((t.assigned_classes || []).length > 0) assigned++;
+      else unassigned++;
+      if (t.is_active) active++;
+    });
+    return { all: teachers.length, assigned, unassigned, active };
+  }, [teachers]);
+
+  const currentClassSubjects = getSubjectsForClass(selectedClassNum);
+
+  // Calculate allocation statistics for active class & section
+  const assignedCount = currentClassSubjects.filter((s) =>
+    getAssignedTeacherForSubject(selectedClassNum, selectedSection, s)
+  ).length;
+  const totalCount = currentClassSubjects.length;
+
   return (
-    <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="glass rounded-[var(--radius-xl)] p-6 border border-border-primary space-y-6">
+      {/* Header & Sub-navigation */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border-primary/50">
         <div>
-          <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-            <UserCog className="w-4 h-4 text-brand" />
-            <span>Branch Teacher Directory & Class Assignment</span>
+          <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+            <UserCog className="w-5 h-5 text-brand" />
+            <span>Teacher & Subject Allocation</span>
           </h3>
           <p className="text-xs text-text-secondary mt-0.5">
-            Assign or de-assign class sections (e.g. 4th A) to teachers registered in your branch.
+            Assign one subject teacher per class subject. Teachers can teach multiple subjects across different classes.
           </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* Clean Segmented Tab Switcher */}
+          <div className="inline-flex items-center p-1 bg-surface rounded-lg border border-border-primary text-xs">
+            <button
+              onClick={() => setViewMode("hierarchy")}
+              className={`px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
+                viewMode === "hierarchy"
+                  ? "bg-brand text-white shadow-sm font-semibold"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              Class Subject Matrix
+            </button>
+            <button
+              onClick={() => setViewMode("directory")}
+              className={`px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
+                viewMode === "directory"
+                  ? "bg-brand text-white shadow-sm font-semibold"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              Teacher Directory ({teachers.length})
+            </button>
+          </div>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setModalClassNum(selectedClassNum);
+              setModalSection(selectedSection);
+              setModalSubject(currentClassSubjects[0] || "Mathematics");
+              setModalInitialTeacherId("");
+              setShowTeacherModal(true);
+            }}
+            disabled={teachers.length === 0}
+            className="text-xs shrink-0 font-semibold"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            Assign Teacher
+          </Button>
         </div>
       </div>
 
+      {/* Status Alerts */}
       {msg && (
-        <div className="p-3 rounded bg-emerald-500/10 text-emerald-500 text-xs font-semibold flex items-center gap-2">
-          <Check className="w-4 h-4" />
-          <span>{msg}</span>
+        <div
+          className={`p-3 rounded-[var(--radius-md)] text-xs font-semibold flex items-center justify-between gap-2 animate-in fade-in duration-200 ${
+            msg.type === "success"
+              ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+              : "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {msg.type === "success" ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+            <span>{msg.text}</span>
+          </div>
+          <button onClick={() => setMsg(null)} className="hover:opacity-75 cursor-pointer">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
       {loading ? (
-        <div className="py-8 flex justify-center">
-          <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        <div className="py-12 flex justify-center">
+          <div className="w-8 h-8 border-3 border-brand border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : teachers.length > 0 ? (
-        <div className="divide-y divide-border-primary/50">
-          {teachers.map((t) => (
-            <div key={t.id} className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-text-primary">{t.name}</span>
-                  <span className="text-xs text-text-tertiary font-mono">({t.phone_number})</span>
-                </div>
-
-                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                  <span className="text-xs text-text-secondary font-medium">Assigned Classes:</span>
-                  {t.assigned_classes.length > 0 ? (
-                    t.assigned_classes.map((c) => (
-                      <span
-                        key={c.id}
-                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand/10 text-brand border border-border-brand"
-                      >
-                        {c.label}
-                        <button
-                          onClick={() => handleDeassign(t.id, c.class_number, c.section)}
-                          className="hover:text-rose-500 cursor-pointer ml-1"
-                          title="De-assign class"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-amber-500 font-semibold italic">Unassigned (Empty List)</span>
-                  )}
-                </div>
+      ) : teachers.length === 0 ? (
+        <div className="p-8 text-center text-text-tertiary text-xs glass rounded-lg border border-border-primary space-y-2">
+          <UserCog className="w-8 h-8 mx-auto text-text-tertiary/40" />
+          <p className="font-semibold text-text-secondary text-sm">No teachers registered in this branch yet</p>
+          <p className="text-xs text-text-tertiary max-w-sm mx-auto">
+            When teachers sign up with your branch name, they will appear in this directory for class and subject assignments.
+          </p>
+        </div>
+      ) : viewMode === "hierarchy" ? (
+        /* ═════════════════════════════════════════════════════════════════════
+           CLASS SUBJECT MATRIX VIEW (Clean Professional Roster Table)
+           ═════════════════════════════════════════════════════════════════════ */
+        <div className="space-y-4">
+          {/* Filter Bar: Clean Dropdowns & Progress Metric */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-surface/50 rounded-lg border border-border-primary">
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Class Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-text-tertiary">Class:</span>
+                <select
+                  value={selectedClassNum}
+                  onChange={(e) => setSelectedClassNum(Number(e.target.value))}
+                  className="px-2.5 py-1 bg-background text-text-primary text-xs font-medium rounded-md border border-border-primary outline-none focus:border-brand cursor-pointer"
+                >
+                  {[1, 2, 3, 4, 5].map((cls) => (
+                    <option key={cls} value={cls}>
+                      Class {cls}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div>
-                {selectedTeacherId === t.id ? (
-                  <div className="flex items-center gap-2 bg-surface p-2 rounded border border-border-primary">
-                    <select
-                      value={assignClassNum}
-                      onChange={(e) => setAssignClassNum(Number(e.target.value))}
-                      className="px-2 py-1 bg-background text-text-primary text-xs rounded border border-border-primary"
-                    >
-                      {[1, 2, 3, 4, 5].map((num) => (
-                        <option key={num} value={num}>
-                          Class {num}
-                        </option>
-                      ))}
-                    </select>
-
-                    <select
-                      value={assignSec}
-                      onChange={(e) => setAssignSec(e.target.value)}
-                      className="px-2 py-1 bg-background text-text-primary text-xs rounded border border-border-primary"
-                    >
-                      {["A", "B", "C", "D"].map((sec) => (
-                        <option key={sec} value={sec}>
-                          Section {sec}
-                        </option>
-                      ))}
-                    </select>
-
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={isAssigning}
-                      onClick={() => handleAssign(t.id)}
-                      className="text-xs"
-                    >
-                      Confirm
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedTeacherId(null)}
-                      className="text-xs"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedTeacherId(t.id)}
-                    className="text-xs"
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-1" />
-                    Assign Class
-                  </Button>
-                )}
+              {/* Section Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-text-tertiary">Section:</span>
+                <select
+                  value={selectedSection}
+                  onChange={(e) => setSelectedSection(e.target.value)}
+                  className="px-2.5 py-1 bg-background text-text-primary text-xs font-medium rounded-md border border-border-primary outline-none focus:border-brand cursor-pointer"
+                >
+                  {["A", "B", "C", "D"].map((sec) => (
+                    <option key={sec} value={sec}>
+                      Section {sec}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-          ))}
+
+            {/* Live Staffing Metric */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-secondary">
+                Staffing Status:
+              </span>
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                  assignedCount === totalCount
+                    ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                    : assignedCount > 0
+                    ? "bg-sky-500/10 text-sky-500 border border-sky-500/20"
+                    : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                }`}
+              >
+                {assignedCount} of {totalCount} Subjects Assigned
+              </span>
+            </div>
+          </div>
+
+          {/* Subjects Table */}
+          <div className="overflow-hidden rounded-lg border border-border-primary">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-surface/80 text-text-tertiary font-semibold uppercase text-[10px] tracking-wider border-b border-border-primary">
+                <tr>
+                  <th className="py-3 px-4">Subject</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4">Assigned Subject Teacher</th>
+                  <th className="py-3 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-primary/40 bg-surface/20">
+                {currentClassSubjects.map((rawSubj) => {
+                  const meta = parseSubjectMeta(rawSubj);
+                  const assignedInfo = getAssignedTeacherForSubject(
+                    selectedClassNum,
+                    selectedSection,
+                    rawSubj
+                  );
+                  const hasTeacher = !!assignedInfo;
+
+                  return (
+                    <tr
+                      key={rawSubj}
+                      className="hover:bg-surface/60 transition-colors"
+                    >
+                      {/* Subject Name & Subtitle */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className={`w-7 h-7 rounded-md flex items-center justify-center font-bold text-xs border ${meta.color}`}
+                          >
+                            {meta.title.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-text-primary text-xs">
+                              {meta.title}
+                            </div>
+                            {meta.subtitle && (
+                              <div className="text-[10px] text-text-tertiary mt-0.5">
+                                {meta.subtitle}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {hasTeacher ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-500 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Assigned
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-xs text-amber-500 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            Unassigned
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Assigned Teacher or Search & Select Trigger */}
+                      <td className="py-3.5 px-4">
+                        {hasTeacher ? (
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-brand/10 text-brand font-bold text-xs flex items-center justify-center border border-border-brand shrink-0">
+                              {assignedInfo.teacher.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .slice(0, 2)
+                                .join("")
+                                .toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-text-primary text-xs flex items-center gap-2">
+                                <span>{assignedInfo.teacher.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setModalClassNum(selectedClassNum);
+                                    setModalSection(selectedSection);
+                                    setModalSubject(rawSubj);
+                                    setModalInitialTeacherId(assignedInfo.teacher.id);
+                                    setShowTeacherModal(true);
+                                  }}
+                                  className="text-[10px] text-brand hover:underline font-medium cursor-pointer"
+                                  title="Change assigned teacher"
+                                >
+                                  (Change)
+                                </button>
+                              </div>
+                              <div className="text-[10px] text-text-tertiary font-mono">
+                                {assignedInfo.teacher.phone_number}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModalClassNum(selectedClassNum);
+                              setModalSection(selectedSection);
+                              setModalSubject(rawSubj);
+                              setModalInitialTeacherId("");
+                              setShowTeacherModal(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface hover:bg-surface/80 text-brand border border-dashed border-border-brand transition-all cursor-pointer shadow-sm hover:shadow"
+                          >
+                            <Search className="w-3.5 h-3.5" />
+                            <span>Select Teacher</span>
+                          </button>
+                        )}
+                      </td>
+
+                      {/* Action */}
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        {hasTeacher ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setModalClassNum(selectedClassNum);
+                                setModalSection(selectedSection);
+                                setModalSubject(rawSubj);
+                                setModalInitialTeacherId(assignedInfo.teacher.id);
+                                setShowTeacherModal(true);
+                              }}
+                              className="text-xs text-text-secondary hover:text-brand hover:bg-brand/10 px-2 py-1 rounded transition-colors font-medium cursor-pointer"
+                              title="Change teacher for this subject"
+                            >
+                              Reassign
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDeassign(
+                                  assignedInfo.teacher.id,
+                                  selectedClassNum,
+                                  selectedSection,
+                                  assignedInfo.assignment.subject || rawSubj,
+                                  assignedInfo.assignment.id
+                                )
+                              }
+                              className="text-xs text-text-tertiary hover:text-rose-500 hover:bg-rose-500/10 px-2.5 py-1 rounded transition-colors font-medium cursor-pointer"
+                              title="Remove teacher from subject"
+                            >
+                              De-assign
+                            </button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => {
+                              setModalClassNum(selectedClassNum);
+                              setModalSection(selectedSection);
+                              setModalSubject(rawSubj);
+                              setModalInitialTeacherId("");
+                              setShowTeacherModal(true);
+                            }}
+                            className="text-xs px-3 py-1 h-auto font-semibold"
+                          >
+                            Assign
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
-        <div className="p-8 text-center text-text-tertiary text-xs">
-          No teachers registered under this branch yet.
+        /* ═════════════════════════════════════════════════════════════════════
+           TEACHER DIRECTORY VIEW (Teacher Workload & Assigned Subjects)
+           ═════════════════════════════════════════════════════════════════════ */
+        <div className="space-y-4">
+          {/* Directory Search & Filters */}
+          <div className="p-3 bg-surface/50 rounded-lg border border-border-primary flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="w-3.5 h-3.5 text-text-tertiary absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search by teacher name, phone, or class..."
+                value={directorySearch}
+                onChange={(e) => setDirectorySearch(e.target.value)}
+                className="w-full pl-8 pr-8 py-1.5 bg-background text-text-primary text-xs rounded-md border border-border-primary outline-none focus:border-brand placeholder:text-text-tertiary"
+              />
+              {directorySearch && (
+                <button
+                  type="button"
+                  onClick={() => setDirectorySearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setDirectoryFilter("all")}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  directoryFilter === "all"
+                    ? "bg-brand text-white shadow-sm"
+                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
+                }`}
+              >
+                All ({directoryCounts.all})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirectoryFilter("unassigned")}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                  directoryFilter === "unassigned"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
+                }`}
+              >
+                <Sparkles className="w-3 h-3 text-emerald-400" />
+                <span>Unassigned ({directoryCounts.unassigned})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirectoryFilter("assigned")}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  directoryFilter === "assigned"
+                    ? "bg-brand text-white shadow-sm"
+                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
+                }`}
+              >
+                Assigned ({directoryCounts.assigned})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirectoryFilter("active")}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  directoryFilter === "active"
+                    ? "bg-brand text-white shadow-sm"
+                    : "bg-surface text-text-secondary hover:text-text-primary border border-border-primary"
+                }`}
+              >
+                Active Only ({directoryCounts.active})
+              </button>
+            </div>
+          </div>
+
+          {/* Teacher Directory List */}
+          <div className="divide-y divide-border-primary/40">
+            {filteredDirectoryTeachers.length === 0 ? (
+              <div className="py-8 text-center text-xs text-text-tertiary">
+                <p className="font-semibold text-text-secondary">No teachers found</p>
+                <p className="text-[11px] mt-1">Try clearing the search query or changing filter tabs.</p>
+              </div>
+            ) : (
+              filteredDirectoryTeachers.map((t: TeacherListItem) => (
+                <div
+                  key={t.id}
+                  className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="w-7 h-7 rounded-full bg-brand/10 text-brand font-bold text-xs flex items-center justify-center border border-border-brand">
+                        {t.name
+                          .split(" ")
+                          .map((n: string) => n[0])
+                          .slice(0, 2)
+                          .join("")
+                          .toUpperCase()}
+                      </div>
+                      <span className="font-bold text-sm text-text-primary">
+                        {t.name}
+                      </span>
+                      <span className="text-xs text-text-tertiary font-mono">
+                        ({t.phone_number})
+                      </span>
+                      <span
+                        className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${
+                          t.is_active
+                            ? "bg-emerald-500/10 text-emerald-500"
+                            : "bg-rose-500/10 text-rose-500"
+                        }`}
+                      >
+                        {t.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap pl-9">
+                      <span className="text-xs text-text-secondary font-medium">
+                        Teaching:
+                      </span>
+                      {t.assigned_classes && t.assigned_classes.length > 0 ? (
+                        t.assigned_classes.map((c: TeacherClassOut) => (
+                          <span
+                            key={c.id || `${c.class_number}-${c.section}-${c.subject}`}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand border border-border-brand"
+                          >
+                            <span>
+                              Class {c.class_number}{c.section} • {parseSubjectMeta(c.subject || "General").title}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDeassign(
+                                  t.id,
+                                  c.class_number,
+                                  c.section,
+                                  c.subject || "General",
+                                  c.id
+                                )
+                              }
+                              className="hover:text-rose-500 cursor-pointer ml-0.5"
+                              title="De-assign subject"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-text-tertiary italic">
+                          No classes assigned yet (Available)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 pl-9 md:pl-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setModalInitialTeacherId(t.id);
+                        setModalClassNum(selectedClassNum);
+                        setModalSection(selectedSection);
+                        const subjs = getSubjectsForClass(selectedClassNum);
+                        setModalSubject(subjs[0] || "Mathematics");
+                        setShowTeacherModal(true);
+                      }}
+                      className="text-xs font-semibold"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      Assign Class
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
+
+      {/* Modern Filter-based Teacher Selection Modal */}
+      <TeacherSearchModal
+        isOpen={showTeacherModal}
+        onClose={() => setShowTeacherModal(false)}
+        teachers={teachers}
+        classNum={modalClassNum}
+        section={modalSection}
+        subject={modalSubject}
+        onClassNumChange={setModalClassNum}
+        onSectionChange={setModalSection}
+        onSubjectChange={setModalSubject}
+        availableSubjects={getSubjectsForClass(modalClassNum)}
+        onAssign={handleAssign}
+        isAssigning={isAssigning}
+        initialTeacherId={modalInitialTeacherId}
+        parseSubjectMeta={parseSubjectMeta}
+        isMatchingSubject={isMatchingSubject}
+      />
     </div>
   );
 }

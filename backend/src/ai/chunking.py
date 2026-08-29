@@ -221,7 +221,12 @@ def extract_chapters_and_chunks(
     return all_chunks
 
 
-def generate_text_embedding(text: str, dim: int = 64) -> list[float]:
+def _stable_hash(s: str) -> int:
+    import hashlib
+    return int(hashlib.md5(s.encode("utf-8")).hexdigest(), 16)
+
+
+def generate_text_embedding(text: str, dim: int = 128) -> list[float]:
     """
     Generate normalized float vector embedding for similarity calculation.
     Uses n-gram hash term frequencies normalized to unit length.
@@ -232,15 +237,14 @@ def generate_text_embedding(text: str, dim: int = 64) -> list[float]:
         return vec
 
     for word in words:
-        # Hash word into vector index
-        idx = abs(hash(word)) % dim
+        idx = _stable_hash(word) % dim
         vec[idx] += 1.0
 
     # Also hash character 3-grams for subword matching
     clean_text = text.lower()
     for i in range(len(clean_text) - 2):
         ngram = clean_text[i : i + 3]
-        idx = abs(hash(ngram)) % dim
+        idx = _stable_hash(ngram) % dim
         vec[idx] += 0.5
 
     # L2 normalize

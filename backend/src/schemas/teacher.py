@@ -1,4 +1,4 @@
-﻿"""
+"""
 Pydantic schemas for the Teacher domain.
 """
 import uuid
@@ -26,9 +26,11 @@ class TeacherProfile(BaseModel):
 
 class TeacherClassOut(BaseModel):
     id: uuid.UUID
+    teacher_id: Optional[uuid.UUID] = None
     class_number: int
     section: str
-    label: str          # e.g. "4A"
+    subject: Optional[str] = ""   # Nullable in DB (legacy records pre-subject column)
+    label: str          # e.g. "4A • Mathematics"
     assigned_at: datetime
 
     model_config = {"from_attributes": True}
@@ -42,6 +44,7 @@ class AssignmentOut(BaseModel):
     branch_name: str
     class_number: int
     section: str
+    subject: Optional[str] = None
     title: str
     description: Optional[str]
     assignment_type: str        # "pdf_upload" | "ai_quiz"
@@ -57,6 +60,7 @@ class AssignmentOut(BaseModel):
 
 class AssignmentCreatePdfRequest(BaseModel):
     title: str
+    subject: Optional[str] = None
     description: Optional[str] = None
     deadline_days: Optional[int] = None    # None = no deadline
 
@@ -70,6 +74,7 @@ class AssignmentCreatePdfRequest(BaseModel):
 
 class AssignmentCreateQuizRequest(BaseModel):
     title: str
+    subject: Optional[str] = None
     description: Optional[str] = None
     module_ids: list[str]       # list of Module UUID strings
     deadline_days: Optional[int] = None
@@ -84,6 +89,7 @@ class AssignmentCreateQuizRequest(BaseModel):
 
 class AssignmentUpdateRequest(BaseModel):
     title: Optional[str] = None
+    subject: Optional[str] = None
     description: Optional[str] = None
     deadline_days: Optional[int] = None   # None = clear deadline; -1 = no change
 
@@ -151,6 +157,7 @@ class TeacherListItem(BaseModel):
 class AssignClassRequest(BaseModel):
     class_number: int
     section: str
+    subject: str
 
     @field_validator("class_number")
     @classmethod
@@ -167,7 +174,17 @@ class AssignClassRequest(BaseModel):
             raise ValueError("Section must be A, B, C, or D.")
         return v
 
+    @field_validator("subject")
+    @classmethod
+    def valid_subject(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Subject is required. A teacher cannot be assigned without a subject.")
+        return v
+
 
 class DeassignClassRequest(BaseModel):
-    class_number: int
-    section: str
+    class_number: Optional[int] = None
+    section: Optional[str] = None
+    subject: Optional[str] = None
+    assignment_id: Optional[uuid.UUID] = None

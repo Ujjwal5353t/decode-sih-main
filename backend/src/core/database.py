@@ -191,11 +191,58 @@ async def init_db() -> None:
         # Migration: curated illustration library asset keys (real pictures,
         # pre-seeded offline) — preferred over image_emoji/option_emojis
         # when the question's picture is in the vocabulary.
+        # Migration: add subject column to teacher_class_assignments
         await conn.execute(
-            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS image_asset_key VARCHAR(60);")
+            text("ALTER TABLE teacher_class_assignments ADD COLUMN IF NOT EXISTS subject VARCHAR(100);")
         )
         await conn.execute(
-            text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS option_asset_keys JSONB;")
+            text("DELETE FROM teacher_class_assignments WHERE subject IS NULL OR subject = '';")
+        )
+        # Migration: add subject column to assignments
+        await conn.execute(
+            text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS subject VARCHAR(100);")
+        )
+
+        # Migration: append-only learning-activity event log (see
+        # src/models/learning.py). Created here as well as via create_all so
+        # deployments that run with AUTO_CREATE_TABLES off still get it, the
+        # same way the publishers tables above are handled.
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS learning_events (
+                    id UUID PRIMARY KEY,
+                    client_event_id VARCHAR(80) NOT NULL,
+                    student_id UUID NOT NULL REFERENCES students(id),
+                    event_type VARCHAR(30) NOT NULL,
+                    module_key VARCHAR(160) NOT NULL,
+                    subject VARCHAR(100) NOT NULL,
+                    class_number INTEGER NOT NULL,
+                    lesson_id UUID REFERENCES lessons(id),
+                    occurred_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+                    received_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+                    duration_ms INTEGER,
+                    detail JSON
+                );
+                """
+            )
+        )
+        # The idempotency guarantee the offline sync queue relies on: a
+        # re-sent event can never become a second row.
+        await conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_learning_event_client_id "
+                "ON learning_events (student_id, client_event_id);"
+            )
+        )
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_learning_events_student_id ON learning_events (student_id);")
+        )
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_learning_events_module_key ON learning_events (module_key);")
+        )
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_learning_events_occurred_at ON learning_events (occurred_at);")
         )
 
 

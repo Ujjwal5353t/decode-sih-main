@@ -651,3 +651,99 @@ button, a, [role="button"] {
   transition-timing-function: cubic-bezier(0.22, 0.68, 0, 1);
 }
 
+/* ════════════════════════════════════════════════════════════
+   CONSOLE — surface language for the School Admin, Teacher and
+   Parent dashboards.
+
+   Every selector below is scoped under .console. The Student
+   dashboard, the marketing site and every shared component used
+   outside these three dashboards render exactly as they did
+   before, because none of them ever carry that class.
+
+   The console deliberately drops the marketing site's glass,
+   gradients and large radii: an interface someone works in all
+   day wants flat surfaces, one hairline, one corner radius and
+   colour reserved for meaning.
+   ════════════════════════════════════════════════════════════ */
+
+.console {
+  --c-panel: var(--bg-surface);
+  --c-sunken: #F7F9FC;
+  --c-line: rgba(15, 23, 42, 0.09);
+  --c-line-strong: rgba(15, 23, 42, 0.16);
+  --c-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --c-radius: 10px;
+}
+
+[data-theme="dark"] .console {
+  --c-panel: var(--bg-surface);
+  --c-sunken: rgba(148, 163, 184, 0.05);
+  --c-line: rgba(148, 163, 184, 0.15);
+  --c-line-strong: rgba(148, 163, 184, 0.28);
+  --c-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.console-panel {
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-radius: var(--c-radius);
+  box-shadow: var(--c-shadow);
+}
+
+/* Figures line up column-to-column instead of jittering by digit width. */
+.console-num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.console-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+/* Rows respond to the pointer without moving — a table that shifts under
+   the cursor is harder to read down. */
+.console-row {
+  transition: background-color 0.15s cubic-bezier(0.22, 0.68, 0, 1);
+}
+.console-row:hover {
+  background: var(--c-sunken);
+}
+
+/* Lift is reserved for things that are genuinely clickable, and is small
+   enough not to disturb the grid around it. */
+.console-lift {
+  transition: border-color 0.18s cubic-bezier(0.22, 0.68, 0, 1),
+              box-shadow 0.18s cubic-bezier(0.22, 0.68, 0, 1),
+              transform 0.18s cubic-bezier(0.22, 0.68, 0, 1);
+}
+.console-lift:hover {
+  border-color: var(--c-line-strong);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+}
+[data-theme="dark"] .console-lift:hover {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+@media (prefers-reduced-motion: reduce) {
+  .console-lift:hover {
+    transform: none;
+  }
+}
+
+/* A quieter scrollbar inside console panes than the site-wide blue one. */
+.console ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.console ::-webkit-scrollbar-thumb {
+  background: var(--c-line-strong);
+  border-radius: var(--radius-full);
+}
+.console ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}

@@ -262,6 +262,11 @@ export function clearStoredAuth() {
   localStorage.removeItem("auth_role");
 }
 
+/** An error raised because the server answered with a non-2xx status. */
+export interface ApiError extends Error {
+  status?: number;
+}
+
 // Universal Fetch Wrapper
 async function fetchApi<T>(
   endpoint: string,
@@ -303,7 +308,12 @@ async function fetchApi<T>(
     } catch {
       errorMessage = response.statusText || errorMessage;
     }
-    throw new Error(errorMessage);
+    // Carry the status so callers can tell "the server rejected you" from
+    // "the request never got there" — the offline paths depend on that
+    // distinction (a fetch that fails outright throws before this point).
+    const error = new Error(errorMessage) as ApiError;
+    error.status = response.status;
+    throw error;
   }
 
   if (response.status === 204) {
@@ -683,9 +693,11 @@ export interface TeacherProfile {
 
 export interface TeacherClassOut {
   id: string;
+  teacher_id?: string;
   class_number: number;
   section: string;
-  label: string;  // e.g. "4A"
+  subject: string;
+  label: string;  // e.g. "4A • Mathematics"
   assigned_at: string;
 }
 
@@ -695,6 +707,7 @@ export interface AssignmentOut {
   branch_name: string;
   class_number: number;
   section: string;
+  subject?: string | null;
   title: string;
   description: string | null;
   assignment_type: "pdf_upload" | "ai_quiz";
@@ -826,6 +839,7 @@ export async function createAiQuizAssignment(
   section: string,
   payload: {
     title: string;
+    subject?: string | null;
     description?: string | null;
     module_ids: string[];
     deadline_days?: number | null;
@@ -919,23 +933,34 @@ export async function getSchoolTeachers(): Promise<TeacherListItem[]> {
 export async function assignClassToTeacher(
   teacher_id: string,
   class_number: number,
-  section: string
+  section: string,
+  subject: string
 ): Promise<TeacherClassOut> {
   return fetchApi<TeacherClassOut>(`/school/teachers/${teacher_id}/assign-class`, {
     method: "POST",
-    body: JSON.stringify({ class_number, section }),
+    body: JSON.stringify({ class_number, section, subject }),
   });
 }
 
 export async function deassignClassFromTeacher(
   teacher_id: string,
-  class_number: number,
-  section: string
+  class_number?: number,
+  section?: string,
+  subject?: string,
+  assignment_id?: string
 ): Promise<void> {
-  await fetchApi<{}>(
-    `/school/teachers/${teacher_id}/assign-class/${class_number}/${section}`,
-    { method: "DELETE" }
-  );
+  if (assignment_id) {
+    await fetchApi<{}>(
+      `/school/teachers/${teacher_id}/assignments/${assignment_id}`,
+      { method: "DELETE" }
+    );
+  } else {
+    const q = subject ? `?subject=${encodeURIComponent(subject)}` : "";
+    await fetchApi<{}>(
+      `/school/teachers/${teacher_id}/assign-class/${class_number}/${section}${q}`,
+      { method: "DELETE" }
+    );
+  }
 }
 
 // ── School Module Upload & OCR ────────────────────────────────────────────────
@@ -1513,4 +1538,126 @@ export async function getLessons(
 
 export async function getLesson(lessonId: string): Promise<LessonOut> {
   return fetchApi<LessonOut>(`/student/lessons/${lessonId}`);
+}
+
+// ── Learning Activity & Progress (Issue #24) ──────────────────────────────────
+
+/**
+ * Types a learner's device reports. MODULE_STARTED and MODULE_COMPLETED are
+ * intentionally absent: the server derives those at ingest, since only it
+ * sees every device's events.
+ */
+export type LearningEventType =
+  | "MODULE_OPENED"
+  | "LESSON_STARTED"
+  | "LESSON_COMPLETED"
+  | "ACTIVITY_COMPLETED"
+  | "QUIZ_STARTED"
+  | "QUIZ_COMPLETED";
+
+export interface LearningEventPayload {
+  client_event_id: string;
+  event_type: LearningEventType;
+  occurred_at: string;
+  lesson_id?: string | null;
+  subject?: string | null;
+  duration_ms?: number | null;
+  detail?: Record<string, unknown> | null;
+}
+
+export interface LearningEventSyncResponse {
+  accepted: string[];
+  duplicates: string[];
+  rejected: { client_event_id: string; reason: string }[];
+}
+
+export type ModuleProgressStatus = "not_started" | "in_progress" | "completed";
+
+export interface ModuleProgressOut {
+  module_key: string;
+  subject: string;
+  class_number: number;
+  title: string;
+  status: ModuleProgressStatus;
+  total_lessons: number;
+  completed_lessons: number;
+  completed_lesson_ids: string[];
+  progress_percent: number;
+  current_lesson_id: string | null;
+  current_lesson_title: string | null;
+  started_at: string | null;
+  last_activity_at: string | null;
+  completed_at: string | null;
+  time_spent_seconds: number | null;
+}
+
+export interface RecentLearningActivityOut {
+  event_type: string;
+  subject: string;
+  module_key: string;
+  lesson_id: string | null;
+  lesson_title: string | null;
+  occurred_at: string;
+}
+
+export interface StudentProgressOut {
+  overall_percent: number;
+  total_modules: number;
+  modules_completed: number;
+  modules_in_progress: number;
+  modules_not_started: number;
+  last_activity_at: string | null;
+  modules: ModuleProgressOut[];
+  recent_activity: RecentLearningActivityOut[];
+}
+
+export interface StudentSubjectProgressOut {
+  subject: string;
+  progress_percent: number;
+  status: ModuleProgressStatus;
+}
+
+export interface ClassStudentProgressOut {
+  student_id: string;
+  unique_number: string;
+  full_name: string;
+  overall_percent: number;
+  modules_completed: number;
+  modules_in_progress: number;
+  last_activity_at: string | null;
+  subjects: StudentSubjectProgressOut[];
+}
+
+export interface ClassProgressOut {
+  class_number: number;
+  section: string;
+  subjects: string[];
+  students: ClassStudentProgressOut[];
+}
+
+/**
+ * Drain the device's offline queue. Idempotent on client_event_id — resending
+ * a batch the server already stored returns those ids under `duplicates`
+ * rather than recording them twice.
+ */
+export async function syncLearningEvents(
+  events: LearningEventPayload[]
+): Promise<LearningEventSyncResponse> {
+  return fetchApi<LearningEventSyncResponse>("/student/learning-events", {
+    method: "POST",
+    body: JSON.stringify({ events }),
+  });
+}
+
+export async function getStudentLearningProgress(): Promise<StudentProgressOut> {
+  return fetchApi<StudentProgressOut>("/student/progress");
+}
+
+export async function getClassLearningProgress(
+  class_number: number,
+  section: string
+): Promise<ClassProgressOut> {
+  return fetchApi<ClassProgressOut>(
+    `/teacher/classes/${class_number}/${section}/progress`
+  );
 }
