@@ -107,7 +107,9 @@ class AssignmentQuizPreviewOut(BaseModel):
     assignment_type: str
     chapters: list[str]
     total_questions: int
-    questions: list[dict]
+    questions: list[QuizQuestionPreview]
+
+    model_config = {"from_attributes": True}
 
 
 class AssignmentUpdateRequest(BaseModel):
