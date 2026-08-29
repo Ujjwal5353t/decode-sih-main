@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+import { BrandLogo } from "@/components/layout/BrandLogo";
 import { motion } from "framer-motion";
 import {
   ShieldCheck,
@@ -67,20 +67,7 @@ export default function SuperAdminLoginPage() {
 
       {/* Header Bar */}
       <header className="p-6 flex items-center justify-between z-10">
-        <Link
-          href="/"
-          className="flex items-center group py-0.5"
-          aria-label="VidyaSetu — Go to home"
-        >
-          <Image
-            src="/vidyasetu-logo.png"
-            alt="VidyaSetu — LEARN • GROW • BELONG — AI for Inclusive Education"
-            width={320}
-            height={96}
-            className="h-10 sm:h-12 md:h-13 w-auto object-contain transition-transform duration-200 group-hover:scale-[1.02]"
-            priority
-          />
-        </Link>
+        <BrandLogo size="lg" priority className="py-0.5" />
 
         <div className="flex items-center gap-4">
           <ThemeToggle />

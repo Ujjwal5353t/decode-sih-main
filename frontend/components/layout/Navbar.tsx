@@ -9,8 +9,8 @@ import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
+import { BrandLogo } from "@/components/layout/BrandLogo";
 
-import Image from "next/image";
 
 // Translation keys mapped to anchor hrefs
 const navLinkDefs = [
@@ -63,20 +63,7 @@ export function Navbar() {
           aria-label="Main navigation"
         >
           {/* Logo */}
-          <Link
-            href="/"
-            className="flex items-center group py-0.5"
-            aria-label="VidyaSetu — Go to home"
-          >
-            <Image
-              src="/vidyasetu-logo.png"
-              alt="VidyaSetu — LEARN • GROW • BELONG — AI for Inclusive Education"
-              width={360}
-              height={108}
-              className="h-14 sm:h-16 md:h-17 lg:h-18 w-auto object-contain transition-transform duration-200 group-hover:scale-[1.02]"
-              priority
-            />
-          </Link>
+          <BrandLogo size="md" priority className="py-0.5" />
 
 
 
