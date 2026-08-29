@@ -150,7 +150,10 @@ def extract_chapters_and_chunks(
             ch_num_raw = match.group(1).strip()
             ch_num = int(ch_num_raw) if ch_num_raw.isdigit() else idx + 1
             ch_title_part = match.group(2).strip()
-            ch_title = f"Chapter {ch_num}: {ch_title_part}" if ch_title_part else f"Chapter {ch_num}"
+            if ch_title_part.lower().startswith("chapter"):
+                ch_title = ch_title_part
+            else:
+                ch_title = f"Chapter {ch_num}: {ch_title_part}" if ch_title_part else f"Chapter {ch_num}"
 
             start_pos = match.start()
             end_pos = matches[idx + 1].start() if idx + 1 < len(matches) else len(full_text)

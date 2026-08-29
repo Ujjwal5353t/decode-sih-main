@@ -50,6 +50,7 @@ class AssignmentOut(BaseModel):
     assignment_type: str        # "pdf_upload" | "ai_quiz"
     file_url: Optional[str]
     module_ids: Optional[str]   # JSON string of UUID list
+    chapter_numbers: Optional[str] = None # JSON string of chapter number list
     deadline_at: Optional[datetime]
     is_locked: bool
     created_at: datetime
@@ -76,15 +77,9 @@ class AssignmentCreateQuizRequest(BaseModel):
     title: str
     subject: Optional[str] = None
     description: Optional[str] = None
-    module_ids: list[str]       # list of Module UUID strings
+    module_ids: Optional[list[str]] = None      # list of Module UUID strings
+    chapter_numbers: Optional[list[int]] = None # list of selected chapter numbers (e.g. [1, 2])
     deadline_days: Optional[int] = None
-
-    @field_validator("module_ids")
-    @classmethod
-    def at_least_one_module(cls, v: list[str]) -> list[str]:
-        if not v:
-            raise ValueError("At least one module must be selected.")
-        return v
 
 
 class AssignmentUpdateRequest(BaseModel):
@@ -188,3 +183,26 @@ class DeassignClassRequest(BaseModel):
     section: Optional[str] = None
     subject: Optional[str] = None
     assignment_id: Optional[uuid.UUID] = None
+
+
+class QuizQuestionPreview(BaseModel):
+    id: str
+    question_number: int
+    chapter_title: str
+    question_text: str
+    options: list[str]
+    correct_option_index: int
+    correct_answer: str
+    explanation: str
+
+
+class AssignmentQuizPreviewOut(BaseModel):
+    assignment_id: uuid.UUID
+    title: str
+    subject: Optional[str] = None
+    class_number: int
+    section: str
+    assignment_type: str
+    chapters: list[str]
+    total_questions: int
+    questions: list[QuizQuestionPreview]

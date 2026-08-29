@@ -797,11 +797,32 @@ export async function getTeacherClassStudents(
   return fetchApi<StudentProfile[]>(`/teacher/classes/${class_number}/${section}/students`);
 }
 
+export interface ChapterOut {
+  chapter_number: number;
+  chapter_title: string;
+  subject: string;
+  class_number: number;
+  module_id?: string | null;
+  module_title?: string | null;
+  chunk_count: number;
+  sample_content: string;
+}
+
 export async function getTeacherClassModules(
   class_number: number,
-  section: string
+  section: string,
+  subject?: string
 ): Promise<ModuleOut[]> {
-  return fetchApi<ModuleOut[]>(`/teacher/classes/${class_number}/${section}/modules`);
+  const query = subject ? `?subject=${encodeURIComponent(subject)}` : "";
+  return fetchApi<ModuleOut[]>(`/teacher/classes/${class_number}/${section}/modules${query}`);
+}
+
+export async function getTeacherClassChapters(
+  class_number: number,
+  subject?: string
+): Promise<ChapterOut[]> {
+  const query = subject ? `?subject=${encodeURIComponent(subject)}` : "";
+  return fetchApi<ChapterOut[]>(`/teacher/classes/${class_number}/chapters${query}`);
 }
 
 export async function getTeacherAssignments(
@@ -841,7 +862,8 @@ export async function createAiQuizAssignment(
     title: string;
     subject?: string | null;
     description?: string | null;
-    module_ids: string[];
+    module_ids?: string[];
+    chapter_numbers?: number[];
     deadline_days?: number | null;
   }
 ): Promise<AssignmentOut> {
@@ -859,6 +881,35 @@ export async function updateAssignment(
     method: "PATCH",
     body: JSON.stringify(payload),
   });
+}
+
+export interface QuizQuestionPreview {
+  id: string;
+  question_number: number;
+  chapter_title: string;
+  question_text: string;
+  options: string[];
+  correct_option_index: number;
+  correct_answer: string;
+  explanation: string;
+}
+
+export interface AssignmentQuizPreviewOut {
+  assignment_id: string;
+  title: string;
+  subject: string | null;
+  class_number: number;
+  section: string;
+  assignment_type: string;
+  chapters: string[];
+  total_questions: number;
+  questions: QuizQuestionPreview[];
+}
+
+export async function getAssignmentQuizPreview(
+  assignment_id: string
+): Promise<AssignmentQuizPreviewOut> {
+  return fetchApi<AssignmentQuizPreviewOut>(`/teacher/assignments/${assignment_id}/quiz-preview`);
 }
 
 export async function deleteAssignment(assignment_id: string): Promise<void> {

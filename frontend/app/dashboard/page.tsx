@@ -130,9 +130,13 @@ import {
   getTeacherClasses,
   getTeacherClassStudents,
   getTeacherClassModules,
+  getTeacherClassChapters,
+  ChapterOut,
   getTeacherAssignments,
   createPdfAssignment,
   createAiQuizAssignment,
+  getAssignmentQuizPreview,
+  AssignmentQuizPreviewOut,
   updateAssignment,
   deleteAssignment,
   getAssignmentSubmissions,
@@ -2236,8 +2240,10 @@ function TeacherDashboardView({
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [loadingStudents, setLoadingStudents] = useState<boolean>(false);
 
-  // Class Modules state (for AI Quiz)
+  // Class Modules & Chapters state (for AI Quiz)
   const [classModules, setClassModules] = useState<ModuleOut[]>([]);
+  const [classChapters, setClassChapters] = useState<ChapterOut[]>([]);
+  const [selectedChapterNumbers, setSelectedChapterNumbers] = useState<number[]>([]);
 
   // Class Assignments state
   const [assignments, setAssignments] = useState<AssignmentOut[]>([]);
@@ -2262,6 +2268,12 @@ function TeacherDashboardView({
   const [selectedModuleIds, setSelectedModuleIds] = useState<string[]>([]);
   const [isSubmittingQuiz, setIsSubmittingQuiz] = useState(false);
   const [quizError, setQuizError] = useState<string | null>(null);
+
+  // AI Quiz Preview Modal state
+  const [showQuizPreviewModal, setShowQuizPreviewModal] = useState<boolean>(false);
+  const [quizPreviewData, setQuizPreviewData] = useState<AssignmentQuizPreviewOut | null>(null);
+  const [loadingQuizPreview, setLoadingQuizPreview] = useState<boolean>(false);
+  const [quizPreviewError, setQuizPreviewError] = useState<string | null>(null);
 
   // Progress Tab state
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>("");
@@ -2304,10 +2316,15 @@ function TeacherDashboardView({
       .catch((err) => console.log("Fetch students note:", err.message))
       .finally(() => setLoadingStudents(false));
 
-    // Load Modules for AI Quiz Selection
-    getTeacherClassModules(selectedClass.class_number, selectedClass.section)
+    // Load Modules for AI Quiz Selection (filtered by assigned subject)
+    getTeacherClassModules(selectedClass.class_number, selectedClass.section, selectedClass.subject || undefined)
       .then((res) => setClassModules(res))
       .catch((err) => console.log("Fetch class modules note:", err.message));
+
+    // Load Chapter Breakdown for AI Quiz Selection
+    getTeacherClassChapters(selectedClass.class_number, selectedClass.subject || undefined)
+      .then((res) => setClassChapters(res))
+      .catch((err) => console.log("Fetch class chapters note:", err.message));
 
     // Load Assignments
     fetchAssignments();
@@ -2374,8 +2391,9 @@ function TeacherDashboardView({
   // Handle AI Quiz Assignment Generation
   const handleCreateQuizAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedClass || !quizTitle.trim() || selectedModuleIds.length === 0) {
-      setQuizError("Please enter a title and select at least one module chapter.");
+    const hasSelection = selectedModuleIds.length > 0 || selectedChapterNumbers.length > 0;
+    if (!selectedClass || !quizTitle.trim() || !hasSelection) {
+      setQuizError("Please enter a title and select at least one module or chapter.");
       return;
     }
 
@@ -2386,7 +2404,8 @@ function TeacherDashboardView({
         title: quizTitle.trim(),
         subject: selectedClass.subject || undefined,
         description: quizDesc.trim() || undefined,
-        module_ids: selectedModuleIds,
+        module_ids: selectedModuleIds.length > 0 ? selectedModuleIds : undefined,
+        chapter_numbers: selectedChapterNumbers.length > 0 ? selectedChapterNumbers : undefined,
         deadline_days: quizDeadlineDays !== "" ? Number(quizDeadlineDays) : undefined,
       });
       setShowQuizModal(false);
@@ -2394,6 +2413,7 @@ function TeacherDashboardView({
       setQuizDesc("");
       setQuizDeadlineDays("");
       setSelectedModuleIds([]);
+      setSelectedChapterNumbers([]);
       fetchAssignments();
     } catch (err: any) {
       setQuizError(err.message || "Failed to generate AI quiz assignment.");
@@ -2675,6 +2695,30 @@ function TeacherDashboardView({
                                 <FileText className="h-3.5 w-3.5" />
                                 {t("teacherDashboard.viewAssignmentPdf")}
                               </a>
+                            )}
+
+                            {asgn.assignment_type === "ai_quiz" && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setLoadingQuizPreview(true);
+                                  setQuizPreviewError(null);
+                                  setQuizPreviewData(null);
+                                  setShowQuizPreviewModal(true);
+                                  try {
+                                    const res = await getAssignmentQuizPreview(asgn.id);
+                                    setQuizPreviewData(res);
+                                  } catch (err: any) {
+                                    setQuizPreviewError(err.message || "Failed to load quiz questions preview.");
+                                  } finally {
+                                    setLoadingQuizPreview(false);
+                                  }
+                                }}
+                                className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand transition-colors hover:bg-brand/20 cursor-pointer"
+                              >
+                                <Sparkles className="h-3.5 w-3.5" />
+                                View Generated Quiz Questions
+                              </button>
                             )}
                           </div>
 
@@ -3056,8 +3100,48 @@ function TeacherDashboardView({
                 </div>
 
                 <div>
-                  <FieldLabel>{t("teacherDashboard.selectModulesRequired")}</FieldLabel>
-                  {classModules.length > 0 ? (
+                  <FieldLabel>Select Modules / Chapters *</FieldLabel>
+                  {classChapters.length > 0 ? (
+                    <div className="max-h-48 space-y-1 overflow-y-auto rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-2 text-xs">
+                      {classChapters.map((ch) => {
+                        const isChecked = selectedChapterNumbers.includes(ch.chapter_number);
+                        return (
+                          <label
+                            key={`${ch.chapter_number}-${ch.subject}`}
+                            className={`flex cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors ${
+                              isChecked ? "bg-brand/10 border border-brand/20" : "hover:bg-[var(--c-panel)]"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedChapterNumbers([...selectedChapterNumbers, ch.chapter_number]);
+                                  if (ch.module_id && !selectedModuleIds.includes(ch.module_id)) {
+                                    setSelectedModuleIds([...selectedModuleIds, ch.module_id]);
+                                  }
+                                } else {
+                                  setSelectedChapterNumbers(
+                                    selectedChapterNumbers.filter((n) => n !== ch.chapter_number)
+                                  );
+                                }
+                              }}
+                              className="mt-0.5 rounded border-border-primary text-brand focus:ring-brand"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-text-primary">
+                                {ch.chapter_title}
+                              </div>
+                              <div className="mt-0.5 text-[11px] text-text-tertiary">
+                                {ch.module_title || "Seeded Textbook"} &bull; {ch.chunk_count} RAG chunks
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : classModules.length > 0 ? (
                     <div className="max-h-40 space-y-0.5 overflow-y-auto rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-1.5 text-xs">
                       {classModules.map((m) => {
                         const isChecked = selectedModuleIds.includes(m.id);
@@ -3123,12 +3207,115 @@ function TeacherDashboardView({
                     variant="primary"
                     size="sm"
                     type="submit"
-                    disabled={isSubmittingQuiz || classModules.length === 0}
+                    disabled={
+                      isSubmittingQuiz ||
+                      !quizTitle.trim() ||
+                      (selectedModuleIds.length === 0 && selectedChapterNumbers.length === 0)
+                    }
                   >
                     {isSubmittingQuiz ? t("teacherDashboard.generating") : t("teacherDashboard.generateQuizBtn")}
                   </Button>
                 </div>
               </form>
+            </Modal>
+          )}
+
+          {/* AI Quiz Questions Preview Modal */}
+          {showQuizPreviewModal && (
+            <Modal
+              title="RAG-Generated AI Quiz Preview"
+              onClose={() => setShowQuizPreviewModal(false)}
+            >
+              {loadingQuizPreview ? (
+                <Loading />
+              ) : quizPreviewError ? (
+                <div className="rounded-[var(--c-radius)] border border-rose-500/20 bg-rose-500/10 p-4 text-xs font-medium text-rose-400">
+                  {quizPreviewError}
+                </div>
+              ) : quizPreviewData ? (
+                <div className="space-y-4">
+                  <div className="rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-3 text-xs">
+                    <div className="font-semibold text-text-primary">
+                      {quizPreviewData.title}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-text-tertiary">
+                      <span>Class {quizPreviewData.class_number}{quizPreviewData.section}</span>
+                      <span>&bull;</span>
+                      <span>{quizPreviewData.subject || "General"}</span>
+                      <span>&bull;</span>
+                      <span>{quizPreviewData.total_questions} Questions</span>
+                    </div>
+                    {quizPreviewData.chapters.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {quizPreviewData.chapters.map((c, i) => (
+                          <span
+                            key={i}
+                            className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium text-brand"
+                          >
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="max-h-96 space-y-4 overflow-y-auto pr-1">
+                    {quizPreviewData.questions.map((q) => (
+                      <div
+                        key={q.id}
+                        className="rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-panel)] p-3 text-xs"
+                      >
+                        <div className="flex items-center justify-between text-[11px] font-medium text-brand">
+                          <span>Question {q.question_number}</span>
+                          <span className="text-[10px] text-text-tertiary">{q.chapter_title}</span>
+                        </div>
+                        <div className="mt-1.5 font-semibold text-text-primary">
+                          {q.question_text}
+                        </div>
+
+                        <div className="mt-2 space-y-1">
+                          {q.options.map((opt, idx) => {
+                            const isCorrect = idx === q.correct_option_index;
+                            return (
+                              <div
+                                key={idx}
+                                className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 ${
+                                  isCorrect
+                                    ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-medium"
+                                    : "bg-[var(--c-sunken)] text-text-secondary"
+                                }`}
+                              >
+                                <span className="font-mono text-[10px] font-bold">
+                                  {String.fromCharCode(65 + idx)}.
+                                </span>
+                                <span className="flex-1">{opt}</span>
+                                {isCorrect && <Check className="h-3.5 w-3.5 text-emerald-400" />}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {q.explanation && (
+                          <div className="mt-2.5 rounded-md border border-brand/20 bg-brand/5 p-2 text-[11px] text-text-secondary">
+                            <span className="font-semibold text-brand">RAG Grounding & Explanation: </span>
+                            {q.explanation}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-end border-t border-[var(--c-line)] pt-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowQuizPreviewModal(false)}
+                    >
+                      Close Preview
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </Modal>
           )}
         </AnimatePresence>

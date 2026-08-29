@@ -84,6 +84,7 @@ class Assignment(SQLModel, table=True):
     file_url: Optional[str] = Field(default=None)
     cloudinary_public_id: Optional[str] = Field(default=None)
     module_ids: Optional[str] = Field(default=None)
+    chapter_numbers: Optional[str] = Field(default=None, description="JSON-encoded list of chapter numbers selected for quiz generation")
 
     deadline_at: Optional[datetime] = Field(default=None)
     is_locked: bool = Field(default=False)
