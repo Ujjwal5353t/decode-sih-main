@@ -155,7 +155,7 @@ ROLE_PERMISSIONS: Dict[str, RolePermissionsResponse] = {
     ),
     "school": RolePermissionsResponse(
         role="school",
-        role_label="School Branch Administrator",
+        role_label="School Admin",
         capabilities=[
             "can_view_school_profile",
             "can_upload_pdf_module",

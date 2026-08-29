@@ -7,8 +7,8 @@ import { Menu, X, Sparkles, LayoutDashboard, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { BrandLogo } from "@/components/layout/BrandLogo";
 
-import Image from "next/image";
 
 const navLinks = [
   { label: "Product",    href: "#how-it-works" },
@@ -59,20 +59,7 @@ export function Navbar() {
           aria-label="Main navigation"
         >
           {/* Logo */}
-          <Link
-            href="/"
-            className="flex items-center group py-0.5"
-            aria-label="VidyaSetu — Go to home"
-          >
-            <Image
-              src="/vidyasetu-logo.png"
-              alt="VidyaSetu — LEARN • GROW • BELONG — AI for Inclusive Education"
-              width={360}
-              height={108}
-              className="h-14 sm:h-16 md:h-17 lg:h-18 w-auto object-contain transition-transform duration-200 group-hover:scale-[1.02]"
-              priority
-            />
-          </Link>
+          <BrandLogo size="md" priority className="py-0.5" />
 
 
 

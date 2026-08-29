@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -17,7 +15,6 @@ import {
   ShieldCheck,
   ClipboardCheck,
   Layers,
-  LogOut,
   X,
   ChevronRight,
   ShieldAlert,
@@ -26,7 +23,8 @@ import {
 } from "lucide-react";
 import { Role, RolePermissionsResponse, DashboardPermissionItem } from "@/lib/api";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
-import { Button } from "@/components/ui/Button";
+import { AccountMenu } from "@/components/dashboard/AccountMenu";
+import { BrandLogo } from "@/components/layout/BrandLogo";
 
 // Map backend icon string names to Lucide-React icons
 const ICON_MAP: Record<string, any> = {
@@ -125,38 +123,25 @@ export function DashboardSidebar({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.22,0.68,0,1)] lg:translate-x-0 ${
+        className={`fixed top-0 bottom-0 left-0 z-40 flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.22,0.68,0,1)] lg:translate-x-0 ${
           isConsole
-            ? "w-72 border-r border-[var(--c-line)] bg-[var(--c-panel)]"
+            ? "w-72 border-r border-[var(--c-line)] bg-[var(--c-panel)] shadow-2xs"
             : "w-72 bg-surface/95 backdrop-blur-md border-r border-border-primary"
         } ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Brand Header */}
         <div
-          className={`flex items-center justify-between ${
+          className={`flex h-[76px] shrink-0 items-center justify-between border-b ${
             isConsole
-              ? "border-b border-[var(--c-line)] px-5 py-4"
-              : "p-5 border-b border-border-primary/60"
+              ? "border-[var(--c-line)] px-5"
+              : "border-border-primary/60 px-5"
           }`}
         >
-          <Link
-            href="/"
-            className="flex items-center group py-0.5"
-            aria-label="VidyaSetu — Go to home"
-          >
-            <Image
-              src="/vidyasetu-logo.png"
-              alt="VidyaSetu — Inclusive Education"
-              width={280}
-              height={84}
-              className="h-10 w-auto object-contain transition-transform duration-200 group-hover:scale-[1.02]"
-              priority
-            />
-          </Link>
+          <BrandLogo size="sm" priority />
 
           <button
             onClick={onCloseMobile}
-            className="p-1.5 rounded-[var(--radius-sm)] text-text-tertiary hover:text-text-primary hover:bg-surface-hover lg:hidden cursor-pointer"
+            className="p-1.5 rounded-xl text-text-tertiary hover:text-text-primary hover:bg-[var(--c-sunken)] lg:hidden cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -166,7 +151,7 @@ export function DashboardSidebar({
         <div
           className={
             isConsole
-              ? "border-b border-[var(--c-line)] px-5 py-4"
+              ? "border-b border-[var(--c-line)] px-4 py-3.5"
               : "p-4 mx-3 my-3 rounded-[var(--radius-lg)] bg-surface-hover/80 border border-border-primary/70"
           }
         >
@@ -174,7 +159,7 @@ export function DashboardSidebar({
             <div
               className={`flex shrink-0 items-center justify-center ${
                 isConsole
-                  ? "h-9 w-9 rounded-[var(--c-radius)] border border-brand/20 bg-brand/10 text-brand"
+                  ? "h-9 w-9 rounded-xl border border-brand/20 bg-brand/10 text-brand shadow-2xs"
                   : "w-10 h-10 rounded-[var(--radius-md)] shadow-sm"
               }`}
               style={isConsole ? undefined : { background: "var(--gradient-brand)" }}
@@ -193,8 +178,8 @@ export function DashboardSidebar({
               <div className="text-[11px] text-text-secondary truncate mt-0.5">
                 {getUserSubtitle()}
               </div>
-              <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-brand/10 text-brand border border-border-brand">
-                {permissions?.role_label || `${role} Role`}
+              <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-brand/10 text-brand border border-brand/20">
+                {role === "school" ? "School Admin" : permissions?.role_label || `${role} Role`}
               </span>
             </div>
           </div>
@@ -203,18 +188,18 @@ export function DashboardSidebar({
         {/* Navigation Section (Fetched from RBAC Backend Schema) */}
         <div
           className={`flex-1 overflow-y-auto ${
-            isConsole ? "space-y-6 px-3 py-4" : "px-3 py-2 space-y-4"
+            isConsole ? "space-y-5 px-3 py-3.5" : "px-3 py-2 space-y-4"
           }`}
         >
           {categories.map((cat) => {
             const items = navigationItems.filter((i) => (i.category || "Main") === cat);
 
             return (
-              <div key={cat} className={isConsole ? "space-y-0.5" : "space-y-1"}>
+              <div key={cat} className={isConsole ? "space-y-1" : "space-y-1"}>
                 <div
                   className={
                     isConsole
-                      ? "px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.09em] text-text-tertiary"
+                      ? "px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.09em] text-text-tertiary"
                       : "px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-text-tertiary"
                   }
                 >
@@ -233,28 +218,18 @@ export function DashboardSidebar({
                           onSelectTab(item.id);
                           onCloseMobile();
                         }}
-                        className={`group relative flex w-full cursor-pointer items-center justify-between gap-3 rounded-[var(--c-radius)] px-3 py-2 text-xs font-medium transition-colors ${
+                        className={`group relative flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 text-xs font-medium transition-all duration-200 ${
                           isActive
-                            ? "bg-brand/8 font-semibold text-brand"
+                            ? "bg-brand text-white font-bold shadow-md shadow-brand/20"
                             : "text-text-secondary hover:bg-[var(--c-sunken)] hover:text-text-primary"
                         }`}
                       >
-                        {/* One indicator that slides between items, rather than
-                            every item cross-fading its own background. */}
-                        {isActive && (
-                          <motion.span
-                            layoutId="console-nav-indicator"
-                            transition={{ type: "spring", stiffness: 520, damping: 40 }}
-                            className="absolute bottom-1.5 left-0 top-1.5 w-[3px] rounded-full bg-brand"
-                          />
-                        )}
-
-                        <div className="flex min-w-0 items-center gap-2.5">
+                        <div className="flex min-w-0 items-center gap-3">
                           <Icon
                             className={`h-4 w-4 shrink-0 transition-colors ${
                               isActive
-                                ? "text-brand"
-                                : "text-text-tertiary group-hover:text-text-secondary"
+                                ? "text-white"
+                                : "text-text-tertiary group-hover:text-brand"
                             }`}
                           />
                           <span className="truncate">{item.label}</span>
@@ -263,16 +238,20 @@ export function DashboardSidebar({
                         <div className="flex shrink-0 items-center gap-1.5">
                           {item.badge && (
                             <span
-                              className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                              className={`rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
                                 isActive
-                                  ? "bg-brand/12 text-brand"
-                                  : "bg-[var(--c-sunken)] text-text-tertiary"
+                                  ? "bg-white/20 text-white"
+                                  : "bg-brand/10 text-brand border border-brand/20"
                               }`}
                             >
                               {item.badge}
                             </span>
                           )}
-                          {isActive && <ChevronRight className="h-3.5 w-3.5 text-brand/70" />}
+                          <ChevronRight
+                            className={`h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 ${
+                              isActive ? "text-white/80" : "text-text-tertiary opacity-40"
+                            }`}
+                          />
                         </div>
                       </button>
                     );
@@ -326,28 +305,43 @@ export function DashboardSidebar({
           })}
         </div>
 
-        {/* Footer Actions */}
+        {/* Institution Context Card (School Admin) */}
+        {role === "school" && user && (
+          <div className="px-3 pb-2">
+            <div className="rounded-xl border border-[var(--c-line)] bg-[var(--c-sunken)] p-3 space-y-1 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                  Branch Prefix
+                </span>
+                <span className="font-mono text-xs font-bold text-brand bg-brand/10 border border-brand/20 px-1.5 py-0.5 rounded-md">
+                  {user.student_prefix}
+                </span>
+              </div>
+              <div className="text-[11px] font-medium text-text-secondary truncate">
+                {user.school_name || "VidyaSetu Institution"}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Footer — account control. Sign Out now lives inside this menu
+            alongside the profile panel, theme and home link. */}
         <div
           className={
             isConsole
-              ? "space-y-3 border-t border-[var(--c-line)] px-5 py-4"
-              : "p-4 border-t border-border-primary/60 space-y-3 bg-surface/40"
+              ? "border-t border-[var(--c-line)] px-3 py-3"
+              : "p-3 border-t border-border-primary/60 bg-surface/40"
           }
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-text-secondary">Interface Theme</span>
-            <ThemeToggle />
-          </div>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={logout}
-            className="w-full justify-start text-xs font-semibold text-text-secondary hover:text-rose-500 hover:bg-rose-500/10 cursor-pointer"
-          >
-            <LogOut className="w-4 h-4 mr-2 text-rose-500" />
-            Sign Out
-          </Button>
+          <AccountMenu
+            user={user}
+            role={role}
+            displayName={getUserDisplayName()}
+            subtitle={getUserSubtitle()}
+            roleLabel={permissions?.role_label || `${role} Role`}
+            logout={logout}
+            isConsole={isConsole}
+          />
         </div>
       </aside>
     </>

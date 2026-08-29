@@ -3,7 +3,7 @@
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
 import { ExternalLink, MessageCircle, Link2, Mail } from "lucide-react";
-import Image from "next/image";
+import { BrandLogo } from "@/components/layout/BrandLogo";
 
 interface FooterLinkItem {
   label: string;
@@ -185,14 +185,7 @@ export function Footer() {
         >
           <div className="md:col-span-5 lg:col-span-5 mb-6 md:mb-0">
             <a href="#hero" className="inline-block mb-4">
-              <Image
-                src="/vidyasetu-logo.png"
-                alt="VidyaSetu — LEARN • GROW • BELONG — AI for Inclusive Education"
-                width={500}
-                height={150}
-                className="h-24 sm:h-28 md:h-32 lg:h-36 w-auto object-contain"
-                priority
-              />
+              <BrandLogo href={null} size="xl" priority />
             </a>
 
 
