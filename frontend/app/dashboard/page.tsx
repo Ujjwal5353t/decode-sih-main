@@ -130,6 +130,10 @@ import {
   getTeacherClasses,
   getTeacherClassStudents,
   getTeacherClassModules,
+  getTeacherClassChapters,
+  ChapterOut,
+  getAssignmentQuizPreview,
+  AssignmentQuizPreviewOut,
   getTeacherAssignments,
   createPdfAssignment,
   createAiQuizAssignment,
@@ -2238,6 +2242,8 @@ function TeacherDashboardView({
 
   // Class Modules state (for AI Quiz)
   const [classModules, setClassModules] = useState<ModuleOut[]>([]);
+  const [classChapters, setClassChapters] = useState<ChapterOut[]>([]);
+  const [selectedChapterNumbers, setSelectedChapterNumbers] = useState<number[]>([]);
 
   // Class Assignments state
   const [assignments, setAssignments] = useState<AssignmentOut[]>([]);
@@ -2262,6 +2268,25 @@ function TeacherDashboardView({
   const [selectedModuleIds, setSelectedModuleIds] = useState<string[]>([]);
   const [isSubmittingQuiz, setIsSubmittingQuiz] = useState(false);
   const [quizError, setQuizError] = useState<string | null>(null);
+
+  // Quiz Preview Modal State
+  const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
+  const [previewQuiz, setPreviewQuiz] = useState<AssignmentQuizPreviewOut | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState<boolean>(false);
+
+  const handleViewQuizPreview = async (assignmentId: string) => {
+    setLoadingPreview(true);
+    setShowPreviewModal(true);
+    try {
+      const res = await getAssignmentQuizPreview(assignmentId);
+      setPreviewQuiz(res);
+    } catch (err: any) {
+      alert(err.message || "Failed to load AI quiz questions preview.");
+      setShowPreviewModal(false);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
 
   // Progress Tab state
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>("");
@@ -2308,6 +2333,11 @@ function TeacherDashboardView({
     getTeacherClassModules(selectedClass.class_number, selectedClass.section)
       .then((res) => setClassModules(res))
       .catch((err) => console.log("Fetch class modules note:", err.message));
+
+    // Load Chapters for RAG Quiz Selection
+    getTeacherClassChapters(selectedClass.class_number, selectedClass.subject || undefined)
+      .then((res) => setClassChapters(res))
+      .catch((err) => console.log("Fetch class chapters note:", err.message));
 
     // Load Assignments
     fetchAssignments();
@@ -2374,8 +2404,12 @@ function TeacherDashboardView({
   // Handle AI Quiz Assignment Generation
   const handleCreateQuizAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedClass || !quizTitle.trim() || selectedModuleIds.length === 0) {
-      setQuizError("Please enter a title and select at least one module chapter.");
+    if (
+      !selectedClass ||
+      !quizTitle.trim() ||
+      (selectedModuleIds.length === 0 && selectedChapterNumbers.length === 0)
+    ) {
+      setQuizError("Please enter a title and select at least one module or chapter.");
       return;
     }
 
@@ -2387,6 +2421,7 @@ function TeacherDashboardView({
         subject: selectedClass.subject || undefined,
         description: quizDesc.trim() || undefined,
         module_ids: selectedModuleIds,
+        chapter_numbers: selectedChapterNumbers,
         deadline_days: quizDeadlineDays !== "" ? Number(quizDeadlineDays) : undefined,
       });
       setShowQuizModal(false);
@@ -2394,6 +2429,7 @@ function TeacherDashboardView({
       setQuizDesc("");
       setQuizDeadlineDays("");
       setSelectedModuleIds([]);
+      setSelectedChapterNumbers([]);
       fetchAssignments();
     } catch (err: any) {
       setQuizError(err.message || "Failed to generate AI quiz assignment.");
@@ -2665,7 +2701,16 @@ function TeacherDashboardView({
                               </p>
                             )}
 
-                            {asgn.file_url && (
+                            {asgn.assignment_type === "ai_quiz" ? (
+                              <button
+                                type="button"
+                                onClick={() => handleViewQuizPreview(asgn.id)}
+                                className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline cursor-pointer"
+                              >
+                                <Brain className="h-3.5 w-3.5 text-violet-400" />
+                                View AI Quiz Questions
+                              </button>
+                            ) : asgn.file_url ? (
                               <a
                                 href={formatPdfUrl(asgn.file_url)}
                                 target="_blank"
@@ -2675,7 +2720,7 @@ function TeacherDashboardView({
                                 <FileText className="h-3.5 w-3.5" />
                                 {t("teacherDashboard.viewAssignmentPdf")}
                               </a>
-                            )}
+                            ) : null}
                           </div>
 
                           <div className="flex shrink-0 items-center gap-5">
@@ -3057,7 +3102,47 @@ function TeacherDashboardView({
 
                 <div>
                   <FieldLabel>{t("teacherDashboard.selectModulesRequired")}</FieldLabel>
-                  {classModules.length > 0 ? (
+                  {classChapters.length > 0 ? (
+                    <div className="max-h-48 space-y-1 overflow-y-auto rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-2 text-xs">
+                      {classChapters.map((ch, idx) => {
+                        const isChecked = selectedChapterNumbers.includes(ch.chapter_number);
+                        return (
+                          <label
+                            key={`${ch.chapter_number}-${ch.module_id || 'seeded'}-${idx}`}
+                            className={`flex cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors ${
+                              isChecked ? "bg-brand/10 border border-brand/20" : "hover:bg-[var(--c-panel)]"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedChapterNumbers([...selectedChapterNumbers, ch.chapter_number]);
+                                  if (ch.module_id && !selectedModuleIds.includes(ch.module_id)) {
+                                    setSelectedModuleIds([...selectedModuleIds, ch.module_id]);
+                                  }
+                                } else {
+                                  setSelectedChapterNumbers(
+                                    selectedChapterNumbers.filter((n) => n !== ch.chapter_number)
+                                  );
+                                }
+                              }}
+                              className="mt-0.5 rounded border-border-primary text-brand focus:ring-brand"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-text-primary">
+                                {ch.chapter_title}
+                              </div>
+                              <div className="mt-0.5 text-[11px] text-text-tertiary">
+                                {ch.module_title || "Seeded Textbook"} &bull; {ch.chunk_count} RAG chunks
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : classModules.length > 0 ? (
                     <div className="max-h-40 space-y-0.5 overflow-y-auto rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-1.5 text-xs">
                       {classModules.map((m) => {
                         const isChecked = selectedModuleIds.includes(m.id);
@@ -3117,7 +3202,7 @@ function TeacherDashboardView({
                     type="button"
                     onClick={() => setShowQuizModal(false)}
                   >
-                    {t("teacherDashboard.cancel")}
+                    {t("teacherDashboard.cancelBtn")}
                   </Button>
                   <Button
                     variant="primary"

@@ -11,6 +11,7 @@
  * pdf.js is imported lazily so it only ships to routes that actually use it.
  */
 
+// @ts-ignore
 import type { PDFDocumentProxy, TextItem } from "pdfjs-dist/types/src/display/api";
 
 export type PdfDocument = PDFDocumentProxy;
@@ -20,10 +21,12 @@ const OCR_PAGE_WIDTH = 1700;
 /** JPEG quality used for rasterised pages — high enough for reliable OCR. */
 const OCR_PAGE_QUALITY = 0.92;
 
+// @ts-ignore
 let pdfjsModule: Promise<typeof import("pdfjs-dist")> | null = null;
 
 async function getPdfjs() {
   if (!pdfjsModule) {
+    // @ts-ignore
     pdfjsModule = import("pdfjs-dist")
       .then((pdfjs) => {
         pdfjs.GlobalWorkerOptions.workerSrc = new URL(

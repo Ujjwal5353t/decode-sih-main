@@ -834,6 +834,39 @@ export async function createPdfAssignment(
   return response.json();
 }
 
+export interface ChapterOut {
+  chapter_number: number;
+  chapter_title: string;
+  subject: string;
+  class_number: number;
+  module_id?: string | null;
+  module_title?: string | null;
+  chunk_count: number;
+  sample_content?: string | null;
+}
+
+export interface AssignmentQuizPreviewOut {
+  assignment_id: string;
+  title: string;
+  subject?: string | null;
+  class_number: number;
+  section: string;
+  assignment_type: string;
+  chapters: string[];
+  total_questions: number;
+  questions: any[];
+}
+
+export async function getTeacherClassChapters(
+  class_number: number,
+  subject?: string
+): Promise<ChapterOut[]> {
+  const url = subject
+    ? `/teacher/classes/${class_number}/chapters?subject=${encodeURIComponent(subject)}`
+    : `/teacher/classes/${class_number}/chapters`;
+  return fetchApi<ChapterOut[]>(url);
+}
+
 export async function createAiQuizAssignment(
   class_number: number,
   section: string,
@@ -842,6 +875,7 @@ export async function createAiQuizAssignment(
     subject?: string | null;
     description?: string | null;
     module_ids: string[];
+    chapter_numbers?: number[];
     deadline_days?: number | null;
   }
 ): Promise<AssignmentOut> {
@@ -849,6 +883,12 @@ export async function createAiQuizAssignment(
     `/teacher/classes/${class_number}/${section}/assignments/ai-quiz`,
     { method: "POST", body: JSON.stringify(payload) }
   );
+}
+
+export async function getAssignmentQuizPreview(
+  assignment_id: string
+): Promise<AssignmentQuizPreviewOut> {
+  return fetchApi<AssignmentQuizPreviewOut>(`/teacher/assignments/${assignment_id}/quiz-preview`);
 }
 
 export async function updateAssignment(
