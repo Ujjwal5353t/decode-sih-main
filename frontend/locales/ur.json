@@ -848,7 +848,9 @@
     "selectModulesRequired": "ماڈیولز / ابواب منتخب کریں *",
     "noModulesWarning": "اس کلاس کے لیے کوئی ماڈیول نہیں ملا۔ پہلے اسکول ڈیش بورڈ میں ماڈیول اپ لوڈ کریں۔",
     "generating": "تیار ہو رہا ہے...",
-    "generateQuizBtn": "AI کوئز بنائیں"
+    "generateQuizBtn": "AI کوئز بنائیں",
+    "cancelBtn": "منسوخ کریں",
+    "generatingBtn": "تیار ہو رہا ہے..."
   },
   "quizQuestions": {
     "science": [

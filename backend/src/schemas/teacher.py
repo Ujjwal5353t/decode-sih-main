@@ -90,9 +90,11 @@ class AssignmentCreateQuizRequest(BaseModel):
 class QuizQuestionPreview(BaseModel):
     id: str = ""
     question_number: int = 1
+    chapter_title: str = ""
     question_text: str
     options: list[str]
-    correct_option: int
+    correct_option_index: int = 0
+    correct_answer: str = ""
     explanation: Optional[str] = None
 
 

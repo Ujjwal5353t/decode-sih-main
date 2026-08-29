@@ -3259,7 +3259,7 @@ function TeacherDashboardView({
                         {q.options && q.options.length > 0 && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-6 pt-1">
                             {q.options.map((opt: string, oIdx: number) => {
-                              const isCorrect = (q.correct_option !== undefined && oIdx === q.correct_option) || opt === q.answer;
+                              const isCorrect = (q.correct_option_index !== undefined && oIdx === q.correct_option_index) || opt === q.correct_answer || opt === q.answer;
                               return (
                                 <div
                                   key={oIdx}

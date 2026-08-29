@@ -1022,7 +1022,9 @@
     "selectModulesRequired": "मॉड्यूल / अध्याय चुनें *",
     "noModulesWarning": "इस कक्षा के लिए कोई मॉड्यूल नहीं मिले। एआई क्विज़ बनाने के लिए पहले स्कूल डैशबोर्ड में मॉड्यूल अपलोड करें।",
     "generating": "तैयार हो रहा है...",
-    "generateQuizBtn": "AI क्विज़ तैयार करें"
+    "generateQuizBtn": "AI क्विज़ तैयार करें",
+    "cancelBtn": "रद्द करें",
+    "generatingBtn": "तैयार हो रहा है..."
   },
   "quizQuestions": {
     "science": [

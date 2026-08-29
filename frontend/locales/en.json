@@ -1022,7 +1022,9 @@
     "selectModulesRequired": "Select Modules / Chapters *",
     "noModulesWarning": "No uploaded modules found for this class. Upload modules first in the School dashboard to generate adaptive quizzes.",
     "generating": "Generating...",
-    "generateQuizBtn": "Generate AI Quiz"
+    "generateQuizBtn": "Generate AI Quiz",
+    "cancelBtn": "Cancel",
+    "generatingBtn": "Generating..."
   },
   "quizQuestions": {
     "science": [
