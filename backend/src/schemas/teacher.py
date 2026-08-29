@@ -87,6 +87,15 @@ class AssignmentCreateQuizRequest(BaseModel):
         return v
 
 
+class QuizQuestionPreview(BaseModel):
+    id: str = ""
+    question_number: int = 1
+    question_text: str
+    options: list[str]
+    correct_option: int
+    explanation: Optional[str] = None
+
+
 class AssignmentQuizPreviewOut(BaseModel):
     assignment_id: uuid.UUID
     title: str

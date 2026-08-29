@@ -3216,6 +3216,94 @@ function TeacherDashboardView({
               </form>
             </Modal>
           )}
+
+          {/* AI Quiz Questions Preview Modal */}
+          {showPreviewModal && (
+            <Modal
+              title={previewQuiz?.title || "AI Quiz Questions Preview"}
+              icon={Brain}
+              iconTone="violet"
+              onClose={() => {
+                setShowPreviewModal(false);
+                setPreviewQuiz(null);
+              }}
+            >
+              {loadingPreview ? (
+                <div className="py-12 flex flex-col items-center gap-3 text-xs text-text-tertiary">
+                  <Loader2 className="w-6 h-6 animate-spin text-brand" />
+                  <span>Loading AI RAG Quiz Questions...</span>
+                </div>
+              ) : previewQuiz ? (
+                <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-semibold text-text-secondary">Class & Subject:</span>
+                    <Chip tone="brand">Class {previewQuiz.class_number}{previewQuiz.section} &bull; {previewQuiz.subject || "Mathematics"}</Chip>
+                    <Chip tone="violet">{previewQuiz.total_questions} RAG Questions</Chip>
+                  </div>
+
+                  {previewQuiz.chapters && previewQuiz.chapters.length > 0 && (
+                    <div className="text-xs text-text-tertiary bg-[var(--c-sunken)] p-2.5 rounded-md border border-[var(--c-line)]">
+                      <span className="font-semibold text-text-secondary">Grounded in Chapters: </span>
+                      {previewQuiz.chapters.join(", ")}
+                    </div>
+                  )}
+
+                  <div className="space-y-3 pt-2">
+                    {previewQuiz.questions.map((q: any, idx: number) => (
+                      <div key={q.id || idx} className="p-3.5 rounded-lg border border-[var(--c-line)] bg-[var(--c-panel)] text-xs space-y-2">
+                        <div className="font-semibold text-text-primary flex items-start gap-2">
+                          <span className="shrink-0 font-mono text-brand font-bold">Q{idx + 1}.</span>
+                          <span>{q.question || q.question_text}</span>
+                        </div>
+
+                        {q.options && q.options.length > 0 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-6 pt-1">
+                            {q.options.map((opt: string, oIdx: number) => {
+                              const isCorrect = (q.correct_option !== undefined && oIdx === q.correct_option) || opt === q.answer;
+                              return (
+                                <div
+                                  key={oIdx}
+                                  className={`p-2 rounded border text-xs font-medium transition-colors ${
+                                    isCorrect
+                                      ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-400 font-bold border-emerald-500/50 shadow-sm"
+                                      : "bg-[var(--c-sunken)] border-[var(--c-line)] text-text-secondary"
+                                  }`}
+                                >
+                                  <span className="font-bold mr-1.5">{String.fromCharCode(65 + oIdx)}.</span>
+                                  {opt}
+                                  {isCorrect && <span className="ml-2 text-[10px] text-emerald-400 font-extrabold uppercase">(Correct Answer)</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {q.explanation && (
+                          <div className="pl-6 pt-1 text-[11px] text-text-tertiary italic">
+                            <span className="font-semibold text-brand">NCERT RAG Context: </span>
+                            {q.explanation}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-end pt-4 border-t border-[var(--c-line)]">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        setShowPreviewModal(false);
+                        setPreviewQuiz(null);
+                      }}
+                    >
+                      Close Preview
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </Modal>
+          )}
         </AnimatePresence>
       </div>
     </ConsoleMotion>
