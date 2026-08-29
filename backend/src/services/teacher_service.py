@@ -33,6 +33,7 @@ from src.schemas.teacher import (
     AssignClassRequest,
     AssignmentCreateQuizRequest,
     AssignmentCreatePdfRequest,
+    AssignmentQuizPreviewOut,
     AssignmentUpdateRequest,
 )
 from src.utils.file_utils import delete_cloudinary_asset
@@ -671,3 +672,58 @@ async def _get_class_assignments(
         ).order_by(Assignment.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def get_assignment_quiz_preview(
+    assignment_id: uuid.UUID, teacher: Teacher, session: AsyncSession
+) -> AssignmentQuizPreviewOut:
+    asgn = await _get_assignment_or_403(assignment_id, teacher, session)
+
+    chapter_nums = []
+    if hasattr(asgn, "chapter_numbers") and asgn.chapter_numbers:
+        try:
+            chapter_nums = json.loads(asgn.chapter_numbers)
+        except Exception:
+            pass
+
+    from src.models.chunk import DocumentChunk
+    from src.ai.rag_quiz_generator import generate_rag_quiz_questions
+
+    stmt = select(DocumentChunk).where(
+        (DocumentChunk.branch_name == teacher.branch_name) | (DocumentChunk.branch_name == "SELF"),
+        DocumentChunk.class_number == asgn.class_number,
+    )
+    if chapter_nums:
+        stmt = stmt.where(DocumentChunk.chapter_number.in_(chapter_nums))
+    if asgn.subject and asgn.subject.strip().lower() not in ("general", "all", "none", ""):
+        stmt = stmt.where(DocumentChunk.subject.ilike(f"%{asgn.subject.strip()}%"))
+
+    stmt = stmt.order_by(DocumentChunk.chapter_number, DocumentChunk.chunk_index)
+    res = await session.execute(stmt)
+    chunks = list(res.scalars().all())
+
+    if not chunks:
+        fb_stmt = select(DocumentChunk).where(
+            (DocumentChunk.branch_name == teacher.branch_name) | (DocumentChunk.branch_name == "SELF"),
+            DocumentChunk.class_number == asgn.class_number,
+        ).limit(20)
+        res_fb = await session.execute(fb_stmt)
+        chunks = list(res_fb.scalars().all())
+
+    questions = generate_rag_quiz_questions(chunks, count=8)
+
+    chapter_titles = list(dict.fromkeys([c.chapter_title for c in chunks if c.chapter_title]))
+    if not chapter_titles:
+        chapter_titles = [f"Chapter {n}" for n in chapter_nums] if chapter_nums else ["General Chapter Overview"]
+
+    return AssignmentQuizPreviewOut(
+        assignment_id=asgn.id,
+        title=asgn.title,
+        subject=asgn.subject,
+        class_number=asgn.class_number,
+        section=asgn.section,
+        assignment_type=asgn.assignment_type,
+        chapters=chapter_titles,
+        total_questions=len(questions),
+        questions=questions,
+    )

@@ -37,14 +37,20 @@ def _normalize_subject(subject: Optional[str]) -> Optional[str]:
 
 
 async def get_class_modules(
-    branch_name: str, class_number: int, session: AsyncSession
+    branch_name: str,
+    class_number: int,
+    session: AsyncSession,
+    subject: Optional[str] = None,
 ) -> list[Module]:
-    result = await session.execute(
-        select(Module).where(
-            Module.branch_name == branch_name,
-            Module.class_number == class_number,
-        ).order_by(Module.created_at)
+    stmt = select(Module).where(
+        Module.branch_name == branch_name,
+        Module.class_number == class_number,
     )
+    if subject and subject.strip() and subject.strip().lower() not in ("general", "all", "none", "null"):
+        stmt = stmt.where(Module.subject.ilike(f"%{subject.strip()}%"))  # type: ignore[attr-defined]
+
+    stmt = stmt.order_by(Module.created_at)
+    result = await session.execute(stmt)
     return list(result.scalars().all())
 
 

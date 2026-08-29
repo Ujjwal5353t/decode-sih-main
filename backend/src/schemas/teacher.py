@@ -87,6 +87,18 @@ class AssignmentCreateQuizRequest(BaseModel):
         return v
 
 
+class AssignmentQuizPreviewOut(BaseModel):
+    assignment_id: uuid.UUID
+    title: str
+    subject: Optional[str] = None
+    class_number: int
+    section: str
+    assignment_type: str
+    chapters: list[str]
+    total_questions: int
+    questions: list[dict]
+
+
 class AssignmentUpdateRequest(BaseModel):
     title: Optional[str] = None
     subject: Optional[str] = None

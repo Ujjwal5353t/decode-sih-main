@@ -799,9 +799,13 @@ export async function getTeacherClassStudents(
 
 export async function getTeacherClassModules(
   class_number: number,
-  section: string
+  section: string,
+  subject?: string
 ): Promise<ModuleOut[]> {
-  return fetchApi<ModuleOut[]>(`/teacher/classes/${class_number}/${section}/modules`);
+  const url = subject
+    ? `/teacher/classes/${class_number}/${section}/modules?subject=${encodeURIComponent(subject)}`
+    : `/teacher/classes/${class_number}/${section}/modules`;
+  return fetchApi<ModuleOut[]>(url);
 }
 
 export async function getTeacherAssignments(

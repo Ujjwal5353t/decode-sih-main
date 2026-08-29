@@ -2329,8 +2329,8 @@ function TeacherDashboardView({
       .catch((err) => console.log("Fetch students note:", err.message))
       .finally(() => setLoadingStudents(false));
 
-    // Load Modules for AI Quiz Selection
-    getTeacherClassModules(selectedClass.class_number, selectedClass.section)
+    // Load Modules for AI Quiz Selection & Curriculum View
+    getTeacherClassModules(selectedClass.class_number, selectedClass.section, selectedClass.subject || undefined)
       .then((res) => setClassModules(res))
       .catch((err) => console.log("Fetch class modules note:", err.message));
 
