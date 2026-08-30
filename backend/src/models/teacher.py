@@ -88,6 +88,8 @@ class Assignment(SQLModel, table=True):
 
     deadline_at: Optional[datetime] = Field(default=None)
     is_locked: bool = Field(default=False)
+    time_limit_minutes: int = Field(default=15)
+    pass_percentage: float = Field(default=60.0)
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
 
@@ -95,7 +97,7 @@ class Assignment(SQLModel, table=True):
 class AssignmentSubmission(SQLModel, table=True):
     """
     A student submission record for an assignment.
-    Score is entered manually by the teacher from the Progress tab.
+    Carries latest status, total attempts, score, pass/fail result, and latest response PDF.
     """
 
     __tablename__ = "assignment_submissions"
@@ -108,8 +110,46 @@ class AssignmentSubmission(SQLModel, table=True):
     )
     score: Optional[float] = Field(default=None)
     max_score: Optional[float] = Field(default=100.0)
+    percentage: Optional[float] = Field(default=None)
+    is_passed: Optional[bool] = Field(default=None)
+    total_attempts: int = Field(default=1)
+    status: str = Field(default="pending", max_length=20)  # pending, submitted, graded, passed, failed
+    response_pdf_url: Optional[str] = Field(default=None)
     attempted_at: datetime = Field(default_factory=_utcnow)
     last_attempted_at: datetime = Field(default_factory=_utcnow)
+
+
+class AssignmentAttempt(SQLModel, table=True):
+    """
+    Detailed attempt record for a student on an assignment.
+    Supports multi-attempt history, AI quiz answers & weak topic tracking,
+    manual PDF response uploads, and AI study advice generation.
+    """
+
+    __tablename__ = "assignment_attempts"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    assignment_id: uuid.UUID = Field(foreign_key="assignments.id", index=True)
+    student_id: uuid.UUID = Field(foreign_key="students.id", index=True)
+    student_unique_number: str = Field(
+        foreign_key="students.unique_number", max_length=20, index=True
+    )
+    attempt_number: int = Field(default=1)
+
+    score: Optional[float] = Field(default=None)
+    max_score: float = Field(default=100.0)
+    percentage: Optional[float] = Field(default=None)
+    is_passed: Optional[bool] = Field(default=None)
+    status: str = Field(default="submitted", max_length=20)  # submitted, graded, passed, failed
+
+    answers_json: Optional[str] = Field(default=None)  # JSON array of answered questions + correctness
+    response_pdf_url: Optional[str] = Field(default=None)
+    teacher_feedback: Optional[str] = Field(default=None)
+    ai_feedback: Optional[str] = Field(default=None)
+    ai_feedback_status: str = Field(default="pending", max_length=20)  # pending, ready, failed
+
+    started_at: datetime = Field(default_factory=_utcnow)
+    completed_at: Optional[datetime] = Field(default=None)
 
 
 class TeacherFeedback(SQLModel, table=True):
@@ -127,3 +167,4 @@ class TeacherFeedback(SQLModel, table=True):
     feedback_text: str = Field(max_length=2000)
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
+

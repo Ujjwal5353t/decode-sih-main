@@ -16,7 +16,7 @@ GET  /student/progress         — per-module learning progress, projected from 
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_session
@@ -31,7 +31,16 @@ from src.schemas.lesson import LessonListItemOut, LessonOut, LessonSlideOut
 from src.schemas.module import ModuleOut
 from src.schemas.quiz import SubjectPriorityOut
 from src.schemas.student import StudentProfile
-from src.schemas.teacher import AssignmentOut, FeedbackOut, SubmissionOut
+from src.schemas.teacher import (
+    AssignmentAttemptOut,
+    AssignmentOut,
+    AssignmentQuizPreviewOut,
+    FeedbackOut,
+    StudentTestResultSummaryOut,
+    SubmitQuizAttemptRequest,
+    SubmitQuizAttemptResult,
+    SubmissionOut,
+)
 from src.services import (
     learning_progress_service,
     lesson_service,
@@ -107,7 +116,7 @@ async def get_student_subject_priority(
 @router.get(
     "/assignments",
     response_model=list[AssignmentOut],
-    summary="Get assignments for the student's class section",
+    summary="Get active assignments for the student's class section (hides expired tests)",
 )
 async def get_student_assignments(
     student: Student = Depends(get_current_student),
@@ -115,6 +124,103 @@ async def get_student_assignments(
 ):
     assignments = await teacher_service.get_student_assignments(student, session)
     return [AssignmentOut.model_validate(a) for a in assignments]
+
+
+@router.get(
+    "/assignments/{assignment_id}/quiz",
+    response_model=AssignmentQuizPreviewOut,
+    summary="Get RAG quiz questions for an AI quiz assignment (8-10 questions max, adaptive on retake)",
+)
+async def get_assignment_quiz(
+    assignment_id: uuid.UUID,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    return await teacher_service.get_assignment_quiz_for_student(assignment_id, student, session)
+
+
+@router.post(
+    "/assignments/{assignment_id}/submit-quiz",
+    response_model=SubmitQuizAttemptResult,
+    summary="Submit answers for an AI quiz attempt (instant score, 60% pass/fail, AI advice)",
+)
+async def submit_assignment_quiz(
+    assignment_id: uuid.UUID,
+    data: SubmitQuizAttemptRequest,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    return await teacher_service.submit_student_quiz_attempt(
+        assignment_id, student, data.answers, session
+    )
+
+
+@router.post(
+    "/assignments/{assignment_id}/upload-response",
+    response_model=SubmissionOut,
+    summary="Upload student response PDF (max 5 MB) for a manual PDF assignment",
+)
+async def upload_assignment_response_pdf(
+    assignment_id: uuid.UUID,
+    file: UploadFile = File(..., description="Student response PDF file (max 5 MB)"),
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    sub = await teacher_service.upload_student_response_pdf(assignment_id, student, file, session)
+    return SubmissionOut(
+        id=sub.id,
+        student_id=sub.student_id,
+        student_unique_number=sub.student_unique_number,
+        score=sub.score,
+        max_score=sub.max_score,
+        percentage=sub.percentage,
+        is_passed=sub.is_passed,
+        total_attempts=sub.total_attempts,
+        status=sub.status,
+        response_pdf_url=sub.response_pdf_url,
+        attempted_at=sub.attempted_at,
+        last_attempted_at=sub.last_attempted_at,
+    )
+
+
+@router.get(
+    "/assignments/{assignment_id}/attempts",
+    response_model=list[AssignmentAttemptOut],
+    summary="Get student's attempt history for a specific assignment",
+)
+async def get_assignment_attempts(
+    assignment_id: uuid.UUID,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    attempts = await teacher_service.get_student_assignment_attempts(assignment_id, student.id, session)
+    return [AssignmentAttemptOut.model_validate(att) for att in attempts]
+
+
+@router.get(
+    "/test-results",
+    response_model=list[StudentTestResultSummaryOut],
+    summary="Get student's complete past test results, attempts, scores, teacher feedback, and AI advice",
+)
+async def get_student_test_results(
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    raw_results = await teacher_service.get_student_all_test_results(student, session)
+    out = []
+    for item in raw_results:
+        sub = item["submission"]
+        sub_out = SubmissionOut.model_validate(sub) if sub else None
+        fb = item["teacher_feedback"]
+        fb_out = FeedbackOut.model_validate(fb) if fb else None
+
+        out.append(StudentTestResultSummaryOut(
+            assignment=AssignmentOut.model_validate(item["assignment"]),
+            submission=sub_out,
+            attempts=[AssignmentAttemptOut.model_validate(a) for a in item["attempts"]],
+            teacher_feedback=fb_out,
+        ))
+    return out
 
 
 @router.post(
@@ -134,9 +240,15 @@ async def submit_assignment(
         student_unique_number=sub.student_unique_number,
         score=sub.score,
         max_score=sub.max_score,
+        percentage=sub.percentage,
+        is_passed=sub.is_passed,
+        total_attempts=sub.total_attempts,
+        status=sub.status,
+        response_pdf_url=sub.response_pdf_url,
         attempted_at=sub.attempted_at,
         last_attempted_at=sub.last_attempted_at,
     )
+
 
 
 @router.get(

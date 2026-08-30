@@ -124,18 +124,51 @@ class SubmissionOut(BaseModel):
     student_email: Optional[str] = None
     score: Optional[float]
     max_score: Optional[float]
+    percentage: Optional[float] = None
+    is_passed: Optional[bool] = None
+    total_attempts: int = 1
+    status: str = "pending"
+    response_pdf_url: Optional[str] = None
     attempted_at: datetime
     last_attempted_at: datetime
 
     model_config = {"from_attributes": True}
 
 
-class SetScoreRequest(BaseModel):
-    score: float
-    max_score: float = 100.0
+class QuizAnswerInput(BaseModel):
+    question_id: str
+    question_text: str
+    selected_option_index: int
+    correct_option_index: int
+    chapter_title: Optional[str] = None
+    explanation: Optional[str] = None
 
 
-# ── Feedback ───────────────────────────────────────────────────────────────────
+class SubmitQuizAttemptRequest(BaseModel):
+    answers: list[QuizAnswerInput]
+
+
+class AssignmentAttemptOut(BaseModel):
+    id: uuid.UUID
+    assignment_id: uuid.UUID
+    student_id: uuid.UUID
+    student_unique_number: str
+    attempt_number: int
+    score: Optional[float]
+    max_score: float
+    percentage: Optional[float]
+    is_passed: Optional[bool]
+    status: str
+    answers_json: Optional[str] = None
+    response_pdf_url: Optional[str] = None
+    teacher_feedback: Optional[str] = None
+    ai_feedback: Optional[str] = None
+    ai_feedback_status: str = "pending"
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
 
 class FeedbackOut(BaseModel):
     id: uuid.UUID
@@ -147,6 +180,30 @@ class FeedbackOut(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class SubmitQuizAttemptResult(BaseModel):
+    attempt: AssignmentAttemptOut
+    score: float
+    max_score: float
+    percentage: float
+    is_passed: bool
+    status: str
+    ai_feedback: Optional[str] = None
+    message: str
+
+
+class StudentTestResultSummaryOut(BaseModel):
+    assignment: AssignmentOut
+    submission: Optional[SubmissionOut] = None
+    attempts: list[AssignmentAttemptOut] = []
+    teacher_feedback: Optional[FeedbackOut] = None
+
+
+class SetScoreRequest(BaseModel):
+    score: float
+    max_score: float = 100.0
+
 
 
 class FeedbackRequest(BaseModel):
