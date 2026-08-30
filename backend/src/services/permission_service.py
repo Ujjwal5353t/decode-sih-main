@@ -103,6 +103,7 @@ ROLE_PERMISSIONS: Dict[str, RolePermissionsResponse] = {
             "can_submit_assignment",
             "can_view_teacher_feedback",
             "can_take_practice_quizzes",
+            "can_view_history",
         ],
         navigation=[
             DashboardPermissionItem(
@@ -149,6 +150,16 @@ ROLE_PERMISSIONS: Dict[str, RolePermissionsResponse] = {
                 category="Practice",
                 actions=[
                     PermissionAction(key="take_practice_quizzes", label="Take Quizzes", description="Interactive adaptive quiz assessments"),
+                ],
+            ),
+            DashboardPermissionItem(
+                id="history",
+                label="Assessment History",
+                description="View your past test performances, diagnostic quiz attempts, scores, and feedbacks",
+                icon="Clock",
+                category="Evaluation",
+                actions=[
+                    PermissionAction(key="view_history", label="View History", description="Access past test & diagnostic attempt history"),
                 ],
             ),
         ],

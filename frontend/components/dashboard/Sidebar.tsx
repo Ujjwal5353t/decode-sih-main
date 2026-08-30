@@ -105,6 +105,7 @@ export function DashboardSidebar({
     settings: "dashboard.nav.settings",
     "admin-requests": "dashboard.nav.adminRequests",
     "school-requests": "dashboard.nav.schoolRequests",
+    history: "dashboard.nav.history",
   };
 
   const getNavItemLabel = (item: DashboardPermissionItem) => {

@@ -675,7 +675,8 @@
       "adminRequests": "Administrator Requests",
       "schoolRequests": "School Requests",
       "grading": "Submissions & Grading",
-      "quizzes": "AI Practice Quizzes"
+      "quizzes": "AI Practice Quizzes",
+      "history": "Assessment History"
     },
     "categories": {
       "main": "MAIN",
@@ -685,7 +686,8 @@
       "admin": "ADMIN",
       "management": "MANAGEMENT",
       "staff": "STAFF",
-      "curriculum": "CURRICULUM"
+      "curriculum": "CURRICULUM",
+      "evaluation": "EVALUATION"
     },
     "descriptions": {
       "overview": "Main dashboard summary & quick stats",
@@ -699,7 +701,8 @@
       "curriculum": "Manage school curriculum modules and lesson materials",
       "analytics": "Deep dive into student performance, mastery, and attendance analytics",
       "quizzes": "Interactive AI-generated concept tests and diagnostic exercises",
-      "grading": "Review student attempts, assign scores, and provide individualized feedback"
+      "grading": "Review student attempts, assign scores, and provide individualized feedback",
+      "history": "View your past test performances, diagnostic quiz attempts, scores, and feedbacks"
     },
     "topbar": {
       "roles": {
