@@ -7,7 +7,7 @@ services:
   # ----------------------------------------------------------------------------
   - type: web
     name: vidyasetu-frontend
-    runtime: node
+    env: node
     plan: free
     region: singapore
     rootDir: frontend
@@ -25,7 +25,7 @@ services:
   # ----------------------------------------------------------------------------
   - type: web
     name: vidyasetu-backend
-    runtime: python
+    env: python
     plan: free
     region: singapore
     rootDir: backend
@@ -65,7 +65,7 @@ services:
   # ----------------------------------------------------------------------------
   - type: worker
     name: vidyasetu-ai-worker
-    runtime: python
+    env: python
     plan: free
     region: singapore
     rootDir: backend
@@ -102,22 +102,12 @@ services:
           name: vidyasetu-backend
           property: envVars.CLOUDINARY_API_SECRET
 
-# ------------------------------------------------------------------------------
-# 4. Managed PostgreSQL Database
-# ------------------------------------------------------------------------------
-databases:
-  - name: vidyasetu-db
-    plan: free
-    region: singapore
-    databaseName: vidyasetu
-    user: vidyasetu_user
-
-# ------------------------------------------------------------------------------
-# 5. Scheduled Cron Job (Daily Progress Digest & Cleanup)
-# ------------------------------------------------------------------------------
-cronjobs:
-  - name: vidyasetu-daily-digest
-    runtime: python
+  # ----------------------------------------------------------------------------
+  # 4. Scheduled Cron Job (Daily Progress Digest & Cleanup)
+  # ----------------------------------------------------------------------------
+  - type: cron
+    name: vidyasetu-daily-digest
+    env: python
     plan: free
     region: singapore
     rootDir: backend
@@ -129,3 +119,13 @@ cronjobs:
         fromDatabase:
           name: vidyasetu-db
           property: connectionString
+
+# ------------------------------------------------------------------------------
+# 5. Managed PostgreSQL Database
+# ------------------------------------------------------------------------------
+databases:
+  - name: vidyasetu-db
+    plan: free
+    region: singapore
+    databaseName: vidyasetu
+    user: vidyasetu_user
