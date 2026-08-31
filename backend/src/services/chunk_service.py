@@ -82,13 +82,16 @@ async def get_class_chapters(
     branch_name: str,
     class_number: int,
     subject: Optional[str] = None,
+    module_id: Optional[uuid.UUID] = None,
 ) -> list[ChapterOut]:
     """
-    Get all distinct chapters available for a branch, class, and subject.
-    Auto-ingests missing module chunks so every seeded module displays its chapters.
+    Get all distinct chapters available for a branch, class, and subject (or specific module).
+    Auto-ingests missing module chunks so every seeded or uploaded module displays its chapters.
     """
+    import os
     from src.models.ncert import NCERTBook
     from src.db.ncert_content import NCERT_CHAPTER_TEXT
+    from src.utils.file_utils import UPLOADS_DIR
 
     # Clean subject filter (ignore generic placeholders like 'General', 'all', '')
     filter_subject = (
@@ -97,12 +100,14 @@ async def get_class_chapters(
         else None
     )
 
-    # 1. Fetch all modules created by school admin for this branch & class
+    # 1. Fetch relevant modules created by school admin for this branch & class
     mod_stmt = select(Module).where(
         Module.branch_name == branch_name,
         Module.class_number == class_number,
     )
-    if filter_subject:
+    if module_id:
+        mod_stmt = mod_stmt.where(Module.id == module_id)
+    elif filter_subject:
         mod_stmt = mod_stmt.where(Module.subject.ilike(f"%{filter_subject}%"))  # type: ignore[attr-defined]
 
     mod_res = await session.execute(mod_stmt)
@@ -114,7 +119,7 @@ async def get_class_chapters(
             select(DocumentChunk).where(DocumentChunk.module_id == mod.id).limit(1)
         )
         if not chk_check.scalar_one_or_none():
-            # Module has no chunks yet — generate them now
+            # Module has no chunks yet — extract or generate them now
             full_text = None
             if mod.ncert_book_id:
                 ncert_book = await session.get(NCERTBook, mod.ncert_book_id)
@@ -123,8 +128,22 @@ async def get_class_chapters(
                     if not full_text:
                         full_text = f"Chapter 1: {ncert_book.title}\n\n{ncert_book.description or ncert_book.title}"
 
+            # If it's a PDF upload, attempt pypdf extraction from disk
+            if not full_text and mod.file_url and mod.file_url.startswith("/uploads/"):
+                try:
+                    rel_path = mod.file_url.replace("/uploads/", "")
+                    disk_path = os.path.join(UPLOADS_DIR, rel_path)
+                    if os.path.isfile(disk_path):
+                        from pypdf import PdfReader
+                        reader = PdfReader(disk_path)
+                        pages_text = [p.extract_text().strip() for p in reader.pages if p.extract_text()]
+                        if pages_text:
+                            full_text = "\n\n".join(pages_text)
+                except Exception:
+                    full_text = None
+
             if not full_text:
-                full_text = f"Chapter 1: {mod.title}\n\n{mod.title}"
+                full_text = f"Chapter 1: {mod.title}\n\nThis module contains curriculum materials for Class {class_number} {mod.subject or subject or 'General'}: {mod.title}."
 
             mod_sub = mod.subject or filter_subject or "General"
             await ingest_module_text(
@@ -141,16 +160,19 @@ async def get_class_chapters(
     # 3. Query all document chunks for this branch & class
     branch_mod_ids = [m.id for m in branch_modules]
 
-    query = select(DocumentChunk).where(
-        (DocumentChunk.branch_name == branch_name)
-        | (DocumentChunk.branch_name == "SELF")
-        | (DocumentChunk.module_id.in_(branch_mod_ids) if branch_mod_ids else False)  # type: ignore[arg-type]
-    ).where(
-        DocumentChunk.class_number == class_number
-    )
+    if module_id:
+        query = select(DocumentChunk).where(DocumentChunk.module_id == module_id)
+    else:
+        query = select(DocumentChunk).where(
+            (DocumentChunk.branch_name == branch_name)
+            | (DocumentChunk.branch_name == "SELF")
+            | (DocumentChunk.module_id.in_(branch_mod_ids) if branch_mod_ids else False)  # type: ignore[arg-type]
+        ).where(
+            DocumentChunk.class_number == class_number
+        )
 
-    if filter_subject:
-        query = query.where(DocumentChunk.subject.ilike(f"%{filter_subject}%"))  # type: ignore[attr-defined]
+        if filter_subject:
+            query = query.where(DocumentChunk.subject.ilike(f"%{filter_subject}%"))  # type: ignore[attr-defined]
 
     query = query.order_by(DocumentChunk.chapter_number, DocumentChunk.chunk_index)
     result = await session.execute(query)
@@ -177,7 +199,7 @@ async def get_class_chapters(
 
     chapter_outs: list[ChapterOut] = []
     for (ch_num, ch_title, mod_id, ch_sub), ch_chunks in chapters_map.items():
-        sample = ch_chunks[0].content[:160] + "..." if len(ch_chunks[0].content) > 160 else ch_chunks[0].content
+        sample = ch_chunks[0].content[:180] + "..." if len(ch_chunks[0].content) > 180 else ch_chunks[0].content
         mod_title = module_titles.get(mod_id, "Seeded Textbook") if mod_id else "Seeded Textbook"
 
         chapter_outs.append(
@@ -193,20 +215,21 @@ async def get_class_chapters(
             )
         )
 
-    # Deduplicate chapters by chapter_number so each chapter appears exactly once
-    deduped_chapters: dict[int, ChapterOut] = {}
-    for ch in sorted(chapter_outs, key=lambda x: (x.chapter_number, 0 if x.module_id else 1)):
-        if ch.chapter_number not in deduped_chapters:
-            deduped_chapters[ch.chapter_number] = ch
+    # Deduplicate chapters by (subject, chapter_number) so each subject retains all its chapters
+    deduped_chapters: dict[tuple[str, int], ChapterOut] = {}
+    for ch in sorted(chapter_outs, key=lambda x: (x.subject.lower(), x.chapter_number, 0 if x.module_id else 1)):
+        dedup_key = (ch.subject.strip().lower(), ch.chapter_number)
+        if dedup_key not in deduped_chapters:
+            deduped_chapters[dedup_key] = ch
         else:
-            existing = deduped_chapters[ch.chapter_number]
+            existing = deduped_chapters[dedup_key]
             existing.chunk_count += ch.chunk_count
             if not existing.module_id and ch.module_id:
                 existing.module_id = ch.module_id
                 existing.module_title = ch.module_title
 
     final_chapters = list(deduped_chapters.values())
-    final_chapters.sort(key=lambda x: x.chapter_number)
+    final_chapters.sort(key=lambda x: (x.subject.lower(), x.chapter_number))
     return final_chapters
 
 
@@ -216,17 +239,24 @@ async def get_chapter_chunks(
     class_number: int,
     chapter_number: int,
     subject: Optional[str] = None,
+    module_id: Optional[uuid.UUID] = None,
 ) -> list[DocumentChunk]:
     """Get all ordered chunks for a specific chapter."""
-    query = select(DocumentChunk).where(
-        (DocumentChunk.branch_name == branch_name) | (DocumentChunk.branch_name == "SELF")
-    ).where(
-        DocumentChunk.class_number == class_number,
-        DocumentChunk.chapter_number == chapter_number,
-    )
+    if module_id:
+        query = select(DocumentChunk).where(
+            DocumentChunk.module_id == module_id,
+            DocumentChunk.chapter_number == chapter_number,
+        )
+    else:
+        query = select(DocumentChunk).where(
+            (DocumentChunk.branch_name == branch_name) | (DocumentChunk.branch_name == "SELF")
+        ).where(
+            DocumentChunk.class_number == class_number,
+            DocumentChunk.chapter_number == chapter_number,
+        )
 
-    if subject and subject.strip():
-        query = query.where(DocumentChunk.subject.ilike(f"%{subject.strip()}%"))  # type: ignore[attr-defined]
+        if subject and subject.strip():
+            query = query.where(DocumentChunk.subject.ilike(f"%{subject.strip()}%"))  # type: ignore[attr-defined]
 
     query = query.order_by(DocumentChunk.chunk_index)
     result = await session.execute(query)

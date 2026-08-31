@@ -87,6 +87,8 @@ const RECOMMENDED_NEXT: Record<SubjectId, { topic: string; reason: string; emoji
 const LANGUAGES: { code: any; label: string }[] = [
   { code: "en", label: "EN" },
   { code: "hi", label: "हिं" },
+  { code: "bn", label: "বাং" },
+  { code: "mr", label: "मरा" },
   { code: "pa", label: "ਪੰਜ" },
   { code: "ur", label: "اردو" },
   { code: "ta", label: "தமி" },
