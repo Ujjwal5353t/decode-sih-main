@@ -1,0 +1,79 @@
+# VidyaSetu - Render Infrastructure as Code (Blueprint)
+# Multi-Service Architecture for "Best Use of Render Track"
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Frontend Web Service (Next.js 16)
+  # ----------------------------------------------------------------------------
+  - type: web
+    name: vidyasetu-frontend
+    env: node
+    plan: free
+    region: singapore
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        fromService:
+          type: web
+          name: vidyasetu-backend
+          property: host
+
+  # ----------------------------------------------------------------------------
+  # 2. Backend Web Service (FastAPI + SQLModel)
+  # ----------------------------------------------------------------------------
+  - type: web
+    name: vidyasetu-backend
+    env: python
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install uv && uv sync
+    startCommand: uv run uvicorn src.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: vidyasetu-secrets
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vidyasetu-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_DAYS
+        value: "7"
+      - key: ADMIN_EMAIL
+        value: admin003@gmail.com
+      - key: APP_NAME
+        value: education-ai
+      - key: DEBUG
+        value: "false"
+
+# ------------------------------------------------------------------------------
+# 3. Managed PostgreSQL Database
+# ------------------------------------------------------------------------------
+databases:
+  - name: vidyasetu-db
+    plan: free
+    region: singapore
+    databaseName: vidyasetu
+    user: vidyasetu_user
+
+# ------------------------------------------------------------------------------
+# 4. Shared Secrets Environment Variable Group
+# ------------------------------------------------------------------------------
+envVarGroups:
+  - name: vidyasetu-secrets
+    envVars:
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
