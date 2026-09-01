@@ -35,6 +35,7 @@ from src.models.learning import (
 )
 from src.models.lesson import Lesson
 from src.models.student import Student
+from src.services import gamification_service
 from src.schemas.learning import (
     ClassProgressOut,
     ClassStudentProgressOut,
@@ -94,6 +95,7 @@ async def ingest_events(
     student: Student,
     events: list[LearningEventIn],
     session: AsyncSession,
+    timezone_name: Optional[str] = None,
 ) -> LearningEventSyncResponse:
     """
     Append a batch of queued events for one student.
@@ -117,6 +119,10 @@ async def ingest_events(
     lesson_cache: dict[uuid.UUID, Optional[Lesson]] = {}
     seen_in_batch: set[str] = set()
     touched_module_keys: set[str] = set()
+    # Lessons this batch actually completed for the first time — the trigger
+    # for streak/XP below. Duplicates never reach here, so replaying a synced
+    # batch cannot pay out twice.
+    completed_lesson_ids: set[uuid.UUID] = set()
 
     for incoming in events:
         client_event_id = (incoming.client_event_id or "").strip()
@@ -217,6 +223,11 @@ async def ingest_events(
         if stored:
             response.accepted.append(client_event_id)
             touched_module_keys.add(key)
+            if (
+                event_type == LearningEventType.LESSON_COMPLETED
+                and lesson is not None
+            ):
+                completed_lesson_ids.add(lesson.id)
         else:
             # Lost a race with a concurrent sync of the same event — which is
             # exactly what the unique constraint is there for.
@@ -224,6 +235,17 @@ async def ingest_events(
 
     if touched_module_keys:
         await _append_derived_events(student.id, touched_module_keys, session)
+
+    # Gamification rides on the same transaction: if the events roll back, so
+    # do the XP and the streak day. Reward state can never claim a lesson that
+    # was not durably stored.
+    if completed_lesson_ids:
+        await gamification_service.on_lessons_completed(
+            session,
+            student_id=student.id,
+            lesson_ids=sorted(completed_lesson_ids),
+            timezone_name=timezone_name,
+        )
 
     return response
 

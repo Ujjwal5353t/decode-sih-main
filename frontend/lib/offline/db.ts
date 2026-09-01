@@ -126,6 +126,16 @@ export async function idbPut(storeName: string, value: unknown): Promise<boolean
   return done === true;
 }
 
+export async function idbDelete(storeName: string, key: IDBValidKey): Promise<void> {
+  await runTransaction(storeName, "readwrite", (store) => {
+    store.delete(key);
+  });
+}
+
+export async function deleteCache(key: string): Promise<void> {
+  await idbDelete(CACHE_STORE, key);
+}
+
 export async function idbDeleteMany(
   storeName: string,
   keys: IDBValidKey[]

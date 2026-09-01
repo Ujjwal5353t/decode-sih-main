@@ -121,3 +121,50 @@ class ClassProgressOut(BaseModel):
     # Column order for the teacher's table.
     subjects: list[str]
     students: list[ClassStudentProgressOut]
+
+
+# ── Gamification (streak / XP / chests) ───────────────────────────────────────
+
+class StreakDayOut(BaseModel):
+    date: str
+    active: bool
+
+
+class ChestStateOut(BaseModel):
+    index: int
+    progress: int
+    required: int
+    unlockable: bool
+    next_badge: str
+    xp_reward: int
+
+
+class GamificationSummaryOut(BaseModel):
+    """Everything the dashboard's streak / XP / chest widgets render."""
+
+    total_xp: int
+    current_streak: int
+    longest_streak: int
+    last_active_date: Optional[str] = None
+    active_today: bool
+    timezone: str
+    week: list[StreakDayOut]
+    lessons_completed: int
+    chest: ChestStateOut
+    badges: list[str] = Field(default_factory=list)
+
+
+class ClaimChestResponse(BaseModel):
+    """
+    `claimed` is false for both "not yet earned" and "already claimed" — the
+    `reason` distinguishes them, so a duplicate click is an ordinary response
+    rather than an error.
+    """
+
+    claimed: bool
+    reason: str
+    lessons_completed: int
+    lessons_required: int
+    chest_index: Optional[int] = None
+    xp_awarded: Optional[int] = None
+    badge: Optional[str] = None

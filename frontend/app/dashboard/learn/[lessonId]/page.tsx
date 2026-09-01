@@ -29,7 +29,7 @@ import {
 } from "@/lib/quizAudio";
 import { StudentProfile, LessonOut, LessonSlideOut } from "@/lib/api";
 import { loadLesson } from "@/lib/offline/contentCache";
-import { recordLearningEvent } from "@/lib/offline/learningEvents";
+import { recordLearningEvent, flushLearningEvents } from "@/lib/offline/learningEvents";
 
 export default function LessonViewerPage() {
   const router = useRouter();
@@ -105,9 +105,12 @@ function LessonFlow({ student }: { student: StudentProfile }) {
     (
       eventType: Parameters<typeof recordLearningEvent>[0]["eventType"],
       detail?: Record<string, unknown>
-    ) => {
-      if (!lesson) return;
-      void recordLearningEvent({
+    ): Promise<void> => {
+      if (!lesson) return Promise.resolve();
+      // Returns the write's promise (rather than firing-and-forgetting it)
+      // so a caller that needs the event durably queued before moving on —
+      // handleFinish, below — can await it instead of racing it.
+      return recordLearningEvent({
         studentId: student.id,
         eventType,
         lessonId: lesson.id,
@@ -159,7 +162,7 @@ function LessonFlow({ student }: { student: StudentProfile }) {
   // the server, which is the only side that sees every device's events.
   useEffect(() => {
     if (!lesson) return;
-    track("LESSON_STARTED");
+    void track("LESSON_STARTED");
   }, [lesson, track]);
 
   // The quick-check slide reaching the screen starts this lesson's quiz.
@@ -167,7 +170,7 @@ function LessonFlow({ student }: { student: StudentProfile }) {
     if (!lesson || quizStartedRef.current) return;
     if (lesson.slides[slideIdx]?.slide_type !== "check") return;
     quizStartedRef.current = true;
-    track("QUIZ_STARTED", { slide_index: slideIdx });
+    void track("QUIZ_STARTED", { slide_index: slideIdx });
   }, [lesson, slideIdx, track]);
 
   // Mascot settles back to idle a beat after a reaction.
@@ -210,7 +213,7 @@ function LessonFlow({ student }: { student: StudentProfile }) {
       // Moving on from a concept/example slide means that activity is done.
       if (!reportedSlidesRef.current.has(slideIdx)) {
         reportedSlidesRef.current.add(slideIdx);
-        track("ACTIVITY_COMPLETED", {
+        void track("ACTIVITY_COMPLETED", {
           slide_index: slideIdx,
           slide_type: currentSlide.slide_type,
         });
@@ -234,7 +237,7 @@ function LessonFlow({ student }: { student: StudentProfile }) {
     // The check slide is this lesson's quiz. Answers are recorded per
     // attempt; nothing here is scored or graded — the quiz-attempt system
     // in /dashboard/diagnostic-quiz remains the assessment of record.
-    track("QUIZ_COMPLETED", {
+    void track("QUIZ_COMPLETED", {
       slide_index: slideIdx,
       selected_option_index: idx,
       correct,
@@ -250,8 +253,13 @@ function LessonFlow({ student }: { student: StudentProfile }) {
     }
   };
 
-  const handleFinish = () => {
-    track("LESSON_COMPLETED");
+  const handleFinish = async () => {
+    // Awaited so the completion is durably in the offline queue (and, in
+    // the common case, already synced) before the flush below and the UI's
+    // move to the "completed" state — a fire-and-forget write here was the
+    // gap that let a fast dashboard return race ahead of its own event.
+    await track("LESSON_COMPLETED");
+    void flushLearningEvents(student.id);
     if (!muted) playCelebrationSound();
     setConfettiTrigger(Date.now());
     setMascotMood("celebrate");

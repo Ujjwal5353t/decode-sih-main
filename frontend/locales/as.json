@@ -618,7 +618,9 @@
     "title": "নিদানিক মূল্যায়ন",
     "subtitle": "শক্তি আৰু পুনৰীক্ষণৰ বিষয় চিনাক্ত কৰক",
     "streak": "ধাৰাবাহিক শুদ্ধ",
-    "points": "XP",
+    "points": "Points",
+    "correctFeedback": "শুদ্ধ!",
+    "incorrectFeedback": "প্ৰায় হৈছে! আগবাঢ়ি যাওক।",
     "question": "প্ৰশ্ন",
     "of": "ৰ",
     "finishQuiz": "কুইজ সমাপ্ত কৰক",
@@ -627,7 +629,9 @@
     "resultsSubtitle": "ইয়াত আপোনাৰ ব্যক্তিগত শিকাৰ ঘাটিৰ বিৱৰণ দিয়া হৈছে",
     "overallMastery": "মুঠ বিষয়ৰ দক্ষতা",
     "recommendedFocus": "পৰামৰ্শিত গুৰুত্বপূৰ্ণ বিষয়সমূহ",
-    "viewCurriculum": "শিক্ষণ মডিউল আৰম্ভ কৰক"
+    "viewCurriculum": "শিক্ষণ মডিউল আৰম্ভ কৰক",
+    "xpEarnedSuffix": "XP অৰ্জন কৰা হ'ল",
+    "correctSuffix": "শুদ্ধ"
   },
   "lessons": {
     "title": "এনিমেটেড পাঠসমূহ",

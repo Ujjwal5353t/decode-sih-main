@@ -27,11 +27,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, select
 
 from src.core.database import get_session
 from src.core.security import create_access_token
 from src.main import app
+from src.models.gamification import (
+    ChestClaim,
+    GamificationProfile,
+    StreakDay,
+    XpTransaction,
+)
 from src.models.learning import LearningEvent
 from src.models.lesson import Lesson
 from src.models.school import School
@@ -78,6 +84,12 @@ async def setup_data() -> dict:
                 TeacherClassAssignment.__table__,
                 Lesson.__table__,
                 LearningEvent.__table__,
+                # ingest_events awards XP / streak days in the same
+                # transaction, so these must exist here too.
+                GamificationProfile.__table__,
+                XpTransaction.__table__,
+                StreakDay.__table__,
+                ChestClaim.__table__,
             ],
         )
 
@@ -124,6 +136,8 @@ async def setup_data() -> dict:
                 branch_name=BRANCH,
                 class_number=CLASS_NUMBER,
                 section=SECTION,
+                # Required since assignments became subject-scoped.
+                subject="Mathematics",
             )
         )
 
@@ -147,6 +161,36 @@ async def setup_data() -> dict:
             "other_teacher_id": str(other_teacher.id),
             "lesson_ids": [str(lesson.id) for lesson in lessons],
         }
+
+
+async def _add_lone_student(unique_number: str) -> str:
+    """A second, otherwise-untouched student — clean ground for asserting
+    what a single first lesson-completion does to a brand-new gamification
+    profile, without the main test student's prior activity in the way."""
+    async with SessionFactory() as session:
+        student = Student(
+            unique_number=unique_number,
+            full_name="Tz Student",
+            password_hash="x",
+            state="Assam",
+            school_name="API Test School",
+            branch_name=BRANCH,
+            class_number=CLASS_NUMBER,
+            section=SECTION,
+        )
+        session.add(student)
+        await session.commit()
+        return str(student.id)
+
+
+async def _profile_timezone(student_id: str) -> str:
+    async with SessionFactory() as session:
+        result = await session.execute(
+            select(GamificationProfile).where(
+                GamificationProfile.student_id == uuid.UUID(student_id)
+            )
+        )
+        return result.scalar_one().timezone
 
 
 def auth(subject: str, role: str) -> dict:
@@ -280,9 +324,25 @@ def main() -> None:
     res = client.get(f"{base}/student/progress")
     assert res.status_code in (401, 403), res.text  # no token at all
 
+    # ── Timezone threading: a lesson completion is often what creates a
+    #    student's gamification profile in the first place, so
+    #    /student/learning-events must accept the same ?tz= convention
+    #    /student/gamification does — otherwise that first-ever profile
+    #    silently stamps to UTC instead of the student's real local day. ────
+    tz_student_id = asyncio.run(_add_lone_student("API0002"))
+    tz_headers = auth(tz_student_id, "student")
+    res = client.post(
+        f"{base}/student/learning-events?tz=Asia/Kolkata",
+        json={"events": lesson_run(lesson_ids[0], 1)},
+        headers=tz_headers,
+    )
+    assert res.status_code == 200, res.text
+    assert asyncio.run(_profile_timezone(tz_student_id)) == "Asia/Kolkata"
+
     print("PASS student flow -> 100%")
     print("PASS offline batch synced after reconnect, retry deduplicated")
     print("PASS teacher class view + authorization boundary")
+    print("PASS learning-events ?tz= threads into the gamification profile")
     print("\nAll learning-progress API tests passed.")
 
 

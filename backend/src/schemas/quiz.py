@@ -66,6 +66,10 @@ class GapReportOut(BaseModel):
     student_class: int
     ai_summary: Optional[str] = None
     ai_summary_status: str = "pending"
+    total_questions: int = 0
+    correct_count: int = 0
+    incorrect_count: int = 0
+    xp_awarded: int = 0
 
 
 class CurrentGapOut(BaseModel):

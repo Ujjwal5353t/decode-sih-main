@@ -1,26 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { BookOpen, CheckCircle, Clock, CloudOff, RefreshCw, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
-import {
-  BookOpen,
-  CheckCircle,
-  ChevronRight,
-  Clock,
-  CloudOff,
-  Play,
-  RefreshCw,
-  TrendingUp,
-} from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { ModuleProgressOut, StudentProfile, StudentProgressOut } from "@/lib/api";
-import { loadStudentProgress } from "@/lib/offline/contentCache";
-import {
-  applyPendingEvents,
-  getQueuedEvents,
-  subscribeToLearningQueue,
-} from "@/lib/offline/learningEvents";
+import { ModuleProgressOut, StudentProfile } from "@/lib/api";
+import { useStudentProgress } from "@/hooks/useStudentProgress";
 import { useLearningSync } from "@/hooks/useLearningSync";
 import { useTranslation } from "@/hooks/useTranslation";
 
@@ -83,50 +66,27 @@ function StatusChip({ status }: { status: ModuleProgressOut["status"] }) {
 }
 
 /**
- * The student's learning-activity view: what to continue, how far each
- * module has got, and what they last did.
+ * Overall progress stat row + per-module breakdown, driven by the same
+ * useStudentProgress() read the Continue Learning hero card uses — this
+ * panel and that card can never disagree, because they share one fetch and
+ * one offline-queue overlay instead of keeping parallel state.
  *
- * Reads the server's projection but overlays anything still sitting in this
- * device's offline queue, so a lesson finished without a connection shows up
- * here immediately and stays consistent once it syncs.
+ * Lives in the dashboard's main content column (not the right sidebar):
+ * it's substantial, detailed content, and the sidebar is reserved for
+ * compact, glanceable widgets.
  */
-export function LearningProgressPanel({ student }: { student: StudentProfile }) {
+export function ModuleProgressOverview({ student }: { student: StudentProfile }) {
   const { t } = useTranslation();
-  const [progress, setProgress] = useState<StudentProgressOut | null>(null);
-  const [stale, setStale] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const { progress, loading, stale, error, refresh } = useStudentProgress(student.id);
   const { pendingCount, isOnline, sync } = useLearningSync(student.id);
 
-  const load = useCallback(async () => {
-    try {
-      const result = await loadStudentProgress(student.id);
-      const pending = await getQueuedEvents(student.id);
-      setProgress(applyPendingEvents(result.data, pending));
-      setStale(result.stale);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load your progress.");
-    } finally {
-      setLoading(false);
-    }
-  }, [student.id]);
-
-  // A queue change means either new local activity or a completed sync —
-  // both change what this panel should show. The subscription also fires
-  // once on mount, which is this panel's initial load.
-  useEffect(
-    () =>
-      subscribeToLearningQueue(() => {
-        void load();
-      }),
-    [load]
-  );
-
   const handleRefresh = async () => {
-    setLoading(true);
+    // sync() only flushes what's queued — if the queue is already empty (the
+    // common case for "stale" after being offline with nothing left to send)
+    // it settles without notifying anyone, so this also re-runs the load
+    // directly to guarantee a fresh network read, not just a drained queue.
     await sync();
-    await load();
+    await refresh();
   };
 
   if (loading && !progress) {
@@ -148,60 +108,8 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
 
   if (progress.total_modules === 0) return null;
 
-  const inProgress = progress.modules
-    .filter((m) => m.status === "in_progress")
-    .sort((a, b) => (b.last_activity_at || "").localeCompare(a.last_activity_at || ""));
-  const continueModule =
-    inProgress[0] || progress.modules.find((m) => m.status === "not_started") || null;
-  const continueHref = continueModule?.current_lesson_id
-    ? `/dashboard/learn/${continueModule.current_lesson_id}`
-    : `/dashboard/learn?subject=${encodeURIComponent(continueModule?.subject || "")}`;
-
   return (
     <div className="space-y-4">
-      {/* ── Continue Learning ─────────────────────────────────────────────── */}
-      {continueModule && (
-        <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <Play className="w-4 h-4 text-brand shrink-0" />
-                <h2 className="text-sm font-bold text-text-primary">
-                  {t("learningProgress.continueLearning")}
-                </h2>
-              </div>
-              <p className="text-base font-bold text-text-primary mt-2 truncate">
-                {continueModule.current_lesson_title || continueModule.title}
-              </p>
-              <p className="text-xs text-text-secondary mt-0.5">
-                {continueModule.subject} ·{" "}
-                {t("learningProgress.lessonsDone", {
-                  done: continueModule.completed_lessons,
-                  total: continueModule.total_lessons,
-                })}
-                {continueModule.last_activity_at
-                  ? ` · ${t("learningProgress.lastStudied", {
-                      time: relativeTime(continueModule.last_activity_at),
-                    })}`
-                  : ""}
-              </p>
-              <div className="mt-3 max-w-sm">
-                <ProgressBar percent={continueModule.progress_percent} />
-              </div>
-            </div>
-
-            <Link href={continueHref} className="shrink-0">
-              <Button variant="primary" size="sm">
-                {continueModule.status === "not_started"
-                  ? t("learningProgress.startLearning")
-                  : t("learningProgress.continue")}
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      )}
-
       {/* ── Overall progress ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
@@ -308,34 +216,49 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
           ))}
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* ── Recent activity ───────────────────────────────────────────────── */}
-      {progress.recent_activity.length > 0 && (
-        <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-3">
-          <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-            <Clock className="w-4 h-4 text-brand" />
-            <span>Recent Learning Activity</span>
-          </h3>
-          <ul className="divide-y divide-border-primary/50">
-            {progress.recent_activity.map((activity, idx) => (
-              <li
-                key={`${activity.event_type}-${activity.occurred_at}-${idx}`}
-                className="py-2 flex items-center justify-between gap-3"
-              >
-                <span className="text-xs text-text-secondary truncate">
-                  <span className="font-semibold text-text-primary">
-                    {EVENT_LABELS[activity.event_type] || activity.event_type}
-                  </span>{" "}
-                  {activity.lesson_title || activity.subject}
-                </span>
-                <span className="text-[11px] text-text-tertiary shrink-0">
-                  {relativeTime(activity.occurred_at)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+/**
+ * Compact recent-activity feed for the right sidebar — a short list, not the
+ * full detail of ModuleProgressOverview, so the sidebar stays scannable.
+ */
+export function RecentActivityWidget({
+  student,
+  limit = 5,
+}: {
+  student: StudentProfile;
+  limit?: number;
+}) {
+  const { progress } = useStudentProgress(student.id);
+
+  if (!progress || progress.recent_activity.length === 0) return null;
+
+  return (
+    <div className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+        <Clock className="h-4 w-4 text-sky-500" />
+        Recent Activity
+      </h3>
+      <ul className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+        {progress.recent_activity.slice(0, limit).map((activity, idx) => (
+          <li
+            key={`${activity.event_type}-${activity.occurred_at}-${idx}`}
+            className="py-2 flex items-center justify-between gap-3"
+          >
+            <span className="min-w-0 truncate text-xs text-slate-600 dark:text-slate-400">
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {EVENT_LABELS[activity.event_type] || activity.event_type}
+              </span>{" "}
+              {activity.lesson_title || activity.subject}
+            </span>
+            <span className="shrink-0 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+              {relativeTime(activity.occurred_at)}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
