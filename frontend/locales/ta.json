@@ -618,7 +618,9 @@
     "title": "கண்டறிதல் மதிப்பீடு",
     "subtitle": "பலங்கள் மற்றும் மதிப்பாய்வு தலைப்புகளை அடையாளம் காணவும்",
     "streak": "தொடர் வெற்றி",
-    "points": "XP",
+    "points": "Points",
+    "correctFeedback": "சரி!",
+    "incorrectFeedback": "இன்னும் கொஞ்சம்! தொடருங்கள்.",
     "question": "கேள்வி",
     "of": "இல்",
     "finishQuiz": "வினாடிவினாவை முடிக்கவும்",
@@ -627,7 +629,9 @@
     "resultsSubtitle": "உங்கள் கற்றல் இடைவெளி விவரங்கள் இங்கே",
     "overallMastery": "ஒட்டுமொத்த தேர்ச்சி",
     "recommendedFocus": "பரிந்துரைக்கப்பட்ட தலைப்புகள்",
-    "viewCurriculum": "கற்றல் தொகுதிகளைத் தொடங்குங்கள்"
+    "viewCurriculum": "கற்றல் தொகுதிகளைத் தொடங்குங்கள்",
+    "xpEarnedSuffix": "XP பெறப்பட்டது",
+    "correctSuffix": "சரி"
   },
   "lessons": {
     "title": "அனிமேஷன் பாடங்கள்",

@@ -795,7 +795,9 @@
     "title": "Diagnostic Assessment",
     "subtitle": "Identify strengths and topics to review",
     "streak": "streak",
-    "points": "XP",
+    "points": "Points",
+    "correctFeedback": "Correct!",
+    "incorrectFeedback": "Almost there! Keep going.",
     "question": "Question",
     "of": "of",
     "finishQuiz": "Finish Diagnostic Quiz",
@@ -804,7 +806,9 @@
     "resultsSubtitle": "Here is your personalized learning gap breakdown",
     "overallMastery": "Overall Mastery",
     "recommendedFocus": "Recommended Focus Topics",
-    "viewCurriculum": "Start Learning Modules"
+    "viewCurriculum": "Start Learning Modules",
+    "xpEarnedSuffix": "XP earned",
+    "correctSuffix": "correct"
   },
   "lessons": {
     "title": "Animated Lessons",

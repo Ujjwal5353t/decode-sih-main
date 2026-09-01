@@ -618,7 +618,9 @@
     "title": "تشخیصی جائزہ",
     "subtitle": "اپنی صلاحیتوں اور جائزہ کے موضوعات کی شناخت کریں",
     "streak": "مسلسل درست",
-    "points": "XP",
+    "points": "Points",
+    "correctFeedback": "درست!",
+    "incorrectFeedback": "قریب پہنچ گئے! جاری رکھیں۔",
     "question": "سوال",
     "of": "از",
     "finishQuiz": "کوئز مکمل کریں",
@@ -627,7 +629,9 @@
     "resultsSubtitle": "یہاں آپ کے سیکھنے کے خلا کی تفصیل ہے",
     "overallMastery": "مجموعی مہارت",
     "recommendedFocus": "تجویز کردہ اہم موضوعات",
-    "viewCurriculum": "تعلیمی ماڈیولز شروع کریں"
+    "viewCurriculum": "تعلیمی ماڈیولز شروع کریں",
+    "xpEarnedSuffix": "XP حاصل ہوئے",
+    "correctSuffix": "درست"
   },
   "lessons": {
     "title": "متحرک اسباق",

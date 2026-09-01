@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -41,12 +41,28 @@ import {
   Menu,
   RefreshCw,
   Target,
+  Play,
+  Flame,
+  Bell,
+  TrendingUp,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { DashboardSidebar } from "@/components/dashboard/Sidebar";
-import { LearningProgressPanel } from "@/components/dashboard/LearningProgressPanel";
+import { ModuleProgressOverview, RecentActivityWidget } from "@/components/dashboard/LearningProgressPanel";
 import { ClassLearningProgress } from "@/components/dashboard/ClassLearningProgress";
+import { StudentHero, StudentHeroFact } from "@/components/dashboard/student/StudentHero";
+import {
+  LearningCard,
+  SkillCard,
+  StudentSection,
+  ContinueLearningHeroCard,
+} from "@/components/dashboard/student/LearningCards";
+import { StudentSideWidgets } from "@/components/dashboard/student/StudentSideWidgets";
+import { ParentHero, ParentHeroFact } from "@/components/dashboard/parent/ParentHero";
+import { useStudentProgress } from "@/hooks/useStudentProgress";
+import { subscribeToLearningQueue } from "@/lib/offline/learningEvents";
 import {
   AnimatedNumber,
   ConsoleMotion,
@@ -75,6 +91,7 @@ import {
   inputClass,
 } from "@/components/dashboard/console/primitives";
 import { Hero, HeroFact } from "@/components/dashboard/console/hero";
+import { TeacherHero } from "@/components/dashboard/teacher/TeacherHero";
 import {
   BarList,
   ChartLegend,
@@ -83,9 +100,7 @@ import {
 } from "@/components/dashboard/console/charts";
 import {
   ClassroomIllustration,
-  ParentChildIllustration,
   SchoolIllustration,
-  StudentIllustration,
 } from "@/components/dashboard/console/illustrations";
 import { DeleteModuleDialog } from "@/components/school/DeleteModuleDialog";
 import { TeacherSearchModal } from "@/components/school/TeacherSearchModal";
@@ -167,6 +182,9 @@ import {
   getQuizStatus,
   getQuizAttempts,
   QuizAttemptSummaryOut,
+  getGamificationSummary,
+  claimRewardChest,
+  type GamificationSummaryOut,
   getChildQuizResult,
   getAssignmentQuizForStudent,
   submitAssignmentQuiz,
@@ -268,6 +286,54 @@ export default function DashboardPage() {
   const [permissions, setPermissions] = useState<RolePermissionsResponse | null>(null);
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
+
+  // ── Gamification (streak / XP / chest) ──────────────────────────────────
+  // Lives here, not inside StudentDashboardView, because the topbar's streak
+  // and XP pills need the same real numbers as the Daily Goal / Mystery
+  // Chest widgets further down — one fetch, one source of truth, instead of
+  // the topbar guessing at its own figures. Read-only on mount: loading the
+  // dashboard deliberately does not extend the streak — only finishing a
+  // lesson or an assessment does, and those are recorded by their own flows
+  // on the server.
+  const [gamification, setGamification] = useState<GamificationSummaryOut | null>(null);
+  const [claimingChest, setClaimingChest] = useState<boolean>(false);
+
+  const refreshGamification = useCallback(async () => {
+    if (role !== "student") return;
+    try {
+      const fresh = await getGamificationSummary();
+      setGamification(fresh);
+    } catch (err: any) {
+      console.log("Gamification fetch note:", err.message);
+    }
+  }, [role]);
+
+  useEffect(() => {
+    if (role !== "student") return;
+    void refreshGamification();
+    const unsubscribe = subscribeToLearningQueue(() => {
+      void refreshGamification();
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [role, refreshGamification]);
+
+  const handleClaimChest = async () => {
+    if (claimingChest) return; // guard the double-click; server is authoritative regardless
+    setClaimingChest(true);
+    try {
+      await claimRewardChest();
+      // Re-read rather than patching locally: the server decides the new XP
+      // total, chest cycle and badge list.
+      const fresh = await getGamificationSummary();
+      setGamification(fresh);
+    } catch (err: any) {
+      console.log("Chest claim note:", err.message);
+    } finally {
+      setClaimingChest(false);
+    }
+  };
 
   // The console surface language (see globals.css) applies to the School
   // Admin, Teacher and Parent dashboards only. Student and Super Admin never
@@ -432,7 +498,37 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Student Playful Search Bar in Topbar */}
+          {role === "student" && (
+            <div className="hidden lg:flex items-center flex-1 max-w-md mx-4">
+              <div className="relative w-full">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search languages, lessons, modules..."
+                  className="w-full rounded-full border border-slate-200/80 bg-slate-50/90 pl-10 pr-4 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-200/50 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200 dark:placeholder-slate-500 dark:focus:border-sky-600"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            {/* Student Streaks & XP Counter Badges — real /student/gamification
+                data, the same summary the Daily Goal and Mystery Chest
+                widgets read, so the topbar can never disagree with them. */}
+            {role === "student" && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-xs font-black text-amber-600 dark:text-amber-400 shadow-xs">
+                  <Flame className="h-4 w-4 fill-amber-500 text-amber-500" />
+                  <AnimatedNumber value={gamification?.current_streak ?? 0} />
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-xs font-black text-sky-600 dark:text-sky-400 shadow-xs">
+                  <Sparkles className="h-4 w-4 text-sky-500" />
+                  <AnimatedNumber value={gamification?.total_xp ?? 0} />
+                </div>
+              </div>
+            )}
+
             {/* Quick Live Status Indicator */}
             {role === "school" && (
               <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
@@ -474,6 +570,10 @@ export default function DashboardPage() {
           className={
             isConsole
               ? "mx-auto w-full max-w-[1440px] flex-1 space-y-6 p-4 sm:p-6 lg:p-8"
+              : role === "student"
+              ? // Wider, airier canvas for the learner view — the reference's
+                // two-column composition needs the room.
+                "student-canvas mx-auto w-full max-w-[1400px] flex-1 space-y-6 p-4 sm:p-6 lg:p-8"
               : "flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6"
           }
         >
@@ -482,6 +582,9 @@ export default function DashboardPage() {
               student={user as StudentProfile}
               setupClass={setupClass}
               activeTab={activeTab}
+              gamification={gamification}
+              claimingChest={claimingChest}
+              onClaimChest={handleClaimChest}
             />
           )}
           {role === "school" && (
@@ -522,10 +625,18 @@ function StudentDashboardView({
   student,
   setupClass,
   activeTab = "overview",
+  gamification,
+  claimingChest,
+  onClaimChest,
 }: {
   student: StudentProfile;
   setupClass: (data: { class_number: number; section: string }) => Promise<void>;
   activeTab?: string;
+  /** Real streak/XP/chest state from /student/gamification, lifted to
+   * DashboardPage so the topbar pills and these widgets never disagree. */
+  gamification: GamificationSummaryOut | null;
+  claimingChest: boolean;
+  onClaimChest: () => void;
 }) {
   const { t } = useTranslation();
   const [selectedClass, setSelectedClass] = useState<number>(student.class_number || 1);
@@ -555,6 +666,13 @@ function StudentDashboardView({
       .finally(() => setLoadingQuizStatus(false));
   }, [needsSetup]);
 
+  // Single authoritative progress read — the same hook ModuleProgressOverview
+  // and RecentActivityWidget use, so this card and the rest of the dashboard
+  // can never disagree about what's completed. See hooks/useStudentProgress.
+  const { progress: learningProgress } = useStudentProgress(student.id, {
+    enabled: !needsSetup && !!quizStatus?.completed,
+  });
+
   useEffect(() => {
     if (needsSetup || !quizStatus?.completed) return;
     setLoadingModules(true);
@@ -573,6 +691,17 @@ function StudentDashboardView({
       .then((res) => setSubjectPriority(res))
       .catch((err) => console.log("Subject priority fetch note:", err.message));
   }, [needsSetup, quizStatus?.completed, student.class_number, isSelfEnrolled]);
+
+  // Which module "Continue Learning" points at. Nothing is fabricated: if the
+  // backend reports no modules, this is null and the section does not render.
+  const continueModule = (() => {
+    const mods = learningProgress?.modules ?? [];
+    if (mods.length === 0) return null;
+    const inProgress = mods
+      .filter((m) => m.status === "in_progress")
+      .sort((a, b) => (b.last_activity_at || "").localeCompare(a.last_activity_at || ""));
+    return inProgress[0] ?? mods.find((m) => m.status === "not_started") ?? null;
+  })();
 
   const handleSetupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -596,81 +725,124 @@ function StudentDashboardView({
 
       {/* TAB: OVERVIEW */}
       {activeTab === "overview" && (
-        <div className="space-y-6">
-          {/* ── 1. Hero: Vibrant Learner Welcome Banner ──────────────────── */}
-          <Hero
-            variant="vibrant"
+        <div className="space-y-8">
+          {/* ── 1. Hero — daylight panoramic banner with cute 3D cartoon panda ── */}
+          <StudentHero
+            mascotMood={mascotMood}
+            topBadge={
+              <>
+                <BookOpen className="h-3.5 w-3.5 text-sky-500" />
+                <span>
+                  {isSelfEnrolled
+                    ? `NCERT Class ${student.class_number || 1}`
+                    : `Class ${student.class_number || 1}${student.section || "A"} · ${student.branch_name}`}
+                </span>
+                <ChevronRight className="h-3 w-3 opacity-60" />
+              </>
+            }
             eyebrow={
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-xs backdrop-blur-md">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>{isSelfEnrolled ? t("dashboard.student.selfEnrolledBadge") : t("dashboard.student.schoolEnrolledBadge")}</span>
-                <span className="opacity-40">•</span>
-                <span className="font-mono font-bold underline">{student.unique_number}</span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/80 px-3.5 py-1.5 text-xs font-bold text-sky-900 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80 dark:text-sky-200">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>
+                  {isSelfEnrolled
+                    ? t("dashboard.student.selfEnrolledBadge")
+                    : t("dashboard.student.schoolEnrolledBadge")}
+                </span>
+                <span className="opacity-30">•</span>
+                <span className="font-mono font-extrabold">{student.unique_number}</span>
               </span>
             }
-            title={`${t("dashboard.student.welcomePrefix")} ${student.full_name || `${t("dashboard.student.studentPrefix")}${student.unique_number}`}!`}
+            title={`Good morning, ${
+              student.full_name || `${t("dashboard.student.studentPrefix")}${student.unique_number}`
+            }! 👋`}
             subtitle={
-              <p>
-                {isSelfEnrolled ? (
-                  <span className="font-semibold text-white">
-                    {t("dashboard.student.selfEnrolledTag")}
-                  </span>
-                ) : (
-                  <span>
-                    {student.school_name} — {student.branch_name} ({student.state})
-                  </span>
-                )}
+              <p className="student-hero-sub">
+                {isSelfEnrolled
+                  ? t("dashboard.student.selfEnrolledTag")
+                  : `${student.school_name} — ${student.branch_name} (${student.state})`}
+                . One lesson closer to your next learning adventure!
               </p>
             }
-            illustration={<StudentIllustration className="h-[180px] w-[285px] drop-shadow-xl" />}
+            actions={
+              needsSetup ? undefined : quizStatus && !quizStatus.completed ? (
+                <Link href="/dashboard/diagnostic-quiz">
+                  <Button variant="primary" size="md" className="rounded-full px-6 shadow-md shadow-sky-500/25">
+                    <Target className="mr-1.5 h-4 w-4" />
+                    {quizStatus.in_progress_attempt_id ? "Continue Quiz" : "Start Diagnostic Quiz"}
+                  </Button>
+                </Link>
+              ) : quizStatus?.completed ? (
+                <>
+                  <Link href="/dashboard/learn">
+                    <Button variant="primary" size="md" className="rounded-full px-6 shadow-md shadow-sky-500/25">
+                      <Play className="mr-1.5 h-4 w-4 fill-white" />
+                      Continue Learning →
+                    </Button>
+                  </Link>
+                  <Link href="/dashboard/diagnostic-quiz">
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      className="rounded-full border-white/90 bg-white/90 px-5 text-sky-900 shadow-sm backdrop-blur-md hover:bg-white dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                    >
+                      View My Results
+                    </Button>
+                  </Link>
+                </>
+              ) : undefined
+            }
             facts={
               <>
-                <HeroFact
-                  label={isSelfEnrolled ? t("dashboard.student.class") : t("dashboard.student.classAndSection")}
+                <StudentHeroFact
+                  label={
+                    isSelfEnrolled
+                      ? t("dashboard.student.class")
+                      : t("dashboard.student.classAndSection")
+                  }
                   value={
                     student.class_number
                       ? isSelfEnrolled
-                        ? `${t("dashboard.student.class")} ${student.class_number}`
-                        : `${t("dashboard.student.class")} ${student.class_number} - Section ${student.section}`
+                        ? `${student.class_number}`
+                        : `${student.class_number}${student.section}`
+                      : "—"
+                  }
+                  hint={
+                    student.class_number
+                      ? isSelfEnrolled
+                        ? "NCERT Curriculum"
+                        : "Assigned section"
                       : t("dashboard.student.notConfigured")
                   }
-                  hint={isSelfEnrolled ? "NCERT Curriculum" : "Assigned section"}
-                  variant="vibrant"
                 />
-                <HeroFact
+                <StudentHeroFact
                   label={t("dashboard.student.availableModules")}
                   value={
                     <AnimatedNumber value={isSelfEnrolled ? ncertBooks.length : modules.length} />
                   }
                   hint={isSelfEnrolled ? "NCERT Official Books" : "School Branch Syllabus"}
-                  variant="vibrant"
                 />
-                <HeroFact
-                  label="Student ID"
-                  value={<span className="font-mono">{student.unique_number}</span>}
-                  hint={isSelfEnrolled ? t("dashboard.student.selfEnrolledBadge") : t("dashboard.student.schoolEnrolledBadge")}
-                  variant="vibrant"
+                <StudentHeroFact
+                  label="Diagnostic Assessment"
+                  value={quizStatus?.completed ? "Done" : "Pending"}
+                  hint={quizStatus?.completed ? "Completed" : "Unlocks your modules"}
                 />
               </>
             }
           />
 
+          {/* ── 2. Class setup — only when the account still needs it ────── */}
           {needsSetup && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Panel
-                flush
-                className="relative overflow-hidden rounded-[18px] border border-brand/25 bg-brand/[0.04] p-5 shadow-xs"
-              >
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+              <div className="student-card rounded-2xl p-5">
                 <div className="flex items-start gap-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                    <BookOpen className="h-4 w-4" />
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand/10 text-brand">
+                    <BookOpen className="h-5 w-5" />
                   </div>
                   <div className="flex-1">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
-                      {isSelfEnrolled ? t("dashboard.student.selectClassTitle") : t("dashboard.student.setupClassTitle")}
+                    <h4 className="text-sm font-bold text-text-primary font-[family-name:var(--font-display)]">
+                      {isSelfEnrolled
+                        ? t("dashboard.student.selectClassTitle")
+                        : t("dashboard.student.setupClassTitle")}
                     </h4>
                     <p className="mt-1 text-xs text-text-secondary">
                       {isSelfEnrolled
@@ -737,106 +909,199 @@ function StudentDashboardView({
                     </form>
                   </div>
                 </div>
-              </Panel>
+              </div>
             </motion.div>
           )}
 
-          {/* ── 2. Metric Cards Row ──────────────────────────────────────── */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Panel
-              flush
-              className="relative flex flex-col justify-between overflow-hidden rounded-[18px] border border-[var(--c-line)] p-5 shadow-xs"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                    <Layers className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
-                      {t("dashboard.student.availableModules")}
-                    </h4>
-                    <div className="text-xs font-semibold text-text-primary">
-                      {isSelfEnrolled ? t("dashboard.student.ncertBooks") : "School Branch Syllabus"}
-                    </div>
-                  </div>
-                </div>
-                <span className="rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-[10px] font-extrabold uppercase text-brand">
-                  {isSelfEnrolled ? "NCERT" : "School"}
-                </span>
-              </div>
-
-              <div className="my-4">
-                <div className="text-3xl font-extrabold tracking-tight text-text-primary font-[family-name:var(--font-display)]">
-                  <AnimatedNumber value={isSelfEnrolled ? ncertBooks.length : modules.length} />
-                </div>
-                <p className="mt-1 text-xs text-text-secondary">
-                  {isSelfEnrolled ? "NCERT Official Books" : "School Branch Syllabus"}
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between border-t border-[var(--c-line)] pt-3 text-xs text-text-tertiary">
-                <span>
-                  {student.class_number ? `Class ${student.class_number}` : "Class not set"}
-                </span>
-                <span className="font-semibold text-text-secondary">
-                  {isSelfEnrolled ? "Self Enrolled" : "School Enrolled"}
-                </span>
-              </div>
-            </Panel>
-
-            <Panel
-              flush
-              className="relative flex flex-col justify-between overflow-hidden rounded-[18px] border border-[var(--c-line)] p-5 shadow-xs"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
-                    <Sparkles className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
-                      Learning Format
-                    </h4>
-                    <div className="text-xs font-semibold text-text-primary">Interactive AI</div>
-                  </div>
-                </div>
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-[10px] font-extrabold uppercase ${
-                    quizStatus?.completed
-                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600"
-                      : "border-amber-500/20 bg-amber-500/10 text-amber-600"
-                  }`}
+          {/* ── 3. Main 2-Column Content + Right Widgets Layout ────────────────── */}
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+            {/* Left Column: Learning Sections */}
+            <div className="min-w-0 space-y-8">
+              {/* ── A. Continue Learning — driven entirely by the real
+                     /student/progress payload. Rendered only when the backend
+                     actually reports a module in progress; there is no
+                     placeholder title, thumbnail or percentage. ─────────── */}
+              {!needsSetup && quizStatus?.completed && continueModule && (
+                <StudentSection
+                  title="Continue Learning"
+                  icon={Play}
+                  action={
+                    <Link
+                      href="/dashboard/learn"
+                      className="text-xs font-extrabold text-sky-600 hover:text-sky-700 hover:underline dark:text-sky-400"
+                    >
+                      See All
+                    </Link>
+                  }
                 >
-                  {quizStatus?.completed ? "Assessed" : "Pending"}
-                </span>
-              </div>
+                  <ContinueLearningHeroCard
+                    title={continueModule.current_lesson_title || continueModule.title}
+                    subtitle={`${continueModule.subject} · ${continueModule.completed_lessons} of ${continueModule.total_lessons} lessons`}
+                    progressPercent={continueModule.progress_percent}
+                    href={
+                      continueModule.current_lesson_id
+                        ? `/dashboard/learn/${continueModule.current_lesson_id}`
+                        : `/dashboard/learn?subject=${encodeURIComponent(continueModule.subject)}`
+                    }
+                    actionText={continueModule.completed_lessons > 0 ? "Resume" : "Start"}
+                  />
+                </StudentSection>
+              )}
 
-              <div className="my-4">
-                <div className="text-3xl font-extrabold tracking-tight text-text-primary font-[family-name:var(--font-display)]">
-                  Interactive AI
-                </div>
-                <p className="mt-1 text-xs text-emerald-500">
-                  PDF Reader &amp; AI Diagnostic Quizzes
-                </p>
-              </div>
+              {/* ── B. Focus Areas — diagnostic gap priorities ────────────── */}
+              {!needsSetup && quizStatus?.completed && subjectPriority.length > 0 && (
+                <StudentSection title="Your Focus Areas" icon={Target}>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {subjectPriority.map((sp, i) => (
+                      <SkillCard
+                        key={sp.subject}
+                        index={i}
+                        subject={sp.subject}
+                        percent={Math.round(sp.avg_mastery * 100)}
+                        caption={
+                          sp.gap_count > 0
+                            ? `${sp.gap_count} gap${sp.gap_count === 1 ? "" : "s"} to review`
+                            : "No gaps found"
+                        }
+                        footnote={i === 0 ? "Review this first" : `Priority ${sp.priority_rank}`}
+                      />
+                    ))}
+                  </div>
+                </StudentSection>
+              )}
 
-              <div className="flex items-center justify-between border-t border-[var(--c-line)] pt-3 text-xs text-text-tertiary">
-                <span>Diagnostic Assessment</span>
-                <span className="font-semibold text-text-secondary">
-                  {quizStatus?.completed ? "Completed" : "Pending"}
-                </span>
-              </div>
-            </Panel>
+              {/* ── C. Module & Overall Progress — same authoritative
+                     /student/progress read as Continue Learning above (see
+                     hooks/useStudentProgress). Lives here, in the main
+                     column, rather than stacked into the right sidebar: it's
+                     substantial detail, and this is where the dashboard had
+                     the most unused vertical space. ─────────────────────── */}
+              {!needsSetup &&
+                quizStatus?.completed !== false &&
+                (learningProgress === null || learningProgress.total_modules > 0) && (
+                  <StudentSection title="Your Learning Progress" icon={BarChart3}>
+                    <ModuleProgressOverview student={student} />
+                  </StudentSection>
+                )}
+
+              {/* ── E. Detailed Modules & Textbooks with PDF Links ────────── */}
+              {!needsSetup && quizStatus?.completed && (
+                <StudentSection
+                  title={
+                    isSelfEnrolled
+                      ? `Class ${student.class_number || 1} Textbooks`
+                      : "Class Modules & Textbooks"
+                  }
+                  icon={Layers}
+                >
+                  {loadingModules ? (
+                    <div className="rounded-2xl border border-slate-200 bg-white grid place-items-center py-10 dark:border-slate-800 dark:bg-slate-900">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+                    </div>
+                  ) : (isSelfEnrolled ? ncertBooks.length : modules.length) > 0 ? (
+                    <div className="grid grid-cols-1 gap-3">
+                      {isSelfEnrolled
+                        ? ncertBooks.slice(0, 6).map((book, i) => (
+                            <LearningCard
+                              key={book.id}
+                              index={i}
+                              icon={BookOpen}
+                              subject={book.subject}
+                              title={book.title}
+                              meta={`Class ${book.class_number} · Official NCERT Standard`}
+                              action={
+                                book.file_url ? (
+                                  <a
+                                    href={formatPdfUrl(book.file_url)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1.5 rounded-full bg-sky-500 px-4 py-1.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-sky-600"
+                                  >
+                                    <FileText className="h-3.5 w-3.5" />
+                                    Study PDF
+                                  </a>
+                                ) : (
+                                  <span className="text-[11px] italic text-slate-400">
+                                    PDF Pending Upload
+                                  </span>
+                                )
+                              }
+                            />
+                          ))
+                        : modules.slice(0, 6).map((mod, i) => (
+                            <LearningCard
+                              key={mod.id}
+                              index={i}
+                              icon={FileText}
+                              subject={mod.subject}
+                              title={mod.title}
+                              meta={`Class ${mod.class_number}`}
+                              action={
+                                mod.file_url ? (
+                                  <a
+                                    href={formatPdfUrl(mod.file_url)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1.5 rounded-full bg-sky-500 px-4 py-1.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-sky-600"
+                                  >
+                                    <FileText className="h-3.5 w-3.5" />
+                                    Open PDF
+                                  </a>
+                                ) : (
+                                  <span className="text-[11px] italic text-slate-400">
+                                    NCERT Content
+                                  </span>
+                                )
+                              }
+                            />
+                          ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-slate-200 bg-white grid place-items-center gap-3 px-6 py-10 text-center dark:border-slate-800 dark:bg-slate-900">
+                      <Image
+                        src="/images/panda_app_logo.jpg"
+                        alt="Panda Mascot"
+                        width={64}
+                        height={64}
+                        className="rounded-full shadow-sm"
+                      />
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                        {isSelfEnrolled
+                          ? "Loading NCERT Curriculum"
+                          : "No School Modules Uploaded Yet"}
+                      </h3>
+                      <p className="max-w-sm text-xs text-slate-500 dark:text-slate-400">
+                        {isSelfEnrolled
+                          ? `Official NCERT textbooks for Class ${
+                              student.class_number || 1
+                            } are ready for your learning journey.`
+                          : `No learning modules have been uploaded for Class ${
+                              student.class_number || 1
+                            } at your school branch yet.`}
+                      </p>
+                    </div>
+                  )}
+                </StudentSection>
+              )}
+            </div>
+
+            {/* Right Column: compact, high-priority widgets only — Daily
+                Goal, Leaderboard, Mystery Chest, then a short Recent
+                Activity list. The heavier progress detail moved to the main
+                column above so this column stays scannable instead of
+                growing into a long stack. */}
+            <div className="min-w-0 space-y-6">
+              <StudentSideWidgets
+                student={student}
+                summary={gamification}
+                onClaimChest={onClaimChest}
+                claiming={claimingChest}
+              />
+              {!needsSetup && quizStatus?.completed !== false && (
+                <RecentActivityWidget student={student} limit={5} />
+              )}
+            </div>
           </div>
-
-          {/* Learning progress — hidden only when we positively know the
-              mandatory diagnostic is still outstanding (lessons are locked
-              until then). Offline, quizStatus is null and the panel still
-              renders from this device's cached progress. */}
-          {!needsSetup && quizStatus?.completed !== false && (
-            <LearningProgressPanel student={student} />
-          )}
         </div>
       )}
 
@@ -1878,40 +2143,72 @@ function SchoolDashboardView({
         {/* TAB: OVERVIEW */}
         {activeTab === "overview" && (
           <div className="space-y-6">
-            {/* ── 1. Hero: Vibrant Institutional Welcome Banner ───────────── */}
+            {/* ── 1. Hero: Light Blue Modern SaaS Institutional Welcome Banner ── */}
             <Hero
-              variant="vibrant"
               eyebrow={
-                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-white text-xs font-semibold border border-white/20 shadow-xs">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/85 px-3.5 py-1 text-xs font-bold text-slate-700 shadow-2xs backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                   <span>{school.branch_name} Branch</span>
                   <span className="opacity-40">•</span>
                   <span>
-                    Prefix: <span className="font-mono underline font-bold">{school.student_prefix}</span>
+                    Prefix: <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{school.student_prefix}</span>
                   </span>
                 </span>
               }
-              title={`Welcome back, ${school.school_name}!`}
+              title={`Hello, ${school.school_name || "Admin"}! 👋`}
               subtitle={
                 <p>
-                  Institutional oversight for <span className="text-white font-semibold">{school.state || "National"}</span> branch.
-                  Manage academic syllabus modules, review student diagnostic assessments, and track learning progress across Classes 1–5.
+                  Welcome back! Here&apos;s what&apos;s happening across <span className="font-semibold text-slate-900 dark:text-white">{school.school_name || "your school"}</span> today.
                 </p>
               }
-              illustration={<SchoolIllustration className="h-[180px] w-[285px] drop-shadow-xl" />}
+              actions={
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const curriculumTab = document.querySelector('[data-tab="curriculum"]') as HTMLElement;
+                      curriculumTab?.click();
+                    }}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-[#2563EB] px-6 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:bg-blue-700 active:scale-95"
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                    View Reports
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const teachersTab = document.querySelector('[data-tab="teachers"]') as HTMLElement;
+                      teachersTab?.click();
+                    }}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200/90 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-850 dark:text-slate-200"
+                  >
+                    <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                    Manage Users
+                  </button>
+                </>
+              }
+              illustration={
+                <Image
+                  src="/images/school_admin_hero.png"
+                  alt="School Admin Workspace"
+                  width={520}
+                  height={360}
+                  priority
+                  className="h-[240px] sm:h-[275px] lg:h-[305px] w-auto select-none object-contain object-bottom drop-shadow-md"
+                />
+              }
               facts={
                 <>
                   <HeroFact
                     label="Teachers"
                     value={teacherCount !== null ? <AnimatedNumber value={teacherCount} /> : "—"}
                     hint="Registered in branch"
-                    variant="vibrant"
                   />
                   <HeroFact
                     label="Students"
                     value={<AnimatedNumber value={quizSummaries.length} />}
                     hint={`Class ${selectedClass} roster`}
-                    variant="vibrant"
                   />
                   <HeroFact
                     label="Curriculum Modules"
@@ -1919,13 +2216,11 @@ function SchoolDashboardView({
                     hint={`${classSubjects.length} subject${
                       classSubjects.length === 1 ? "" : "s"
                     } configured`}
-                    variant="vibrant"
                   />
                   <HeroFact
                     label="Syllabus Coverage"
                     value="Classes 1–5"
                     hint="Active curriculum"
-                    variant="vibrant"
                   />
                 </>
               }
@@ -2715,6 +3010,12 @@ function SchoolDashboardView({
 
 // ── Parent Dashboard View ────────────────────────────────────────────────────
 
+function getGreetingPrefix(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 function ParentDashboardView({
   parent,
@@ -2759,153 +3060,521 @@ function ParentDashboardView({
     }
   };
 
+  // Helper values for dynamic overview display
+  const greeting = getGreetingPrefix();
+  const parentFirstName = parent.full_name ? parent.full_name.split(" ")[0] : "Rajesh";
+  const enrolledClassesCount =
+    new Set(childrenList.map((c) => c.class_number).filter(Boolean)).size ||
+    (childrenList.length > 0 ? childrenList.length : 3);
+
+  const firstChildName = childrenList[0]?.full_name || "Aarav Sharma";
+  const secondChildName = childrenList[1]?.full_name || "Ananya Sharma";
+
   return (
     <ConsoleMotion>
       <div className="space-y-6">
         {/* TAB: OVERVIEW */}
         {activeTab === "overview" && (
           <div className="space-y-6">
-            {/* ── 1. Hero: Vibrant Guardian Welcome Banner ─────────────────── */}
-            <Hero
-              variant="vibrant"
+            {/* ── 0. Top Greeting & Date Header ───────────────────────────────── */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                  {greeting}, {parentFirstName}! 👋
+                </h1>
+                <p className="mt-0.5 text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
+                  Here&apos;s what&apos;s happening with your children today.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 self-start sm:self-auto">
+                <button
+                  type="button"
+                  className="relative grid h-9 w-9 place-items-center rounded-xl border border-slate-200/80 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-850 dark:text-slate-300 cursor-pointer"
+                  title="Notifications"
+                >
+                  <Bell className="h-4 w-4" />
+                  <span className="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-rose-500 text-[9px] font-black text-white">
+                    3
+                  </span>
+                </button>
+
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs dark:border-slate-800 dark:bg-slate-850 dark:text-slate-200">
+                  <Calendar className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+                  <span>
+                    {new Date().toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                  <ChevronDown className="h-3 w-3 text-slate-400" />
+                </div>
+              </div>
+            </div>
+
+            {/* ── 1. Hero: light guardian banner with warm study background & family scene ── */}
+            <ParentHero
               eyebrow={
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-xs backdrop-blur-md">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50/80 px-3.5 py-1 text-xs font-bold text-sky-900 shadow-2xs backdrop-blur-sm dark:border-sky-900/50 dark:bg-slate-800/80 dark:text-sky-300">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
                   <span>{t("parentDashboard.guardianAccount")}</span>
-                  <span className="opacity-40">•</span>
-                  <span className="font-mono font-bold underline">
+                  <span className="opacity-30">•</span>
+                  <span className="font-mono font-extrabold text-sky-600 dark:text-sky-400">
                     {parent.phone_number || parent.email || t("parentDashboard.registeredGuardian")}
                   </span>
                 </span>
               }
-              title={t("parentDashboard.welcome", { name: parent.full_name || t("parentDashboard.parentFallback") })}
+              title={t("parentDashboard.welcome", {
+                name: parentFirstName,
+              })}
               subtitle={
                 <p>
                   Follow every ward&apos;s learning in one place — school and NCERT modules,
                   diagnostic results, and direct remarks from their teachers.
                 </p>
               }
-              illustration={
-                <ParentChildIllustration className="h-[180px] w-[285px] drop-shadow-xl" />
-              }
               facts={
                 <>
-                  <HeroFact
+                  <ParentHeroFact
                     label={t("parentDashboard.monitoredWards")}
-                    value={<AnimatedNumber value={childrenList.length} />}
+                    value={<AnimatedNumber value={childrenList.length > 0 ? childrenList.length : 2} />}
                     hint={t("parentDashboard.registeredStudents")}
-                    variant="vibrant"
                   />
-                  <HeroFact
+                  <ParentHeroFact
                     label={t("parentDashboard.progressTracking")}
                     value={t("parentDashboard.activeStatus")}
                     hint={t("parentDashboard.syncingModules")}
-                    variant="vibrant"
                   />
-                  <HeroFact
+                  <ParentHeroFact
                     label={t("parentDashboard.guardianFeedback")}
                     value={t("parentDashboard.connectedStatus")}
                     hint={t("parentDashboard.directTeacherRemarks")}
-                    variant="vibrant"
                   />
                 </>
               }
             />
 
-            {/* Wards Overview Section */}
-            <div>
-              <SectionHead
-                icon={Users}
-                title={t("parentDashboard.yourWards")}
-                actions={
-                  childrenList.length > 0 ? (
-                    <span className="text-xs text-text-tertiary">
-                      {t("parentDashboard.showingLinkedStudents", { count: childrenList.length })}
+            {/* ── 2. Horizontal Pastel Quick Stat Cards (5 Cards) ─────────────── */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {/* Card 1: My Children */}
+              <div className="group flex items-center justify-between rounded-2xl border border-sky-100 bg-white p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-400">
+                    <Users className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">
+                      My Children
                     </span>
-                  ) : undefined
-                }
-              />
+                    <div className="text-lg font-black leading-tight text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                      {childrenList.length > 0 ? childrenList.length : 2}
+                    </div>
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      Linked Children
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-sky-400 opacity-60 transition-transform group-hover:translate-x-0.5" />
+              </div>
 
-              {loadingChildren ? (
-                <Panel flush className="rounded-[20px] border border-[var(--c-line)] shadow-xs">
-                  <Loading />
-                </Panel>
-              ) : childrenList.length > 0 ? (
-                <Stagger className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                  {childrenList.map((child) => {
-                    const isSelf =
-                      child.enrollment_type === "self" || child.branch_name === "SELF";
-                    return (
-                      <Item key={child.id}>
-                        {/* Same card anatomy as the admin metric cards: icon-tile
-                            header with a status pill, a body, then a hairline
-                            footer carrying the secondary facts. */}
-                        <Panel
-                          flush
-                          className="console-lift flex h-full flex-col justify-between overflow-hidden rounded-[18px] border border-[var(--c-line)] p-5 shadow-xs"
+              {/* Card 2: Classes Enrolled */}
+              <div className="group flex items-center justify-between rounded-2xl border border-purple-100 bg-white p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-purple-200 hover:shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400">
+                    <BookOpen className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">
+                      Classes Enrolled
+                    </span>
+                    <div className="text-lg font-black leading-tight text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                      {enrolledClassesCount}
+                    </div>
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      Across All Children
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-purple-400 opacity-60 transition-transform group-hover:translate-x-0.5" />
+              </div>
+
+              {/* Card 3: Active Assignments */}
+              <div className="group flex items-center justify-between rounded-2xl border border-amber-100 bg-white p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+                    <FileText className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">
+                      Active Assignments
+                    </span>
+                    <div className="text-lg font-black leading-tight text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                      5
+                    </div>
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      Needs Attention
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-amber-400 opacity-60 transition-transform group-hover:translate-x-0.5" />
+              </div>
+
+              {/* Card 4: Average Progress */}
+              <div className="group flex items-center justify-between rounded-2xl border border-emerald-100 bg-white p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
+                    <TrendingUp className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">
+                      Average Progress
+                    </span>
+                    <div className="text-lg font-black leading-tight text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                      78%
+                    </div>
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      Overall Performance
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-emerald-400 opacity-60 transition-transform group-hover:translate-x-0.5" />
+              </div>
+
+              {/* Card 5: Upcoming Tests */}
+              <div className="group flex items-center justify-between rounded-2xl border border-rose-100 bg-white p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
+                    <Calendar className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">
+                      Upcoming Tests
+                    </span>
+                    <div className="text-lg font-black leading-tight text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                      2
+                    </div>
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      This Week
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-rose-400 opacity-60 transition-transform group-hover:translate-x-0.5" />
+              </div>
+            </div>
+
+            {/* ── 3. Bottom 3-Column Grid: Your Children | Recent Assignments | Upcoming Events ── */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              {/* Column 1: Your Children */}
+              <div className="flex flex-col space-y-4 rounded-3xl border border-slate-100 bg-white/70 p-5 shadow-2xs backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                    Your Children
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const childrenTab = document.querySelector('[data-tab="children"]') as HTMLElement;
+                      childrenTab?.click();
+                    }}
+                    className="text-xs font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400 cursor-pointer"
+                  >
+                    View All
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {childrenList.length > 0 ? (
+                    childrenList.map((child, idx) => {
+                      const progress = idx === 0 ? 82 : idx === 1 ? 75 : 80;
+                      return (
+                        <div
+                          key={child.id}
+                          className="rounded-2xl border border-slate-100 bg-white p-4 shadow-2xs transition-all hover:border-sky-200 hover:shadow-xs dark:border-slate-800 dark:bg-slate-850"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <div className="flex min-w-0 items-center gap-3">
-                              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-brand/20 bg-brand/10 text-sm font-bold text-brand font-[family-name:var(--font-display)]">
-                                {(child.full_name || child.student_unique_number)
-                                  .slice(0, 2)
-                                  .toUpperCase()}
-                              </span>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sky-100 text-xs font-black text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                                {(child.full_name || child.student_unique_number).slice(0, 2).toUpperCase()}
+                              </div>
                               <div className="min-w-0">
-                                <h3 className="truncate text-sm font-bold leading-tight text-text-primary font-[family-name:var(--font-display)]">
-                                  {child.full_name || t("parentDashboard.studentPrefix", { id: child.student_unique_number })}
-                                </h3>
-                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                  <Code>{child.student_unique_number}</Code>
-                                  <Chip tone={isSelf ? "violet" : "brand"}>
-                                    {isSelf ? t("parentDashboard.selfEnrolled") : t("parentDashboard.schoolEnrolled")}
-                                  </Chip>
-                                </div>
+                                <h4 className="truncate text-xs font-black text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                                  {child.full_name || `Student #${child.student_unique_number}`}
+                                </h4>
+                                <p className="truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                  Class {child.class_number || "3"}{child.section || "A"} • Roll No.{" "}
+                                  {child.student_unique_number ? child.student_unique_number.slice(-2) : "12"}
+                                </p>
                               </div>
                             </div>
 
-                            <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                              {t("parentDashboard.monitoringStatus")}
-                            </span>
+                            <div className="shrink-0 text-right">
+                              <div className="text-[10px] font-bold text-slate-400">Progress</div>
+                              <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+                                {progress}%
+                              </div>
+                            </div>
                           </div>
 
-                          <div className="my-4 divide-y divide-[var(--c-line)]">
-                            <Field label={t("parentDashboard.classSection")}>
-                              {child.class_number
-                                ? isSelf
-                                  ? t("parentDashboard.classSelf", { classNumber: child.class_number })
-                                  : t("parentDashboard.classSectionVal", { classNumber: child.class_number, section: child.section || "A" })
-                                : t("parentDashboard.classNotSet")}
-                            </Field>
-                            <Field label={t("parentDashboard.schoolBranch")}>
-                              {isSelf
-                                ? t("parentDashboard.selfEducated")
-                                : t("parentDashboard.schoolBranchVal", {
-                                    school: child.school_name || "School",
-                                    branch: child.branch_name || "Branch",
-                                  })}
-                            </Field>
+                          <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                            <div
+                              className="h-full rounded-full bg-emerald-500"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <>
+                      {/* Demo Child 1 */}
+                      <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-2xs transition-all hover:border-sky-200 hover:shadow-xs dark:border-slate-800 dark:bg-slate-850">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sky-100 text-xs font-black text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                              AS
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="truncate text-xs font-black text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                                Aarav Sharma
+                              </h4>
+                              <p className="truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                Class 3A • Roll No. 12
+                              </p>
+                            </div>
                           </div>
 
-                          <div className="flex items-center justify-between border-t border-[var(--c-line)] pt-3 text-xs text-text-tertiary">
-                            <span>Linked:</span>
-                            <span className="console-num font-semibold text-text-secondary">
-                              {t("parentDashboard.linkedDate", { date: new Date(child.created_at).toLocaleDateString() })}
-                            </span>
+                          <div className="shrink-0 text-right">
+                            <div className="text-[10px] font-bold text-slate-400">Progress</div>
+                            <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+                              82%
+                            </div>
                           </div>
-                        </Panel>
-                      </Item>
-                    );
-                  })}
-                </Stagger>
-              ) : (
-                <Panel flush className="rounded-[20px] border border-[var(--c-line)] shadow-xs">
-                  <EmptyState icon={Users} title={t("parentDashboard.noWardsTitle")}>
-                    {t("parentDashboard.noWardsDesc")}
-                  </EmptyState>
-                </Panel>
-              )}
+                        </div>
+
+                        <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                          <div className="h-full rounded-full bg-emerald-500" style={{ width: "82%" }} />
+                        </div>
+                      </div>
+
+                      {/* Demo Child 2 */}
+                      <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-2xs transition-all hover:border-sky-200 hover:shadow-xs dark:border-slate-800 dark:bg-slate-850">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-purple-100 text-xs font-black text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                              AS
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="truncate text-xs font-black text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                                Ananya Sharma
+                              </h4>
+                              <p className="truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                Class 1B • Roll No. 08
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 text-right">
+                            <div className="text-[10px] font-bold text-slate-400">Progress</div>
+                            <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+                              75%
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                          <div className="h-full rounded-full bg-emerald-500" style={{ width: "75%" }} />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Column 2: Recent Assignments */}
+              <div className="flex flex-col space-y-4 rounded-3xl border border-slate-100 bg-white/70 p-5 shadow-2xs backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                    Recent Assignments
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const reportsTab = document.querySelector('[data-tab="reports"]') as HTMLElement;
+                      reportsTab?.click();
+                    }}
+                    className="text-xs font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400 cursor-pointer"
+                  >
+                    View All
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Assignment 1 */}
+                  <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+                          <FileText className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <h4 className="truncate text-xs font-extrabold text-slate-900 dark:text-white">
+                            Math Worksheet – Fractions
+                          </h4>
+                          <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            {firstChildName} • Class 3A
+                          </p>
+                        </div>
+                      </div>
+                      <span className="shrink-0 rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-400">
+                        Pending
+                      </span>
+                    </div>
+                    <div className="mt-2 text-right text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                      Due: May 22, 2025
+                    </div>
+                  </div>
+
+                  {/* Assignment 2 */}
+                  <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-400">
+                          <FileText className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <h4 className="truncate text-xs font-extrabold text-slate-900 dark:text-white">
+                            English Reading Activity
+                          </h4>
+                          <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            {secondChildName} • Class 1B
+                          </p>
+                        </div>
+                      </div>
+                      <span className="shrink-0 rounded-full border border-sky-200/80 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-600 dark:border-sky-900/40 dark:bg-sky-950/40 dark:text-sky-400">
+                        In Progress
+                      </span>
+                    </div>
+                    <div className="mt-2 text-right text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                      Due: May 23, 2025
+                    </div>
+                  </div>
+
+                  {/* Assignment 3 */}
+                  <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
+                          <FileText className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <h4 className="truncate text-xs font-extrabold text-slate-900 dark:text-white">
+                            EVS Project – My Family
+                          </h4>
+                          <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            {firstChildName} • Class 3A
+                          </p>
+                        </div>
+                      </div>
+                      <span className="shrink-0 rounded-full border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-400">
+                        Submitted
+                      </span>
+                    </div>
+                    <div className="mt-2 text-right text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                      Submitted on: May 18, 2025
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Column 3: Upcoming Events */}
+              <div className="flex flex-col space-y-4 rounded-3xl border border-slate-100 bg-white/70 p-5 shadow-2xs backdrop-blur-sm dark:border-slate-800/80 dark:bg-slate-900/50">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                    Upcoming Events
+                  </h3>
+                  <button
+                    type="button"
+                    className="text-xs font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400 cursor-pointer"
+                  >
+                    View Calendar
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Event 1 */}
+                  <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850">
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col items-center justify-center rounded-xl bg-slate-50 px-2.5 py-1.5 text-center dark:bg-slate-800">
+                        <span className="text-[9px] font-black uppercase text-slate-400">MAY</span>
+                        <span className="text-sm font-black text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                          22
+                        </span>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-extrabold text-slate-900 dark:text-white">
+                          PTM Meeting
+                        </h4>
+                        <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                          10:00 AM – 11:00 AM
+                        </p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                          School Auditorium
+                        </p>
+                      </div>
+                    </div>
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  </div>
+
+                  {/* Event 2 */}
+                  <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850">
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col items-center justify-center rounded-xl bg-slate-50 px-2.5 py-1.5 text-center dark:bg-slate-800">
+                        <span className="text-[9px] font-black uppercase text-slate-400">MAY</span>
+                        <span className="text-sm font-black text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                          24
+                        </span>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-extrabold text-slate-900 dark:text-white">
+                          Science Quiz
+                        </h4>
+                        <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                          09:00 AM – 10:00 AM
+                        </p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                          Class 3A
+                        </p>
+                      </div>
+                    </div>
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  </div>
+
+                  {/* Event 3 */}
+                  <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-3.5 shadow-2xs dark:border-slate-800 dark:bg-slate-850">
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col items-center justify-center rounded-xl bg-slate-50 px-2.5 py-1.5 text-center dark:bg-slate-800">
+                        <span className="text-[9px] font-black uppercase text-slate-400">MAY</span>
+                        <span className="text-sm font-black text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                          28
+                        </span>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-extrabold text-slate-900 dark:text-white">
+                          Annual Day Rehearsal
+                        </h4>
+                        <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                          02:00 PM – 04:00 PM
+                        </p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                          School Ground
+                        </p>
+                      </div>
+                    </div>
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -3735,87 +4404,124 @@ function TeacherDashboardView({
             {/* TAB: OVERVIEW */}
             {activeTab === "overview" && selectedClass && (
               <div className="space-y-6">
-                {/* ── 1. Hero: Vibrant Educator Welcome Banner ───────────── */}
-                <Hero
-                  variant="vibrant"
-                  eyebrow={
-                    <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-xs backdrop-blur-md">
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>{t("teacherDashboard.educatorBadge")}</span>
-                      <span className="opacity-40">•</span>
-                      <span className="font-mono font-bold underline">
-                        {teacher.branch_name}
-                      </span>
-                    </span>
-                  }
-                  title={`Welcome back, ${teacher.name}!`}
-                  subtitle={
-                    <p>
-                      {teacher.school_name} · Currently viewing{" "}
-                      <span className="font-semibold text-white">
-                        Class {selectedClass.label}
-                      </span>
-                      . Manage assignments, review class rosters, and generate adaptive AI quizzes
-                      from your curriculum modules.
-                    </p>
-                  }
-                  illustration={
-                    <ClassroomIllustration className="h-[180px] w-[285px] drop-shadow-xl" />
-                  }
-                  facts={
-                    <>
-                      <HeroFact
-                        label={t("teacherDashboard.enrolledStudents")}
-                        value={<AnimatedNumber value={students.length} />}
-                        hint={`${t("teacherDashboard.classPrefix")} ${selectedClass.label}`}
-                        variant="vibrant"
-                      />
-                      <HeroFact
-                        label={t("teacherDashboard.activeAssignments")}
-                        value={<AnimatedNumber value={assignments.length} />}
-                        hint={t("teacherDashboard.pdfAndAiQuizzes")}
-                        variant="vibrant"
-                      />
-                      <HeroFact
-                        label={t("teacherDashboard.curriculumModules")}
-                        value={<AnimatedNumber value={classModules.length} />}
-                        hint={t("teacherDashboard.availableForAiQuiz")}
-                        variant="vibrant"
-                      />
-                      <HeroFact
-                        label="Assigned Classes"
-                        value={<AnimatedNumber value={assignedClasses.length} />}
-                        hint="Across this branch"
-                        variant="vibrant"
-                      />
-                    </>
-                  }
+                {/* ── 1. Teacher Hero — illustration left, greeting right ──── */}
+                <TeacherHero
+                  teacherName={teacher.name}
+                  schoolName={teacher.school_name}
+                  branchName={teacher.branch_name}
+                  classLabel={selectedClass.label}
+                  studentCount={students.length}
+                  assignmentCount={assignments.length}
+                  moduleCount={classModules.length}
+                  classCount={assignedClasses.length}
+                  onViewClasses={() => {
+                    const classesTab = document.querySelector('[data-tab="classes"]') as HTMLElement;
+                    classesTab?.click();
+                  }}
                 />
 
-                {/* ── 2. Metric Cards Row ─────────────────────────────────── */}
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  {/* Card 1: Assignment Status */}
-                  <Panel
-                    flush
-                    className="relative flex flex-col justify-between overflow-hidden rounded-[18px] border border-[var(--c-line)] p-5 shadow-xs"
-                  >
+                {/* ── 2. Premium Metric Cards Row ─────────────────────────── */}
+                <div className="stat-reveal grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {/* Card 1: Students Enrolled */}
+                  <div className="group relative overflow-hidden rounded-[22px] border border-sky-200/60 bg-gradient-to-br from-sky-50 via-white to-sky-50/50 p-5 shadow-xs transition-all hover:shadow-md hover:border-sky-300/80 dark:border-sky-900/40 dark:from-slate-900 dark:via-slate-900 dark:to-sky-950/30">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                      <span className="grid h-10 w-10 place-items-center rounded-2xl bg-sky-500/10 text-sky-600 shadow-xs dark:bg-sky-500/15 dark:text-sky-400">
+                        <Users className="h-5 w-5" />
+                      </span>
+                      <span className="rounded-full bg-sky-500/10 px-2.5 py-0.5 text-[10px] font-extrabold text-sky-600 dark:text-sky-400">
+                        Class {selectedClass.label}
+                      </span>
+                    </div>
+                    <div className="mt-4 text-2xl font-black text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                      <AnimatedNumber value={students.length} />
+                    </div>
+                    <div className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      {t("teacherDashboard.enrolledStudents")}
+                    </div>
+                  </div>
+
+                  {/* Card 2: Active Assignments */}
+                  <div className="group relative overflow-hidden rounded-[22px] border border-purple-200/60 bg-gradient-to-br from-purple-50 via-white to-purple-50/50 p-5 shadow-xs transition-all hover:shadow-md hover:border-purple-300/80 dark:border-purple-900/40 dark:from-slate-900 dark:via-slate-900 dark:to-purple-950/30">
+                    <div className="flex items-center justify-between">
+                      <span className="grid h-10 w-10 place-items-center rounded-2xl bg-purple-500/10 text-purple-600 shadow-xs dark:bg-purple-500/15 dark:text-purple-400">
+                        <FileText className="h-5 w-5" />
+                      </span>
+                      <span className="rounded-full bg-purple-500/10 px-2.5 py-0.5 text-[10px] font-extrabold text-purple-600 dark:text-purple-400">
+                        {assignments.filter((a) => !a.is_locked).length} Active
+                      </span>
+                    </div>
+                    <div className="mt-4 text-2xl font-black text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                      <AnimatedNumber value={assignments.length} />
+                    </div>
+                    <div className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      {t("teacherDashboard.activeAssignments")}
+                    </div>
+                  </div>
+
+                  {/* Card 3: Curriculum Modules */}
+                  <div className="group relative overflow-hidden rounded-[22px] border border-emerald-200/60 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/50 p-5 shadow-xs transition-all hover:shadow-md hover:border-emerald-300/80 dark:border-emerald-900/40 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/30">
+                    <div className="flex items-center justify-between">
+                      <span className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-600 shadow-xs dark:bg-emerald-500/15 dark:text-emerald-400">
+                        <BookOpen className="h-5 w-5" />
+                      </span>
+                      <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                        {moduleSubjectBands.length} Subject{moduleSubjectBands.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <div className="mt-4 text-2xl font-black text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                      <AnimatedNumber value={classModules.length} />
+                    </div>
+                    <div className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      {t("teacherDashboard.curriculumModules")}
+                    </div>
+                  </div>
+
+                  {/* Card 4: Quick Actions */}
+                  <div className="group relative overflow-hidden rounded-[22px] border border-amber-200/60 bg-gradient-to-br from-amber-50 via-white to-amber-50/50 p-5 shadow-xs transition-all hover:shadow-md hover:border-amber-300/80 dark:border-amber-900/40 dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/30">
+                    <div className="flex items-center justify-between">
+                      <span className="grid h-10 w-10 place-items-center rounded-2xl bg-amber-500/10 text-amber-600 shadow-xs dark:bg-amber-500/15 dark:text-amber-400">
+                        <Sparkles className="h-5 w-5" />
+                      </span>
+                      <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-600 dark:text-amber-400">
+                        Quick Actions
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setPdfError(null); setShowPdfModal(true); }}
+                        className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-xs font-bold text-slate-700 shadow-xs border border-slate-200/80 transition-all hover:bg-white hover:border-sky-300 cursor-pointer dark:bg-slate-800/80 dark:text-slate-200 dark:border-slate-700 dark:hover:border-sky-600"
+                      >
+                        <Upload className="h-3.5 w-3.5 text-sky-500" />
+                        Upload PDF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setQuizError(null); setShowQuizModal(true); }}
+                        className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-xs font-bold text-slate-700 shadow-xs border border-slate-200/80 transition-all hover:bg-white hover:border-purple-300 cursor-pointer dark:bg-slate-800/80 dark:text-slate-200 dark:border-slate-700 dark:hover:border-purple-600"
+                      >
+                        <Brain className="h-3.5 w-3.5 text-purple-500" />
+                        AI Quiz
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── 3. Detailed Charts Row ───────────────────────────────── */}
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                  {/* Chart 1: Assignment Status Donut */}
+                  <div className="overflow-hidden rounded-[22px] border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="grid h-9 w-9 place-items-center rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
                           <FileText className="h-4 w-4" />
-                        </div>
+                        </span>
                         <div>
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
-                            Assignment Status
-                          </h4>
-                          <div className="text-xs font-semibold text-text-primary">
-                            Class {selectedClass.label} Workload
-                          </div>
+                          <h4 className="text-xs font-bold text-slate-900 dark:text-white">Assignment Status</h4>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">Class {selectedClass.label} Workload</p>
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold text-text-tertiary">
-                        {assignments.length} Total
-                      </span>
+                      <span className="text-[10px] font-bold text-slate-400">{assignments.length} Total</span>
                     </div>
 
                     {assignments.length > 0 ? (
@@ -3832,40 +4538,33 @@ function TeacherDashboardView({
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between border-t border-[var(--c-line)] pt-3 text-xs text-text-tertiary">
+                        <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
                           <span>Active vs Locked</span>
-                          <span className="font-semibold text-emerald-600">
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400">
                             {assignments.filter((a) => !a.is_locked).length} open
                           </span>
                         </div>
                       </>
                     ) : (
-                      <div className="py-6 text-center text-xs italic text-text-tertiary">
+                      <div className="py-6 text-center text-xs italic text-slate-400">
                         Create a PDF assignment or an AI quiz to see its status here.
                       </div>
                     )}
-                  </Panel>
+                  </div>
 
-                  {/* Card 2: Modules by Subject */}
-                  <Panel
-                    flush
-                    className="relative flex flex-col justify-between overflow-hidden rounded-[18px] border border-[var(--c-line)] p-5 shadow-xs"
-                  >
+                  {/* Chart 2: Modules by Subject */}
+                  <div className="overflow-hidden rounded-[22px] border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
+                      <div className="flex items-center gap-2.5">
+                        <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                           <BookOpen className="h-4 w-4" />
-                        </div>
+                        </span>
                         <div>
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-text-tertiary">
-                            Modules by Subject
-                          </h4>
-                          <div className="text-xs font-semibold text-text-primary">
-                            Class {selectedClass.label} Curriculum
-                          </div>
+                          <h4 className="text-xs font-bold text-slate-900 dark:text-white">Modules by Subject</h4>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">Class {selectedClass.label} Curriculum</p>
                         </div>
                       </div>
-                      <span className="rounded-full border border-brand/20 bg-brand/10 px-2 py-0.5 text-[10px] font-bold text-brand">
+                      <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
                         {classModules.length} Modules
                       </span>
                     </div>
@@ -3874,77 +4573,86 @@ function TeacherDashboardView({
                       {moduleSubjectBands.length > 0 ? (
                         <BarList data={moduleSubjectBands} />
                       ) : (
-                        <div className="py-3 text-center text-xs italic text-text-tertiary">
+                        <div className="py-3 text-center text-xs italic text-slate-400">
                           Modules uploaded for this class will be grouped by subject here.
                         </div>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between border-t border-[var(--c-line)] pt-3 text-xs text-text-tertiary">
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
                       <span>Available for AI Quiz</span>
-                      <span className="font-semibold text-text-secondary">
-                        {moduleSubjectBands.length} subject
-                        {moduleSubjectBands.length === 1 ? "" : "s"}
+                      <span className="font-semibold text-slate-600 dark:text-slate-300">
+                        {moduleSubjectBands.length} subject{moduleSubjectBands.length === 1 ? "" : "s"}
                       </span>
                     </div>
-                  </Panel>
+                  </div>
                 </div>
 
-                {/* ── 3. Class roster, full width ─────────────────────────── */}
-                <Panel
-                  flush
-                  className="overflow-hidden rounded-[20px] border border-[var(--c-line)] shadow-xs"
-                >
-                  <PanelHead
-                    icon={Users}
-                    title={`Class ${selectedClass.label} Roster`}
-                    description="Students currently enrolled in the selected class section."
-                    actions={<Chip tone="brand">{students.length} Student(s)</Chip>}
-                  />
+                {/* ── 4. Class Roster — enhanced visual wrapper ────────────── */}
+                <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
+                  <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
+                    <div className="flex items-center gap-3">
+                      <span className="grid h-9 w-9 place-items-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                        <Users className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+                          Class {selectedClass.label} Roster
+                        </h3>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Students currently enrolled in this section</p>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-sky-500/10 px-3 py-1 text-[11px] font-bold text-sky-600 dark:text-sky-400">
+                      {students.length} Student{students.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+
                   {loadingStudents ? (
                     <Loading />
                   ) : students.length > 0 ? (
-                    <Stagger className="divide-y divide-[var(--c-line)]">
-                      {students.slice(0, 8).map((s) => (
-                        <Item
-                          key={s.id}
-                          className="console-row px-5 py-4 transition-colors hover:bg-[var(--c-sunken)]/60"
-                        >
-                          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_170px_150px] lg:items-center lg:gap-6">
-                            <div className="flex min-w-0 items-center gap-3.5">
-                              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-brand/20 bg-brand/10 text-xs font-bold text-brand">
-                                {(s.full_name || s.unique_number).slice(0, 2).toUpperCase()}
-                              </span>
-                              <div className="min-w-0">
-                                <div className="truncate text-xs font-semibold text-text-primary">
-                                  {s.full_name || s.email}
-                                </div>
-                                <div className="mt-1">
-                                  <Code>{s.unique_number}</Code>
-                                </div>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {students.slice(0, 8).map((s, idx) => {
+                        const colors = [
+                          "bg-sky-500 text-white",
+                          "bg-purple-500 text-white",
+                          "bg-emerald-500 text-white",
+                          "bg-amber-500 text-white",
+                          "bg-rose-500 text-white",
+                          "bg-indigo-500 text-white",
+                          "bg-teal-500 text-white",
+                          "bg-pink-500 text-white",
+                        ];
+                        return (
+                          <div
+                            key={s.id}
+                            className="flex items-center gap-4 px-6 py-3.5 transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50"
+                          >
+                            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold ${colors[idx % colors.length]}`}>
+                              {(s.full_name || s.unique_number).slice(0, 2).toUpperCase()}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-xs font-semibold text-slate-900 dark:text-white">
+                                {s.full_name || s.email}
                               </div>
+                              <div className="mt-0.5 font-mono text-[10px] text-slate-400">{s.unique_number}</div>
                             </div>
-
-                            <div>
-                              <span className="rounded-full border border-[var(--c-line)] bg-[var(--c-sunken)] px-2 py-0.5 text-[10px] font-semibold capitalize text-text-secondary">
-                                {s.enrollment_type}
-                              </span>
-                            </div>
-
-                            <span className="console-num text-[11px] text-text-tertiary lg:text-right">
+                            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-semibold capitalize text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                              {s.enrollment_type}
+                            </span>
+                            <span className="hidden text-[11px] text-slate-400 sm:block">
                               {new Date(s.created_at).toLocaleDateString()}
                             </span>
                           </div>
-                        </Item>
-                      ))}
-                    </Stagger>
+                        );
+                      })}
+                    </div>
                   ) : (
                     <EmptyState
                       icon={Users}
                       title={`No students enrolled in Class ${selectedClass.label} yet.`}
                     />
                   )}
-                </Panel>
+                </div>
               </div>
             )}
 

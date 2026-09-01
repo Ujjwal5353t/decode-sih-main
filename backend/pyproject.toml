@@ -25,6 +25,10 @@ dependencies = [
     "google-genai>=2.17.0",
     "pypdf>=5.0.0",
     "reportlab>=5.0.1",
+    # IANA time-zone database. Windows and slim Linux images ship no system
+    # zone db, so without this zoneinfo raises and every student's streak
+    # silently falls back to UTC day boundaries.
+    "tzdata>=2024.1",
 ]
 
 [dependency-groups]
