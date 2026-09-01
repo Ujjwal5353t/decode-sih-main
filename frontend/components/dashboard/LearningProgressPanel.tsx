@@ -4,14 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
+  Award,
   BookOpen,
   CheckCircle,
   ChevronRight,
   Clock,
   CloudOff,
+  Flame,
   Play,
   RefreshCw,
   TrendingUp,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ModuleProgressOut, StudentProfile, StudentProgressOut } from "@/lib/api";
@@ -202,8 +205,8 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
         </div>
       )}
 
-      {/* ── Overall progress ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* ── Overall progress, Points & Streak ─────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
           <div className="flex items-center justify-between text-text-tertiary text-xs">
             <span>{t("learningProgress.overallProgress")}</span>
@@ -219,6 +222,34 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
 
         <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
           <div className="flex items-center justify-between text-text-tertiary text-xs">
+            <span>Learning Points</span>
+            <Award className="w-4 h-4 text-amber-500" />
+          </div>
+          <div className="text-2xl font-bold text-amber-500 flex items-center gap-1.5">
+            <span>{progress.points ?? 0}</span>
+            <span className="text-xs font-semibold text-text-secondary">XP</span>
+          </div>
+          <span className="text-[11px] text-text-secondary flex items-center gap-1">
+            <Zap className="w-3 h-3 text-amber-500" /> Real activity rewards
+          </span>
+        </div>
+
+        <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+          <div className="flex items-center justify-between text-text-tertiary text-xs">
+            <span>Day Streak</span>
+            <Flame className="w-4 h-4 text-rose-500" />
+          </div>
+          <div className="text-2xl font-bold text-rose-500 flex items-center gap-1.5">
+            <span>{progress.current_streak ?? 0}</span>
+            <span className="text-xs font-semibold text-text-secondary">Days</span>
+          </div>
+          <span className="text-[11px] text-text-secondary">
+            {progress.longest_streak ? `Best: ${progress.longest_streak} days` : "Active streak"}
+          </span>
+        </div>
+
+        <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
+          <div className="flex items-center justify-between text-text-tertiary text-xs">
             <span>{t("learningProgress.modulesCompleted")}</span>
             <CheckCircle className="w-4 h-4 text-emerald-500" />
           </div>
@@ -227,23 +258,6 @@ export function LearningProgressPanel({ student }: { student: StudentProfile }) 
           </div>
           <span className="text-[11px] text-text-secondary">
             {t("learningProgress.ofModulesInClass", { total: progress.total_modules })}
-          </span>
-        </div>
-
-        <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-1">
-          <div className="flex items-center justify-between text-text-tertiary text-xs">
-            <span>{t("learningProgress.inProgress")}</span>
-            <BookOpen className="w-4 h-4 text-purple-500" />
-          </div>
-          <div className="text-2xl font-bold text-text-primary">
-            {progress.modules_in_progress}
-          </div>
-          <span className="text-[11px] text-text-secondary">
-            {progress.last_activity_at
-              ? t("learningProgress.lastActive", {
-                  time: relativeTime(progress.last_activity_at),
-                })
-              : t("learningProgress.notStartedYet")}
           </span>
         </div>
       </div>

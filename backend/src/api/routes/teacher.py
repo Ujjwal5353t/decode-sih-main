@@ -39,7 +39,7 @@ from src.schemas.teacher import (
     TeacherClassOut,
     TeacherProfile,
 )
-from src.schemas.learning import ClassProgressOut
+from src.schemas.learning import ClassProgressOut, StudentDetailedProgressOut
 from src.schemas.student import StudentProfile
 from src.schemas.module import ModuleOut
 from src.schemas.chunk import ChapterOut, ChunkOut, RAGChunkSearchRequest, RAGSearchResult
@@ -112,22 +112,63 @@ async def get_class_students(
 async def get_class_learning_progress(
     class_number: int,
     section: str,
+    subject: Optional[str] = Query(None, description="Optional subject filter"),
     teacher: Teacher = Depends(get_current_teacher),
     session: AsyncSession = Depends(get_session),
 ):
     """
-    Scoped twice over, both times from the token rather than the URL: the
-    teacher must hold an assignment for this class+section, and the roster is
-    read from their own branch. A class number the teacher is not assigned to
-    is a 403 even if it exists, so student ids never have to be trusted from
-    the frontend.
+    Scoped to the teacher's branch and assigned subject(s) for this class+section.
     """
-    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session)
+    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session, subject=subject)
+    assigned_classes = await teacher_service.get_assigned_classes(teacher, session)
+    assigned_subjects = [
+        c.subject for c in assigned_classes
+        if c.class_number == class_number and c.section.upper() == section.upper()
+    ]
+    target_subject = subject or (assigned_subjects[0] if len(assigned_subjects) == 1 else None)
+
     students = await teacher_service.get_class_students(
         teacher.branch_name, class_number, section.upper(), session
     )
     return await learning_progress_service.get_class_progress(
-        students, class_number, section, session
+        students, class_number, section, session, subject=target_subject, allowed_subjects=assigned_subjects
+    )
+
+
+@router.get(
+    "/students/{student_unique_number}/detailed-progress",
+    response_model=StudentDetailedProgressOut,
+    summary="Get a student's comprehensive assessment growth, test scores, lagging topics, and learning progress",
+)
+async def get_teacher_student_detailed_progress(
+    student_unique_number: str,
+    subject: Optional[str] = Query(None, description="Optional subject filter"),
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    from sqlmodel import select
+    from src.models.student import Student
+    st_res = await session.execute(
+        select(Student).where(Student.unique_number == student_unique_number)
+    )
+    student = st_res.scalar_one_or_none()
+    if not student or student.branch_name != teacher.branch_name:
+        raise HTTPException(status_code=404, detail="Student not found in your school branch.")
+
+    assigned_classes = await teacher_service.get_assigned_classes(teacher, session)
+    matching_assignments = [
+        c for c in assigned_classes
+        if c.class_number == student.class_number and (not c.section or c.section.upper() == (student.section or "A").upper())
+    ]
+    if not matching_assignments:
+        raise HTTPException(status_code=403, detail="You are not assigned to teach this student's class.")
+
+    assigned_subjects = [c.subject for c in matching_assignments]
+    target_subject = subject or (assigned_subjects[0] if len(assigned_subjects) == 1 else None)
+
+    from src.services import assessment_progress_service
+    return await assessment_progress_service.calculate_student_detailed_progress(
+        student, session, subject=target_subject, allowed_subjects=assigned_subjects
     )
 
 

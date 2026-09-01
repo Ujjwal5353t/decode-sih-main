@@ -363,6 +363,77 @@ async def _lessons_for_classes(
 
 # ── Projection ─────────────────────────────────────────────────────────────────
 
+def _calculate_learning_points(events: list[LearningEvent]) -> int:
+    """
+    Compute total learning points from verified activities:
+    - 50 pts per unique completed lesson (LESSON_COMPLETED)
+    - 100 pts per unique completed module (MODULE_COMPLETED)
+    - 10 pts per quiz check completed (QUIZ_COMPLETED)
+    - 5 pts per activity slide completed (ACTIVITY_COMPLETED)
+    - 5 pts per lesson started (LESSON_STARTED)
+    """
+    points = 0
+    completed_lessons: set[uuid.UUID] = set()
+    completed_modules: set[str] = set()
+
+    for event in events:
+        if event.event_type == LearningEventType.LESSON_COMPLETED.value and event.lesson_id:
+            if event.lesson_id not in completed_lessons:
+                completed_lessons.add(event.lesson_id)
+                points += 50
+        elif event.event_type == LearningEventType.MODULE_COMPLETED.value:
+            if event.module_key not in completed_modules:
+                completed_modules.add(event.module_key)
+                points += 100
+        elif event.event_type == LearningEventType.QUIZ_COMPLETED.value:
+            points += 10
+        elif event.event_type == LearningEventType.ACTIVITY_COMPLETED.value:
+            points += 5
+        elif event.event_type == LearningEventType.LESSON_STARTED.value:
+            points += 5
+
+    return points
+
+
+def _calculate_learning_streaks(events: list[LearningEvent]) -> tuple[int, int]:
+    """
+    Compute current and longest consecutive daily learning streaks (in days).
+    A day counts if at least one learning event occurred on that calendar date.
+    """
+    if not events:
+        return 0, 0
+
+    activity_dates = sorted({event.occurred_at.date() for event in events})
+    if not activity_dates:
+        return 0, 0
+
+    longest = 1
+    current_run = 1
+    for i in range(1, len(activity_dates)):
+        if activity_dates[i] == activity_dates[i - 1] + timedelta(days=1):
+            current_run += 1
+            if current_run > longest:
+                longest = current_run
+        else:
+            current_run = 1
+
+    today = datetime.utcnow().date()
+    yesterday = today - timedelta(days=1)
+    last_date = activity_dates[-1]
+
+    if last_date < yesterday:
+        current_streak = 0
+    else:
+        current_streak = 1
+        for i in range(len(activity_dates) - 1, 0, -1):
+            if activity_dates[i] - timedelta(days=1) == activity_dates[i - 1]:
+                current_streak += 1
+            else:
+                break
+
+    return current_streak, longest
+
+
 async def get_student_progress(
     student: Student, session: AsyncSession
 ) -> StudentProgressOut:
@@ -412,12 +483,18 @@ async def get_student_progress(
     completed_lessons = sum(m.completed_lessons for m in modules)
     overall = round(completed_lessons / total_lessons * 100) if total_lessons else 0
 
+    points = _calculate_learning_points(events)
+    current_streak, longest_streak = _calculate_learning_streaks(events)
+
     return StudentProgressOut(
         overall_percent=overall,
         total_modules=len(modules),
         modules_completed=sum(1 for m in modules if m.status == STATUS_COMPLETED),
         modules_in_progress=sum(1 for m in modules if m.status == STATUS_IN_PROGRESS),
         modules_not_started=sum(1 for m in modules if m.status == STATUS_NOT_STARTED),
+        points=points,
+        current_streak=current_streak,
+        longest_streak=longest_streak,
         last_activity_at=max((e.occurred_at for e in events), default=None),
         modules=modules,
         recent_activity=[
@@ -543,39 +620,132 @@ def _project_module(
     )
 
 
+def _normalize_subject_key(s: Optional[str]) -> str:
+    if not s:
+        return ""
+    import re
+    clean = s.lower().strip()
+    base = re.sub(r"\s*\([^)]*\)", "", clean).strip()
+    if "environmental" in base or "evs" in base:
+        return "evs"
+    if "mathematics" in base or "math" in base:
+        return "mathematics"
+    if "english" in base:
+        return "english"
+    if "hindi" in base:
+        return "hindi"
+    if "science" in base and "social" not in base:
+        return "science"
+    if "social" in base:
+        return "social studies"
+    return base
+
+
+def _match_subject(subj: Optional[str], target_subjects: Optional[set[str]]) -> bool:
+    if not target_subjects:
+        return True
+    if not subj:
+        return False
+    norm = _normalize_subject_key(subj)
+    return norm in target_subjects or (subj.strip().lower() in target_subjects)
+
+
 async def get_class_progress(
     students: list[Student],
     class_number: int,
     section: str,
     session: AsyncSession,
+    subject: Optional[str] = None,
+    allowed_subjects: Optional[list[str]] = None,
 ) -> ClassProgressOut:
     """
-    One row per student, one column per subject taught to this class.
-
-    The caller is responsible for having authorized the class and for having
-    sourced `students` from its own branch — see the teacher route.
+    One row per student, scoped to the teacher's assigned subject(s).
     """
-    lessons = await _lessons_for_classes({class_number}, session)
+    target_subjects: Optional[set[str]] = None
+    raw_candidates = []
+    if subject and subject.strip():
+        raw_candidates.append(subject.strip())
+    elif allowed_subjects:
+        raw_candidates.extend([s.strip() for s in allowed_subjects if s and s.strip()])
+
+    specific_candidates = [
+        s for s in raw_candidates if s.lower() not in ("general", "all", "")
+    ]
+    if specific_candidates:
+        target_subjects = {_normalize_subject_key(s) for s in specific_candidates}
+
+    raw_lessons = await _lessons_for_classes({class_number}, session)
+    all_class_subjects = sorted({l.subject for l in raw_lessons if l.subject})
+
+    lessons = raw_lessons
+    if target_subjects:
+        lessons = [l for l in raw_lessons if _match_subject(l.subject, target_subjects)]
+
     module_lessons: dict[str, list[Lesson]] = {}
     for lesson in lessons:
         module_lessons.setdefault(
             module_key_for(lesson.subject, lesson.class_number), []
         ).append(lesson)
-    subjects = sorted({lesson.subject for lesson in lessons})
+
+    is_general_or_multi = (
+        not target_subjects
+        or len(allowed_subjects or []) > 1
+        or any((s or "").lower() in ("general", "all", "") for s in (allowed_subjects or []))
+    )
+    if is_general_or_multi and all_class_subjects:
+        subjects = all_class_subjects
+    elif lessons:
+        subjects = sorted({lesson.subject for lesson in lessons})
+    elif target_subjects:
+        subjects = sorted([s.capitalize() for s in target_subjects])
+    else:
+        subjects = []
 
     events_by_student: dict[uuid.UUID, list[LearningEvent]] = {}
+    subs_by_student: dict[uuid.UUID, list] = {}
     student_ids = [s.id for s in students]
     if student_ids:
-        result = await session.execute(
-            select(LearningEvent)
-            .where(
-                LearningEvent.student_id.in_(student_ids),  # type: ignore[attr-defined]
-                LearningEvent.class_number == class_number,
-            )
-            .order_by(LearningEvent.occurred_at)
+        evt_query = select(LearningEvent).where(
+            LearningEvent.student_id.in_(student_ids),  # type: ignore[attr-defined]
+            LearningEvent.class_number == class_number,
         )
+        result = await session.execute(evt_query.order_by(LearningEvent.occurred_at))
         for event in result.scalars().all():
+            if not _match_subject(event.subject, target_subjects):
+                continue
             events_by_student.setdefault(event.student_id, []).append(event)
+
+        subs_by_student: dict[uuid.UUID, list] = {}
+        attempts_by_student: dict[uuid.UUID, list] = {}
+        try:
+            from src.models.teacher import Assignment, AssignmentSubmission, AssignmentAttempt
+            asgn_stmt = select(Assignment).where(Assignment.class_number == class_number)
+            asgn_res = await session.execute(asgn_stmt)
+            all_asgns = asgn_res.scalars().all()
+            valid_asgn_ids = {
+                a.id for a in all_asgns
+                if _match_subject(a.subject, target_subjects)
+            }
+
+            subs_res = await session.execute(
+                select(AssignmentSubmission).where(
+                    AssignmentSubmission.student_id.in_(student_ids)  # type: ignore[attr-defined]
+                )
+            )
+            for sub in subs_res.scalars().all():
+                if sub.assignment_id in valid_asgn_ids:
+                    subs_by_student.setdefault(sub.student_id, []).append(sub)
+
+            attempts_res = await session.execute(
+                select(AssignmentAttempt)
+                .where(AssignmentAttempt.student_id.in_(student_ids))  # type: ignore[attr-defined]
+                .order_by(AssignmentAttempt.started_at.asc(), AssignmentAttempt.attempt_number.asc())
+            )
+            for att in attempts_res.scalars().all():
+                if att.assignment_id in valid_asgn_ids:
+                    attempts_by_student.setdefault(att.student_id, []).append(att)
+        except Exception:
+            pass
 
     rows: list[ClassStudentProgressOut] = []
     for student in students:
@@ -592,18 +762,81 @@ async def get_class_progress(
 
         total_lessons = sum(m.total_lessons for m in modules)
         completed_lessons = sum(m.completed_lessons for m in modules)
+        curriculum_pct = round(completed_lessons / total_lessons * 100) if total_lessons else 0
+        points = _calculate_learning_points(student_events)
+        current_streak, _ = _calculate_learning_streaks(student_events)
+
+        st_subs = subs_by_student.get(student.id, [])
+        st_attempts = attempts_by_student.get(student.id, [])
+
+        attempts_by_asgn: dict[uuid.UUID, list] = {}
+        for att in st_attempts:
+            attempts_by_asgn.setdefault(att.assignment_id, []).append(att)
+
+        asgn_ids = set(attempts_by_asgn.keys()) | {s.assignment_id for s in st_subs}
+        asgn_metrics = []
+        for aid in asgn_ids:
+            raw_atts = attempts_by_asgn.get(aid, [])
+            sub = next((s for s in st_subs if s.assignment_id == aid), None)
+            if raw_atts:
+                sorted_atts = sorted(raw_atts, key=lambda a: (a.started_at, a.attempt_number))
+                initial_pct = float(
+                    sorted_atts[0].percentage
+                    if sorted_atts[0].percentage is not None
+                    else ((sorted_atts[0].score or 0) / max(1.0, sorted_atts[0].max_score or 100.0)) * 100.0
+                )
+                latest_pct = float(
+                    sorted_atts[-1].percentage
+                    if sorted_atts[-1].percentage is not None
+                    else ((sorted_atts[-1].score or 0) / max(1.0, sorted_atts[-1].max_score or 100.0)) * 100.0
+                )
+                delta = round(latest_pct - initial_pct, 1)
+                is_passed = bool(sorted_atts[-1].is_passed if sorted_atts[-1].is_passed is not None else (latest_pct >= 60.0))
+                is_lagging = (latest_pct < 60.0) or (delta <= -5.0)
+            elif sub:
+                sub_pct = float(
+                    sub.percentage
+                    if sub.percentage is not None
+                    else ((sub.score or 0) / max(1.0, sub.max_score or 100.0)) * 100.0
+                )
+                latest_pct = sub_pct
+                delta = 0.0
+                is_passed = bool(sub.is_passed if sub.is_passed is not None else (sub_pct >= 60.0))
+                is_lagging = sub_pct < 60.0
+            else:
+                continue
+
+            asgn_metrics.append({
+                "latest_score": latest_pct,
+                "delta": delta,
+                "is_passed": is_passed,
+                "is_lagging": is_lagging,
+            })
+
+        total_asgns = len(asgn_metrics)
+        passed_asgns = sum(1 for m in asgn_metrics if m["is_passed"])
+        lagging_asgns = sum(1 for m in asgn_metrics if m["is_lagging"])
+        avg_score = round(sum(m["latest_score"] for m in asgn_metrics) / total_asgns, 1) if total_asgns else 0.0
+        overall_growth = round(sum(m["delta"] for m in asgn_metrics) / total_asgns, 1) if total_asgns else 0.0
+        # Holistic mastery solely based on assessment performance and consecutive growth trajectory
+        holistic = min(100, max(0, round(avg_score + (overall_growth * 0.25)))) if total_asgns else 0
 
         rows.append(
             ClassStudentProgressOut(
                 student_id=student.id,
                 unique_number=student.unique_number,
                 full_name=student.full_name or "",
-                overall_percent=(
-                    round(completed_lessons / total_lessons * 100) if total_lessons else 0
-                ),
+                overall_percent=curriculum_pct,
                 modules_completed=sum(1 for m in modules if m.status == STATUS_COMPLETED),
                 modules_in_progress=sum(1 for m in modules if m.status == STATUS_IN_PROGRESS),
+                points=points,
+                current_streak=current_streak,
                 last_activity_at=max((e.occurred_at for e in student_events), default=None),
+                total_assessments_taken=total_asgns,
+                average_test_score=avg_score,
+                assessments_passed=passed_asgns,
+                assessments_lagging=lagging_asgns,
+                holistic_mastery_percent=holistic,
                 subjects=[
                     StudentSubjectProgressOut(
                         subject=subject,

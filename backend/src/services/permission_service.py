@@ -265,6 +265,16 @@ ROLE_PERMISSIONS: Dict[str, RolePermissionsResponse] = {
                     PermissionAction(key="monitor_child_assignments", label="Homework & Quizzes", description="Track submissions and teacher marks"),
                 ],
             ),
+            DashboardPermissionItem(
+                id="progress",
+                label="Detailed Progress",
+                description="Consecutive assessment trends, score growth, lagging areas, and curriculum mastery",
+                icon="TrendingUp",
+                category="Analytics",
+                actions=[
+                    PermissionAction(key="view_child_scores", label="Assessment Growth", description="Track score deltas and lagging indicators"),
+                ],
+            ),
         ],
     ),
     "admin": RolePermissionsResponse(

@@ -41,12 +41,15 @@ import {
   Menu,
   RefreshCw,
   Target,
+  Flame,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { DashboardSidebar } from "@/components/dashboard/Sidebar";
 import { LearningProgressPanel } from "@/components/dashboard/LearningProgressPanel";
 import { ClassLearningProgress } from "@/components/dashboard/ClassLearningProgress";
+import { ParentDetailedProgress } from "@/components/dashboard/ParentDetailedProgress";
 import {
   AnimatedNumber,
   ConsoleMotion,
@@ -126,6 +129,7 @@ import {
   QuizStatusOut,
   StudentQuizSummaryOut,
   getStudentModules,
+  getStudentLearningProgress,
   getNCERTBooksForClass,
   getSubjectPriority,
   SubjectPriorityOut,
@@ -175,6 +179,8 @@ import {
   getStudentTestResults,
   getChildTestResults,
   getTeacherStudentAttempts,
+  getChildLearningProgress,
+  StudentProgressOut,
   AssignmentAttemptOut,
   StudentTestResultSummaryOut,
 } from "@/lib/api";
@@ -496,6 +502,7 @@ export default function DashboardPage() {
             <ParentDashboardView
               parent={user as ParentProfile}
               activeTab={activeTab}
+              onSelectTab={setActiveTab}
             />
           )}
           {role === "admin" && (
@@ -538,6 +545,7 @@ function StudentDashboardView({
   const [quizStatus, setQuizStatus] = useState<QuizStatusOut | null>(null);
   const [loadingQuizStatus, setLoadingQuizStatus] = useState<boolean>(true);
   const [subjectPriority, setSubjectPriority] = useState<SubjectPriorityOut[]>([]);
+  const [learningProgress, setLearningProgress] = useState<StudentProgressOut | null>(null);
 
   const isSelfEnrolled = student.enrollment_type === "self" || student.branch_name === "SELF";
   const needsSetup = isSelfEnrolled ? student.class_number === null : (student.class_number === null || student.section === null);
@@ -572,6 +580,10 @@ function StudentDashboardView({
     getSubjectPriority()
       .then((res) => setSubjectPriority(res))
       .catch((err) => console.log("Subject priority fetch note:", err.message));
+
+    getStudentLearningProgress()
+      .then((res) => setLearningProgress(res))
+      .catch((err) => console.log("Learning progress fetch note:", err.message));
   }, [needsSetup, quizStatus?.completed, student.class_number, isSelfEnrolled]);
 
   const handleSetupSubmit = async (e: React.FormEvent) => {
@@ -924,25 +936,48 @@ function StudentDashboardView({
                       isTopPriority={idx === 0}
                     />
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {group.items.map((book) => (
-                        <div
-                          key={book.id}
-                          className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                                {book.subject}
-                              </span>
-                              <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">
-                                NCERT Book
-                              </span>
+                      {group.items.map((book) => {
+                        const prog = learningProgress?.modules.find(
+                          (m) => m.subject.toLowerCase() === (book.subject || "").toLowerCase()
+                        );
+                        return (
+                          <div
+                            key={book.id}
+                            className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand truncate">
+                                    {book.subject}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded shrink-0">
+                                    NCERT Book
+                                  </span>
+                                </div>
+                                {prog && (
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border shrink-0 ${
+                                      prog.status === "completed"
+                                        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                        : prog.status === "in_progress"
+                                        ? "bg-brand/10 text-brand border-border-brand"
+                                        : "bg-surface text-text-tertiary border-border-primary"
+                                    }`}
+                                  >
+                                    {prog.status === "completed"
+                                      ? "Completed"
+                                      : prog.status === "in_progress"
+                                      ? `${prog.progress_percent}% In Progress`
+                                      : "Not Started"}
+                                  </span>
+                                )}
+                              </div>
+                              <h3 className="text-sm font-bold text-text-primary">{book.title}</h3>
+                              <p className="text-xs text-text-secondary mt-1 line-clamp-2">
+                                {book.description}
+                              </p>
                             </div>
-                            <h3 className="text-sm font-bold text-text-primary">{book.title}</h3>
-                            <p className="text-xs text-text-secondary mt-1 line-clamp-2">
-                              {book.description}
-                            </p>
-                          </div>
 
                           <div className="mt-4 pt-3 border-t border-border-primary/50 flex items-center justify-between">
                             <span className="text-[11px] text-text-tertiary">Official NCERT Standard</span>
@@ -963,7 +998,8 @@ function StudentDashboardView({
                             )}
                           </div>
                         </div>
-                      ))}
+                      );
+                    })}
                     </div>
                   </div>
                 ))}
@@ -989,36 +1025,60 @@ function StudentDashboardView({
                       isTopPriority={idx === 0}
                     />
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {group.items.map((mod) => (
-                        <div
-                          key={mod.id}
-                          className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                                {mod.subject}
-                              </span>
-                              <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
+                      {group.items.map((mod) => {
+                        const prog = learningProgress?.modules.find(
+                          (m) => m.subject.toLowerCase() === (mod.subject || "").toLowerCase()
+                        );
+                        return (
+                          <div
+                            key={mod.id}
+                            className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand truncate">
+                                    {mod.subject}
+                                  </span>
+                                  <span className="text-xs text-text-tertiary shrink-0">Class {mod.class_number}</span>
+                                </div>
+                                {prog && (
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border shrink-0 ${
+                                      prog.status === "completed"
+                                        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                        : prog.status === "in_progress"
+                                        ? "bg-brand/10 text-brand border-border-brand"
+                                        : "bg-surface text-text-tertiary border-border-primary"
+                                    }`}
+                                  >
+                                    {prog.status === "completed"
+                                      ? "Completed"
+                                      : prog.status === "in_progress"
+                                      ? `${prog.progress_percent}% In Progress`
+                                      : "Not Started"}
+                                  </span>
+                                )}
+                              </div>
+                              <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
                             </div>
-                            <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
-                          </div>
 
-                          {mod.file_url ? (
-                            <a
-                              href={formatPdfUrl(mod.file_url)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                              Open PDF Module
-                            </a>
-                          ) : (
-                            <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module Content</span>
-                          )}
-                        </div>
-                      ))}
+                            {mod.file_url ? (
+                              <a
+                                href={formatPdfUrl(mod.file_url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                Open PDF Module
+                              </a>
+                            ) : (
+                              <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module Content</span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
@@ -2715,13 +2775,84 @@ function SchoolDashboardView({
 
 // ── Parent Dashboard View ────────────────────────────────────────────────────
 
+function WardProgressWidget({
+  uniqueNumber,
+  onViewDetailed,
+}: {
+  uniqueNumber: string;
+  onViewDetailed?: () => void;
+}) {
+  const [progress, setProgress] = useState<StudentProgressOut | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getChildLearningProgress(uniqueNumber)
+      .then((data) => {
+        if (!cancelled) setProgress(data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [uniqueNumber]);
+
+  if (loading) {
+    return (
+      <div className="py-2 flex items-center justify-center border-t border-[var(--c-line)] mt-3 pt-3">
+        <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!progress) return null;
+
+  return (
+    <div className="mt-3 pt-3 border-t border-[var(--c-line)] space-y-2">
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-semibold text-text-primary">Learning Progress</span>
+        <span className="font-bold text-brand">{progress.overall_percent}%</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-[var(--c-sunken)] overflow-hidden">
+        <div
+          className={`h-full rounded-full ${progress.overall_percent >= 100 ? "bg-emerald-500" : "bg-brand"}`}
+          style={{ width: `${Math.min(100, Math.max(0, progress.overall_percent))}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between text-[11px] text-text-secondary pt-0.5">
+        <span className="inline-flex items-center gap-1 text-amber-500 font-semibold">
+          <Award className="w-3.5 h-3.5" /> {progress.points ?? 0} XP
+        </span>
+        <span className="inline-flex items-center gap-1 text-rose-500 font-medium">
+          <Flame className="w-3 h-3" /> {progress.current_streak ?? 0}d streak
+        </span>
+        <span>
+          {progress.modules_completed}/{progress.total_modules} done
+        </span>
+      </div>
+      {onViewDetailed && (
+        <button
+          onClick={onViewDetailed}
+          className="w-full text-center text-[11px] font-bold text-brand hover:underline pt-1 cursor-pointer block"
+        >
+          View Detailed Progress &amp; Growth →
+        </button>
+      )}
+    </div>
+  );
+}
 
 function ParentDashboardView({
   parent,
   activeTab = "overview",
+  onSelectTab,
 }: {
   parent: ParentProfile;
   activeTab?: string;
+  onSelectTab?: (tab: string) => void;
 }) {
   const { t } = useTranslation();
   const [childrenList, setChildrenList] = useState<ChildLinkOut[]>([]);
@@ -2888,6 +3019,11 @@ function ParentDashboardView({
                             </Field>
                           </div>
 
+                          <WardProgressWidget
+                            uniqueNumber={child.student_unique_number}
+                            onViewDetailed={() => onSelectTab && onSelectTab("progress")}
+                          />
+
                           <div className="flex items-center justify-between border-t border-[var(--c-line)] pt-3 text-xs text-text-tertiary">
                             <span>Linked:</span>
                             <span className="console-num font-semibold text-text-secondary">
@@ -3001,6 +3137,12 @@ function ParentDashboardView({
                             </span>
                           </Field>
                         </div>
+                        <div className="px-5 pb-3">
+                          <WardProgressWidget
+                            uniqueNumber={child.student_unique_number}
+                            onViewDetailed={() => onSelectTab && onSelectTab("progress")}
+                          />
+                        </div>
                       </Panel>
                     </Item>
                   ))}
@@ -3014,6 +3156,11 @@ function ParentDashboardView({
               )}
             </div>
           </div>
+        )}
+
+        {/* TAB: PROGRESS & CONSECUTIVE GROWTH ANALYTICS */}
+        {(activeTab === "progress" || activeTab === "analytics") && (
+          <ParentDetailedProgress childrenList={childrenList} />
         )}
 
         {/* TAB: REPORTS */}
@@ -4000,6 +4147,7 @@ function TeacherDashboardView({
               <ClassLearningProgress
                 classNumber={selectedClass.class_number}
                 section={selectedClass.section}
+                subject={selectedClass.subject}
               />
             )}
 

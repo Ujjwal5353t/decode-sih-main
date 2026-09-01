@@ -1235,6 +1235,19 @@
     "noGapsFound": "No gaps found.",
     "summaryGenerating": "Summary generating...",
     "daysStreak": "{days} Days",
-    "lessonsCompleted": "{completed}/{total}"
+    "lessonsCompleted": "{completed}/{total}",
+    "detailedProgressTitle": "Detailed Progress & Assessment Growth",
+    "detailedProgressDesc": "Consecutive test trends, score growth deltas, lagging subject alerts, and curriculum mastery.",
+    "holisticMastery": "Real Holistic Mastery",
+    "consecutiveGrowth": "Consecutive Test Growth",
+    "laggingAlerts": "Lagging / Alert Areas",
+    "improving": "Improving",
+    "declining": "Declining",
+    "mastered": "Mastered",
+    "needsAttention": "Needs Attention",
+    "laggingBehind": "Lagging Behind",
+    "subjectMastery": "Subject Mastery Matrix",
+    "curriculumLessons": "Curriculum & Learning Modules",
+    "diagnosticGaps": "Diagnostic Skill Gaps"
   }
 }

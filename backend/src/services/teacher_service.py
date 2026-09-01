@@ -664,6 +664,36 @@ async def submit_student_quiz_attempt(
     except Exception:
         pass
 
+    # Record learning event so XP, points, and activity streaks update on dashboards
+    try:
+        from src.models.learning import LearningEvent, LearningEventType
+        from src.services.learning_progress_service import module_key_for
+        sub_subject = asgn.subject or "General"
+        sub_class_num = asgn.class_number or student.class_number or 1
+        m_key = module_key_for(sub_subject, sub_class_num)
+        ev = LearningEvent(
+            client_event_id=f"asgn_attempt:{attempt.id}",
+            student_id=student.id,
+            event_type=LearningEventType.QUIZ_COMPLETED.value,
+            module_key=m_key,
+            subject=sub_subject,
+            class_number=sub_class_num,
+            occurred_at=attempt.completed_at or datetime.utcnow(),
+            received_at=datetime.utcnow(),
+            detail={
+                "assignment_id": str(assignment_id),
+                "attempt_number": next_attempt_num,
+                "score": score,
+                "percentage": percentage,
+                "is_passed": is_passed,
+                "title": asgn.title,
+            },
+        )
+        session.add(ev)
+        await session.commit()
+    except Exception:
+        pass
+
     msg = "Quiz passed successfully! Excellent work." if is_passed else f"Quiz result: {percentage:.1f}%. Below {pass_thresh:.0f}% pass mark. You can re-attempt with adapted questions!"
 
     from src.schemas.teacher import AssignmentAttemptOut

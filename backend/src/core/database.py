@@ -179,6 +179,16 @@ async def init_db() -> None:
         await conn.execute(
             text("ALTER TABLE questions ADD COLUMN IF NOT EXISTS branch_name VARCHAR(120);")
         )
+        # Migration: ensure learning_events legacy columns allow NULL
+        await conn.execute(
+            text("ALTER TABLE learning_events ALTER COLUMN module_id DROP NOT NULL;")
+        )
+        await conn.execute(
+            text("ALTER TABLE learning_events ALTER COLUMN client_ts DROP NOT NULL;")
+        )
+        await conn.execute(
+            text("ALTER TABLE learning_events ALTER COLUMN synced_at DROP NOT NULL;")
+        )
         # Migration: image-emoji stand-in for questions that identify
         # something visually (no image-hosting pipeline exists)
         await conn.execute(

@@ -25,6 +25,7 @@ from src.models.student import Student
 from src.schemas.learning import (
     LearningEventSyncRequest,
     LearningEventSyncResponse,
+    StudentDetailedProgressOut,
     StudentProgressOut,
 )
 from src.schemas.lesson import LessonListItemOut, LessonOut, LessonSlideOut
@@ -373,3 +374,17 @@ async def get_student_learning_progress(
     session: AsyncSession = Depends(get_session),
 ):
     return await learning_progress_service.get_student_progress(student, session)
+
+
+@router.get(
+    "/detailed-progress",
+    response_model=StudentDetailedProgressOut,
+    summary="This student's comprehensive assessment growth, consecutive test trends, lagging topics, and curriculum mastery",
+)
+async def get_student_detailed_progress(
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    from src.services import assessment_progress_service
+    return await assessment_progress_service.calculate_student_detailed_progress(student, session)
+

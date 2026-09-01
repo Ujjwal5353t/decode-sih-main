@@ -91,6 +91,9 @@ class StudentProgressOut(BaseModel):
     modules_completed: int
     modules_in_progress: int
     modules_not_started: int
+    points: int = 0
+    current_streak: int = 0
+    longest_streak: int = 0
     last_activity_at: Optional[datetime] = None
     modules: list[ModuleProgressOut]
     recent_activity: list[RecentActivityOut]
@@ -111,8 +114,16 @@ class ClassStudentProgressOut(BaseModel):
     overall_percent: int
     modules_completed: int
     modules_in_progress: int
+    points: int = 0
+    current_streak: int = 0
     last_activity_at: Optional[datetime] = None
     subjects: list[StudentSubjectProgressOut]
+    # Assessment & Test Metrics
+    total_assessments_taken: int = 0
+    average_test_score: float = 0.0
+    assessments_passed: int = 0
+    assessments_lagging: int = 0
+    holistic_mastery_percent: int = 0
 
 
 class ClassProgressOut(BaseModel):
@@ -121,3 +132,97 @@ class ClassProgressOut(BaseModel):
     # Column order for the teacher's table.
     subjects: list[str]
     students: list[ClassStudentProgressOut]
+
+
+# ── Consecutive Assessment Growth & Detailed Mastery (Server → Parent/Student/Teacher) ──
+
+class AssessmentAttemptTrend(BaseModel):
+    attempt_number: int
+    score: float
+    max_score: float
+    percentage: float
+    is_passed: bool
+    status: str
+    completed_at: datetime
+    delta_from_previous: Optional[float] = None  # Percentage delta (+/-) from previous attempt
+
+
+class AssessmentGrowthItem(BaseModel):
+    assignment_id: uuid.UUID
+    title: str
+    subject: str
+    assignment_type: str  # "ai_quiz" | "pdf_upload"
+    chapter_numbers: list[int] = []
+    total_attempts: int
+    initial_score: float
+    latest_score: float
+    best_score: float
+    score_delta: float  # Difference between latest and initial attempt (+/- %)
+    trend: str          # "improving" | "declining" | "stable" | "mastered"
+    status: str         # "mastered" | "progressing" | "needs_attention" | "lagging"
+    is_lagging: bool
+    latest_attempt_at: datetime
+    attempts_history: list[AssessmentAttemptTrend]
+    teacher_feedback: Optional[str] = None
+    ai_feedback: Optional[str] = None
+
+
+class SubjectAssessmentProgressOut(BaseModel):
+    subject: str
+    overall_mastery_percent: int
+    assessment_count: int
+    average_score: float
+    growth_delta: float  # Cumulative percentage delta across consecutive tests
+    trend: str           # "improving" | "declining" | "stable" | "mastered"
+    status: str          # "mastered" | "progressing" | "needs_attention" | "lagging"
+    lagging_topics_count: int
+    assessments: list[AssessmentGrowthItem]
+
+
+class DiagnosticGapSummary(BaseModel):
+    subject: str
+    topic_code: str
+    topic_name: str
+    originating_class: int
+    student_current_class: int
+
+
+class StudentDetailedProgressOut(BaseModel):
+    student_id: uuid.UUID
+    student_unique_number: str
+    full_name: str
+    class_number: Optional[int] = None
+    section: Optional[str] = None
+    school_name: Optional[str] = None
+    branch_name: Optional[str] = None
+    enrollment_type: str = "school"
+
+    # Holistic Mastery & Consecutive Growth Indicators
+    holistic_mastery_percent: int       # Blended score: 50% tests + 25% consecutive growth + 25% curriculum
+    curriculum_completion_percent: int  # Overall lesson completion %
+    average_test_score: float
+    consecutive_growth_rate: float      # Overall average score movement (+/- %)
+    consecutive_trend: str              # "improving" | "declining" | "stable" | "mastered"
+
+    total_assessments_taken: int
+    assessments_passed: int
+    assessments_lagging: int
+
+    points: int = 0
+    current_streak: int = 0
+    longest_streak: int = 0
+    last_activity_at: Optional[datetime] = None
+
+    # Detailed subject progression with consecutive assessment performance
+    subjects: list[SubjectAssessmentProgressOut]
+
+    # Curriculum Module breakdowns
+    modules: list[ModuleProgressOut]
+
+    # Diagnostic topic gaps
+    diagnostic_gaps: list[DiagnosticGapSummary] = []
+    diagnostic_overall_score: Optional[float] = None
+
+    # Recent activity logs
+    recent_activity: list[RecentActivityOut] = []
+
