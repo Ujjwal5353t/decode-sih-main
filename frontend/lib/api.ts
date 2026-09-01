@@ -203,6 +203,10 @@ export interface GapReportOut {
   student_class: number;
   ai_summary: string | null;
   ai_summary_status: AiSummaryStatus;
+  total_questions: number;
+  correct_count: number;
+  incorrect_count: number;
+  xp_awarded: number;
 }
 
 export interface StudentQuizSummaryOut {
@@ -531,6 +535,10 @@ export interface SubjectPriorityOut {
   gap_count: number;
   avg_classes_behind: number;
   gap_topics: string[];
+  /** Bayesian Knowledge Tracing mastery estimate, 0–1. Returned by
+   *  /student/subject-priority; 0.3 is the neutral prior for a subject with
+   *  no answer history yet, not a measured score. */
+  avg_mastery: number;
 }
 
 export async function getSubjectPriority(): Promise<SubjectPriorityOut[]> {
@@ -1807,7 +1815,15 @@ export interface ClassProgressOut {
 export async function syncLearningEvents(
   events: LearningEventPayload[]
 ): Promise<LearningEventSyncResponse> {
-  return fetchApi<LearningEventSyncResponse>("/student/learning-events", {
+  // Same IANA zone /student/gamification sends, adopted at most once by the
+  // backend (see gamification_service.get_or_create_profile). A lesson
+  // completion is often what creates a student's gamification profile in
+  // the first place, so this needs to carry the real zone too — otherwise
+  // that first-ever profile silently stamps to UTC instead of the
+  // student's actual local day.
+  const tz = browserTimeZone();
+  const q = tz ? `?tz=${encodeURIComponent(tz)}` : "";
+  return fetchApi<LearningEventSyncResponse>(`/student/learning-events${q}`, {
     method: "POST",
     body: JSON.stringify({ events }),
   });
@@ -1995,3 +2011,71 @@ export async function getTeacherStudentAttempts(
   );
 }
 
+// ── Gamification: streak, XP, reward chests ───────────────────────────────────
+
+export interface StreakDayOut {
+  date: string;
+  active: boolean;
+}
+
+export interface ChestStateOut {
+  index: number;
+  progress: number;
+  required: number;
+  unlockable: boolean;
+  next_badge: string;
+  xp_reward: number;
+}
+
+export interface GamificationSummaryOut {
+  total_xp: number;
+  current_streak: number;
+  longest_streak: number;
+  last_active_date: string | null;
+  active_today: boolean;
+  timezone: string;
+  week: StreakDayOut[];
+  lessons_completed: number;
+  chest: ChestStateOut;
+  badges: string[];
+}
+
+export interface ClaimChestResponse {
+  claimed: boolean;
+  /** "ok" | "locked" | "already_claimed" */
+  reason: string;
+  lessons_completed: number;
+  lessons_required: number;
+  chest_index?: number | null;
+  xp_awarded?: number | null;
+  badge?: string | null;
+}
+
+/**
+ * The browser's IANA zone, used only to decide which calendar day activity
+ * falls in. The server adopts it once and then pins it, so this can shift a
+ * day boundary but never manufacture streak days.
+ */
+function browserTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Read-only: fetching this never extends the streak. */
+export async function getGamificationSummary(): Promise<GamificationSummaryOut> {
+  const tz = browserTimeZone();
+  const q = tz ? `?tz=${encodeURIComponent(tz)}` : "";
+  return fetchApi<GamificationSummaryOut>(`/student/gamification${q}`);
+}
+
+/** Idempotent — a repeat click returns claimed:false rather than paying twice. */
+export async function claimRewardChest(): Promise<ClaimChestResponse> {
+  const tz = browserTimeZone();
+  const q = tz ? `?tz=${encodeURIComponent(tz)}` : "";
+  return fetchApi<ClaimChestResponse>(`/student/gamification/claim-chest${q}`, {
+    method: "POST",
+  });
+}

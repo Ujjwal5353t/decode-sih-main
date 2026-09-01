@@ -23,6 +23,8 @@ from src.core.database import get_session
 from src.core.dependencies import get_current_student
 from src.models.student import Student
 from src.schemas.learning import (
+    ClaimChestResponse,
+    GamificationSummaryOut,
     LearningEventSyncRequest,
     LearningEventSyncResponse,
     StudentDetailedProgressOut,
@@ -43,6 +45,7 @@ from src.schemas.teacher import (
     SubmissionOut,
 )
 from src.services import (
+    gamification_service,
     learning_progress_service,
     lesson_service,
     module_service,
@@ -348,6 +351,7 @@ async def get_student_lesson(
 )
 async def sync_learning_events(
     body: LearningEventSyncRequest,
+    tz: Optional[str] = None,
     student: Student = Depends(get_current_student),
     session: AsyncSession = Depends(get_session),
 ):
@@ -360,8 +364,19 @@ async def sync_learning_events(
     Deliberately not gated on class setup or the diagnostic quiz: an event
     that was recorded while offline must still be storable later, whatever
     the student's account state has become in the meantime.
+
+    `tz` is the same IANA zone `/student/gamification` accepts, adopted only
+    once (see gamification_service.get_or_create_profile). Threading it
+    through here too matters because a lesson completion is what actually
+    creates the gamification profile and claims the streak day for that
+    calendar date — without it, a device whose first-ever gamification
+    contact is a lesson completion (rather than the dashboard's own
+    /student/gamification read) would stamp that student's profile to UTC,
+    and streak-day boundaries would drift from their real local day.
     """
-    return await learning_progress_service.ingest_events(student, body.events, session)
+    return await learning_progress_service.ingest_events(
+        student, body.events, session, timezone_name=tz
+    )
 
 
 @router.get(
@@ -388,3 +403,51 @@ async def get_student_detailed_progress(
     from src.services import assessment_progress_service
     return await assessment_progress_service.calculate_student_detailed_progress(student, session)
 
+
+# ── Gamification: streak, XP, reward chests ───────────────────────────────────
+
+@router.get(
+    "/gamification",
+    response_model=GamificationSummaryOut,
+    summary="This student's streak, XP total and reward-chest progress",
+)
+async def get_gamification_summary(
+    tz: Optional[str] = None,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Read-only. Opening the dashboard deliberately does NOT extend the streak —
+    only finishing a lesson or completing an assessment does, and those are
+    recorded by their own flows.
+
+    `tz` is an IANA zone (e.g. "Asia/Kolkata") used to decide which calendar
+    day activity belongs to. It is adopted only the first time, then the
+    stored zone wins — otherwise a student could harvest extra streak days by
+    switching timezone between calls. An unknown value silently falls back to
+    UTC rather than failing the request.
+    """
+    return await gamification_service.get_summary(student.id, session, timezone_name=tz)
+
+
+@router.post(
+    "/gamification/claim-chest",
+    response_model=ClaimChestResponse,
+    summary="Claim the next unlocked reward chest (idempotent)",
+)
+async def claim_reward_chest(
+    tz: Optional[str] = None,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Eligibility is recomputed from the student's real lesson completions on
+    every call — the client never states how many lessons it thinks it has.
+
+    A repeat click returns `claimed: false` with reason "already_claimed"
+    instead of paying out twice; the UNIQUE constraint on
+    (student_id, chest_index) is what guarantees that under concurrency.
+    """
+    return await gamification_service.claim_chest(
+        session, student_id=student.id, timezone_name=tz
+    )

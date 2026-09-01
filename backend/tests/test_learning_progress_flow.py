@@ -24,6 +24,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel, select
 
+from src.models.gamification import (
+    ChestClaim,
+    GamificationProfile,
+    StreakDay,
+    XpTransaction,
+)
 from src.models.learning import LearningEvent, LearningEventType
 from src.models.lesson import Lesson
 from src.models.school import School
@@ -51,6 +57,12 @@ async def _fresh_db():
                 TeacherClassAssignment.__table__,
                 Lesson.__table__,
                 LearningEvent.__table__,
+                # ingest_events awards XP / streak days in the same
+                # transaction, so these must exist here too.
+                GamificationProfile.__table__,
+                XpTransaction.__table__,
+                StreakDay.__table__,
+                ChestClaim.__table__,
             ],
         )
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

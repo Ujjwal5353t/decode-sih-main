@@ -313,6 +313,20 @@ async def _finalize_attempt(attempt: QuizAttempt, session: AsyncSession) -> None
     session.add(attempt)
     await _sync_student_topic_gaps(attempt, session)
 
+    # Gamification: XP for the attempt (scaled by its own score) plus a streak
+    # day. Runs before the commit below so reward state lands atomically with
+    # the finalised attempt; the per-attempt idempotency key means the guard
+    # at the top of this function is belt-and-braces rather than the only
+    # thing preventing a second payout.
+    from src.services import gamification_service
+
+    await gamification_service.on_quiz_completed(
+        session,
+        student_id=attempt.student_id,
+        attempt_id=attempt.id,
+        overall_score=attempt.overall_score,
+    )
+
     # Commit now (not just flush) — the background task below opens its own
     # DB session on a separate connection, so it won't see this attempt's
     # completed status/scores until this transaction is durably committed.
@@ -589,6 +603,19 @@ async def compute_gap_report(attempt: QuizAttempt, session: AsyncSession) -> dic
                 "originating_class": g["deepest_probed_class"],
                 "student_current_class": attempt.class_number_at_attempt,
             })
+
+    answers_result = await session.execute(
+        select(QuizAnswer.is_correct).where(QuizAnswer.attempt_id == attempt.id)
+    )
+    outcomes = list(answers_result.scalars().all())
+    correct_count = sum(1 for o in outcomes if o)
+
+    from src.services import gamification_service
+
+    xp_awarded = await gamification_service.get_xp_for_source(
+        session, student_id=attempt.student_id, source_type="quiz_attempt", source_id=attempt.id
+    )
+
     return {
         "attempt_id": str(attempt.id),
         "subjects_covered": attempt.subjects,
@@ -599,6 +626,10 @@ async def compute_gap_report(attempt: QuizAttempt, session: AsyncSession) -> dic
         "student_class": attempt.class_number_at_attempt,
         "ai_summary": attempt.ai_summary,
         "ai_summary_status": attempt.ai_summary_status,
+        "total_questions": len(outcomes),
+        "correct_count": correct_count,
+        "incorrect_count": len(outcomes) - correct_count,
+        "xp_awarded": xp_awarded,
     }
 
 

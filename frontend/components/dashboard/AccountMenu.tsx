@@ -204,29 +204,31 @@ export function AccountMenu({
           aria-expanded={open}
           aria-label="Account menu"
           className={cn(
-            "group flex w-full cursor-pointer items-center gap-2.5 rounded-xl border p-2 text-left transition-colors",
+            "group flex w-full cursor-pointer items-center gap-3 rounded-2xl border p-2 text-left transition-colors",
             open
-              ? "border-brand/30 bg-brand/[0.06]"
+              ? "border-brand/40 bg-brand/[0.08]"
               : isConsole
               ? "border-transparent hover:border-[var(--c-line)] hover:bg-[var(--c-sunken)]"
-              : "border-transparent hover:bg-surface-hover"
+              : "border-border-primary/70 bg-white/50 hover:bg-surface-hover hover:border-brand/30 dark:bg-slate-900/40"
           )}
         >
           <span
             className={cn(
-              "grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br text-[11px] font-bold text-white shadow-sm",
+              "grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br text-[11px] font-black text-white shadow-xs",
               avatarGradient
             )}
           >
             {initials}
           </span>
 
-          <span className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1">
             <span className="block truncate text-xs font-bold text-text-primary">
               {displayName}
             </span>
-            <span className="block truncate text-[11px] text-text-tertiary">{roleLabel}</span>
-          </span>
+            <span className="block truncate text-[11px] font-medium text-text-tertiary">
+              {role === "student" ? "Student Learner" : roleLabel}
+            </span>
+          </div>
 
           <ChevronDown
             className={cn(
@@ -246,27 +248,27 @@ export function AccountMenu({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 6, scale: 0.985 }}
               transition={{ duration: 0.16, ease: [0.22, 0.68, 0, 1] }}
-              // Opens upward: this sits at the bottom of the rail.
-              className="console-panel absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-xl border border-[var(--c-line)] shadow-[var(--shadow-lg)]"
+              // Opens upward: this sits at the bottom of the rail with solid background
+              className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-2xl border border-border-primary/90 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
             >
               {/* Identity header */}
-              <div className="flex items-center gap-2.5 border-b border-[var(--c-line)] bg-[var(--c-sunken)] px-3 py-3">
+              <div className="flex items-center gap-3 border-b border-border-primary/80 bg-slate-50/80 px-3.5 py-3 dark:bg-slate-850 dark:border-slate-800">
                 <span
                   className={cn(
-                    "grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br text-[11px] font-bold text-white shadow-sm",
+                    "grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br text-[11px] font-bold text-white shadow-sm",
                     avatarGradient
                   )}
                 >
                   {initials}
                 </span>
-                <span className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <span className="block truncate text-xs font-bold text-text-primary">
                     {displayName}
                   </span>
                   <span className="block truncate text-[11px] text-text-tertiary">
-                    {subtitle}
+                    {role === "student" ? "Student Learner" : subtitle}
                   </span>
-                </span>
+                </div>
               </div>
 
               <div className="space-y-0.5 p-1.5">
