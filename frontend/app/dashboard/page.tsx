@@ -103,6 +103,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { Mascot, MascotMood } from "@/components/quiz/Mascot";
 import { QuizRunnerModal } from "@/components/quiz/QuizRunnerModal";
 import { AttemptHistoryModal } from "@/components/quiz/AttemptHistoryModal";
+import { DiagnosticReportModal } from "@/components/quiz/DiagnosticReportModal";
 import {
   StudentProfile,
   SchoolProfile,
@@ -162,6 +163,8 @@ import {
   assignClassToTeacher,
   deassignClassFromTeacher,
   getQuizStatus,
+  getQuizAttempts,
+  QuizAttemptSummaryOut,
   getChildQuizResult,
   getAssignmentQuizForStudent,
   submitAssignmentQuiz,
@@ -342,6 +345,7 @@ export default function DashboardPage() {
     settings: "dashboard.nav.settings",
     "admin-requests": "dashboard.nav.adminRequests",
     "school-requests": "dashboard.nav.schoolRequests",
+    history: "dashboard.nav.history",
   };
 
   const getPageTitle = () => {
@@ -1046,25 +1050,411 @@ function StudentDashboardView({
           </p>
         </div>
       )}
+
+      {/* TAB: HISTORY */}
+      {activeTab === "history" && <StudentHistorySection />}
+    </div>
+  );
+}
+
+function StudentHistorySection() {
+  const [filter, setFilter] = useState<"all" | "diagnostic" | "class_tests">("all");
+  const [diagnosticAttempts, setDiagnosticAttempts] = useState<QuizAttemptSummaryOut[]>([]);
+  const [testResults, setTestResults] = useState<StudentTestResultSummaryOut[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Modals
+  const [selectedDiagnosticId, setSelectedDiagnosticId] = useState<string | null>(null);
+  const [selectedClassTestHistory, setSelectedClassTestHistory] = useState<{
+    title: string;
+    attempts: AssignmentAttemptOut[];
+    feedback?: FeedbackOut | null;
+  } | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      getQuizAttempts().catch((err) => {
+        console.log("Diagnostic attempts fetch error:", err.message);
+        return [];
+      }),
+      getStudentTestResults().catch((err) => {
+        console.log("Student test results fetch error:", err.message);
+        return [];
+      }),
+    ])
+      .then(([diagAttempts, results]) => {
+        setDiagnosticAttempts(diagAttempts);
+        setTestResults(results);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Compute metric stats
+  const completedDiagnosticCount = diagnosticAttempts.filter((a) => a.status === "completed").length;
+  const latestCompletedDiagnostic = diagnosticAttempts.find((a) => a.status === "completed");
+
+  const classTestCount = testResults.length;
+  const gradedClassTests = testResults.filter(
+    (r) => (r.submission?.percentage ?? r.attempts[0]?.percentage) !== null && (r.submission?.percentage ?? r.attempts[0]?.percentage) !== undefined
+  );
+  const avgClassTestScore =
+    gradedClassTests.length > 0
+      ? gradedClassTests.reduce(
+          (acc, r) => acc + (r.submission?.percentage ?? r.attempts[0]?.percentage ?? 0),
+          0
+        ) / gradedClassTests.length
+      : null;
+
+  // Build unified items list for "all" filter, ordered by date descending
+  type UnifiedHistoryItem =
+    | { type: "diagnostic"; date: string; data: QuizAttemptSummaryOut }
+    | { type: "class_test"; date: string; data: StudentTestResultSummaryOut };
+
+  const unifiedItems: UnifiedHistoryItem[] = [];
+
+  if (filter === "all" || filter === "diagnostic") {
+    diagnosticAttempts.forEach((att) => {
+      unifiedItems.push({
+        type: "diagnostic",
+        date: att.completed_at || att.started_at,
+        data: att,
+      });
+    });
+  }
+
+  if (filter === "all" || filter === "class_tests") {
+    testResults.forEach((res) => {
+      const date =
+        res.submission?.last_attempted_at ||
+        res.attempts[0]?.started_at ||
+        res.assignment.created_at;
+      unifiedItems.push({
+        type: "class_test",
+        date,
+        data: res,
+      });
+    });
+  }
+
+  unifiedItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return (
+    <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-6">
+      {/* Top Header & Filter Segment */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-primary pb-4">
+        <div>
+          <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+            <Clock className="w-5 h-5 text-brand" />
+            <span>Personal Assessment &amp; Attempt History</span>
+          </h3>
+          <p className="text-xs text-text-secondary mt-0.5">
+            Review past scores, attempts, teacher feedback, and AI study advice for diagnostic &amp; class tests.
+          </p>
+        </div>
+
+        {/* Filter chips */}
+        <div className="flex items-center gap-1.5 bg-surface p-1 rounded-[var(--radius-md)] border border-border-primary self-start sm:self-auto">
+          <button
+            onClick={() => setFilter("all")}
+            className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
+              filter === "all"
+                ? "bg-brand text-white shadow-sm"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            All ({diagnosticAttempts.length + testResults.length})
+          </button>
+          <button
+            onClick={() => setFilter("diagnostic")}
+            className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
+              filter === "diagnostic"
+                ? "bg-brand text-white shadow-sm"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            Diagnostic Quizzes ({diagnosticAttempts.length})
+          </button>
+          <button
+            onClick={() => setFilter("class_tests")}
+            className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
+              filter === "class_tests"
+                ? "bg-brand text-white shadow-sm"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            Class Tests ({testResults.length})
+          </button>
+        </div>
+      </div>
+
+      {/* Summary Metrics Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="glass rounded-[var(--radius-md)] p-4 border border-border-primary flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+              Diagnostic Assessment
+            </span>
+            <div className="text-lg font-extrabold text-text-primary mt-0.5">
+              {latestCompletedDiagnostic?.overall_score !== null &&
+              latestCompletedDiagnostic?.overall_score !== undefined
+                ? `${latestCompletedDiagnostic.overall_score.toFixed(1)}%`
+                : completedDiagnosticCount > 0
+                ? "Completed"
+                : "Pending"}
+            </div>
+            <p className="text-[11px] text-text-secondary mt-0.5">
+              {completedDiagnosticCount} Attempt{completedDiagnosticCount === 1 ? "" : "s"} Recorded
+            </p>
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
+            <Target className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="glass rounded-[var(--radius-md)] p-4 border border-border-primary flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+              Class Tests Performance
+            </span>
+            <div className="text-lg font-extrabold text-text-primary mt-0.5">
+              {avgClassTestScore !== null ? `${avgClassTestScore.toFixed(1)}% Avg` : "No Scores Yet"}
+            </div>
+            <p className="text-[11px] text-text-secondary mt-0.5">
+              {classTestCount} Class Test{classTestCount === 1 ? "" : "s"} Assigned
+            </p>
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
+            <Award className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="glass rounded-[var(--radius-md)] p-4 border border-border-primary flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+              Total Assessments
+            </span>
+            <div className="text-lg font-extrabold text-text-primary mt-0.5 font-[family-name:var(--font-display)]">
+              {diagnosticAttempts.length + testResults.length}
+            </div>
+            <p className="text-[11px] text-text-secondary mt-0.5">
+              Diagnostic &amp; Teacher Tests Combined
+            </p>
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
+            <Clock className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* History List */}
+      {loading ? (
+        <div className="py-12 flex justify-center">
+          <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : unifiedItems.length > 0 ? (
+        <div className="space-y-4">
+          {unifiedItems.map((item) => {
+            if (item.type === "diagnostic") {
+              const att = item.data;
+              const isCompleted = att.status === "completed";
+
+              return (
+                <div
+                  key={`diag-${att.id}`}
+                  className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-4 hover:border-brand/40 transition-all"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-brand/10 text-brand border border-border-brand">
+                          Diagnostic Quiz
+                        </span>
+                        <span className="text-xs text-text-tertiary font-medium">
+                          • {att.subjects?.join(", ") || "All Subjects"}
+                        </span>
+                      </div>
+
+                      <h4 className="font-bold text-sm text-text-primary flex items-center gap-2">
+                        <Target className="w-4 h-4 text-brand shrink-0" />
+                        <span>Adaptive Diagnostic Assessment Attempt</span>
+                      </h4>
+
+                      <p className="text-[11px] text-text-tertiary">
+                        Started: {new Date(att.started_at).toLocaleString()}
+                        {att.completed_at &&
+                          ` • Completed: ${new Date(att.completed_at).toLocaleString()}`}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      {att.overall_score !== null && att.overall_score !== undefined ? (
+                        <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-brand/10 text-brand border border-border-brand">
+                          {att.overall_score.toFixed(1)}% Mastery
+                        </span>
+                      ) : (
+                        <span
+                          className={`px-2.5 py-0.5 rounded text-[11px] font-semibold ${
+                            isCompleted ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"
+                          }`}
+                        >
+                          {isCompleted ? "Completed" : "In Progress"}
+                        </span>
+                      )}
+
+                      {isCompleted && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setSelectedDiagnosticId(att.id)}
+                          className="text-xs py-1 gap-1 cursor-pointer"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          View Gap Report
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            } else {
+              const res = item.data;
+              const asgn = res.assignment;
+              const sub = res.submission;
+              const attempts = res.attempts;
+              const fb = res.teacher_feedback;
+
+              const latestAttempt = attempts[0];
+              const scorePercent = sub?.percentage ?? latestAttempt?.percentage;
+              const isPassed = sub?.is_passed ?? latestAttempt?.is_passed;
+
+              return (
+                <div
+                  key={`asgn-${asgn.id}`}
+                  className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-4 hover:border-brand/40 transition-all"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-brand/10 text-brand">
+                          {asgn.assignment_type === "pdf_upload" ? "Manual PDF Test" : "AI Quiz"}
+                        </span>
+                        {asgn.subject && (
+                          <span className="text-xs text-text-tertiary font-medium">• {asgn.subject}</span>
+                        )}
+                      </div>
+
+                      <h4 className="font-bold text-sm text-text-primary flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-brand shrink-0" />
+                        <span>{asgn.title}</span>
+                      </h4>
+
+                      <p className="text-[11px] text-text-tertiary">
+                        Assigned on {new Date(asgn.created_at).toLocaleDateString()}
+                        {sub?.last_attempted_at &&
+                          ` • Last Attempt: ${new Date(sub.last_attempted_at).toLocaleString()}`}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      {scorePercent !== null && scorePercent !== undefined ? (
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-bold border ${
+                            isPassed
+                              ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
+                              : "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                          }`}
+                        >
+                          {scorePercent.toFixed(1)}% ({isPassed ? "PASSED" : "FAILED"})
+                        </span>
+                      ) : (
+                        <span className="text-xs text-text-tertiary italic">Score Pending</span>
+                      )}
+
+                      {attempts.length > 0 && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() =>
+                            setSelectedClassTestHistory({
+                              title: asgn.title,
+                              attempts,
+                              feedback: fb,
+                            })
+                          }
+                          className="text-xs py-1 gap-1 cursor-pointer"
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          View Attempts ({attempts.length})
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Teacher Feedback Banner if present */}
+                  {fb && (
+                    <div className="p-3 rounded bg-brand/5 border border-border-brand text-xs space-y-1">
+                      <div className="flex items-center gap-1.5 text-brand font-bold">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Teacher Feedback:</span>
+                      </div>
+                      <p className="text-text-primary">{fb.feedback_text}</p>
+                    </div>
+                  )}
+
+                  {/* AI Feedback Preview if present */}
+                  {latestAttempt?.ai_feedback && (
+                    <div className="p-3 rounded bg-surface/60 border border-border-primary/60 text-xs space-y-1">
+                      <div className="flex items-center gap-1.5 text-brand font-bold">
+                        <Brain className="w-3.5 h-3.5" />
+                        <span>Latest AI Study Advice:</span>
+                      </div>
+                      <p className="text-text-primary line-clamp-2">{latestAttempt.ai_feedback}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+          })}
+        </div>
+      ) : (
+        <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
+          <Clock className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
+          <h4 className="text-sm font-semibold text-text-primary">No Recorded History Found</h4>
+          <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
+            Complete your diagnostic quiz or submit class assignments to start building your personal assessment history.
+          </p>
+        </div>
+      )}
+
+      {/* Diagnostic Gap Report Modal */}
+      {selectedDiagnosticId && (
+        <DiagnosticReportModal
+          attemptId={selectedDiagnosticId}
+          onClose={() => setSelectedDiagnosticId(null)}
+        />
+      )}
+
+      {/* Class Test Attempt History Modal */}
+      {selectedClassTestHistory && (
+        <AttemptHistoryModal
+          assignmentTitle={selectedClassTestHistory.title}
+          attempts={selectedClassTestHistory.attempts}
+          teacherFeedback={selectedClassTestHistory.feedback}
+          onClose={() => setSelectedClassTestHistory(null)}
+        />
+      )}
     </div>
   );
 }
 
 function StudentAssignmentsSection() {
-  const [subTab, setSubTab] = useState<"active" | "history">("active");
   const [assignments, setAssignments] = useState<AssignmentOut[]>([]);
   const [testResults, setTestResults] = useState<StudentTestResultSummaryOut[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Active quiz runner state
   const [activeQuizAsgn, setActiveQuizAsgn] = useState<{ id: string; title: string } | null>(null);
-
-  // Attempt History Modal state
-  const [historyModalAsgn, setHistoryModalAsgn] = useState<{
-    title: string;
-    attempts: AssignmentAttemptOut[];
-    feedback?: FeedbackOut | null;
-  } | null>(null);
 
   // PDF Response upload state per assignment
   const [uploadingPdfId, setUploadingPdfId] = useState<string | null>(null);
@@ -1138,39 +1528,16 @@ function StudentAssignmentsSection() {
 
   return (
     <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary space-y-6">
-      {/* Top Header & Sub-Tabs */}
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-primary pb-4">
         <div>
           <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
             <FileText className="w-5 h-5 text-brand" />
-            <span>Class Tests, Quizzes & Performance</span>
+            <span>Class Tests, Quizzes &amp; Active Homework</span>
           </h3>
           <p className="text-xs text-text-secondary mt-0.5">
-            Attempt assigned AI quizzes and upload PDF responses before deadlines.
+            Attempt assigned AI quizzes and upload PDF responses before deadlines. Past test results &amp; feedback can be reviewed under Assessment History.
           </p>
-        </div>
-
-        <div className="flex items-center gap-2 bg-surface p-1 rounded-[var(--radius-md)] border border-border-primary self-start sm:self-auto">
-          <button
-            onClick={() => setSubTab("active")}
-            className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
-              subTab === "active"
-                ? "bg-brand text-white shadow-sm"
-                : "text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            Active Tests ({assignments.length})
-          </button>
-          <button
-            onClick={() => setSubTab("history")}
-            className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all cursor-pointer ${
-              subTab === "history"
-                ? "bg-brand text-white shadow-sm"
-                : "text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            Past Results & Feedback ({testResults.length})
-          </button>
         </div>
       </div>
 
@@ -1178,256 +1545,159 @@ function StudentAssignmentsSection() {
         <div className="py-12 flex justify-center">
           <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : subTab === "active" ? (
-        /* ACTIVE TESTS TAB */
-        assignments.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {assignments.map((asgn) => {
-              const resSummary = testResults.find((r) => r.assignment.id === asgn.id);
-              const submission = resSummary?.submission;
-              const attempts = resSummary?.attempts || [];
-              const latestAttempt = attempts[0];
+      ) : assignments.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {assignments.map((asgn) => {
+            const resSummary = testResults.find((r) => r.assignment.id === asgn.id);
+            const submission = resSummary?.submission;
+            const attempts = resSummary?.attempts || [];
+            const latestAttempt = attempts[0];
 
-              const isPassed = submission?.is_passed ?? latestAttempt?.is_passed ?? false;
-              const hasAttempts = attempts.length > 0;
-              const scorePercent = submission?.percentage ?? latestAttempt?.percentage;
+            const isPassed = submission?.is_passed ?? latestAttempt?.is_passed ?? false;
+            const hasAttempts = attempts.length > 0;
+            const scorePercent = submission?.percentage ?? latestAttempt?.percentage;
 
-              return (
-                <div
-                  key={asgn.id}
-                  className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-4 flex flex-col justify-between"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase bg-brand/10 text-brand border border-border-brand">
-                        {asgn.assignment_type === "pdf_upload" ? "Manual PDF Test" : "AI RAG Quiz"}
+            return (
+              <div
+                key={asgn.id}
+                className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-4 flex flex-col justify-between"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase bg-brand/10 text-brand border border-border-brand">
+                      {asgn.assignment_type === "pdf_upload" ? "Manual PDF Test" : "AI RAG Quiz"}
+                    </span>
+
+                    {asgn.deadline_at && (
+                      <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Due {new Date(asgn.deadline_at).toLocaleDateString()}
                       </span>
+                    )}
+                  </div>
 
-                      {asgn.deadline_at && (
-                        <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          Due {new Date(asgn.deadline_at).toLocaleDateString()}
-                        </span>
-                      )}
+                  <h4 className="font-bold text-sm text-text-primary">{asgn.title}</h4>
+                  {asgn.description && (
+                    <p className="text-xs text-text-secondary line-clamp-2">{asgn.description}</p>
+                  )}
+
+                  {asgn.subject && (
+                    <span className="inline-block text-[11px] font-semibold text-text-tertiary">
+                      Subject: {asgn.subject}
+                    </span>
+                  )}
+
+                  {/* Question PDF Link for manual PDF test */}
+                  {asgn.file_url && (
+                    <div className="pt-1">
+                      <a
+                        href={formatPdfUrl(asgn.file_url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
+                      >
+                        <FileText className="w-4 h-4" />
+                        View Question Paper (PDF) →
+                      </a>
                     </div>
-
-                    <h4 className="font-bold text-sm text-text-primary">{asgn.title}</h4>
-                    {asgn.description && (
-                      <p className="text-xs text-text-secondary line-clamp-2">{asgn.description}</p>
-                    )}
-
-                    {asgn.subject && (
-                      <span className="inline-block text-[11px] font-semibold text-text-tertiary">
-                        Subject: {asgn.subject}
-                      </span>
-                    )}
-
-                    {/* Question PDF Link for manual PDF test */}
-                    {asgn.file_url && (
-                      <div className="pt-1">
-                        <a
-                          href={formatPdfUrl(asgn.file_url)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
-                        >
-                          <FileText className="w-4 h-4" />
-                          View Question Paper (PDF) →
-                        </a>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Submission Status & Action */}
-                  <div className="pt-3 border-t border-border-primary/50 space-y-3">
-                    {hasAttempts && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-text-tertiary">Latest Status:</span>
-                        {scorePercent !== null && scorePercent !== undefined ? (
-                          <span
-                            className={`font-bold px-2 py-0.5 rounded text-[11px] ${
-                              isPassed
-                                ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
-                            }`}
-                          >
-                            {scorePercent.toFixed(1)}% ({isPassed ? "PASSED" : "FAILED"})
-                          </span>
-                        ) : (
-                          <span className="text-brand font-semibold">
-                            Submitted ({attempts.length} Attempt{attempts.length === 1 ? "" : "s"})
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {asgn.assignment_type === "ai_quiz" ? (
-                      /* AI Quiz Attempt Button */
-                      <div className="flex items-center justify-between gap-2">
-                        {isPassed ? (
-                          <span className="text-emerald-500 text-xs font-bold flex items-center gap-1">
-                            <CheckCircle className="w-4 h-4" /> Test Passed (Score ≥ 60%)
-                          </span>
-                        ) : (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => setActiveQuizAsgn({ id: asgn.id, title: asgn.title })}
-                            className="w-full text-xs py-1.5 gap-1.5"
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            {hasAttempts ? "Re-attempt Quiz (Adapted Questions)" : "Attempt AI Quiz (15 Mins)"}
-                          </Button>
-                        )}
-                      </div>
-                    ) : (
-                      /* Manual PDF Response Upload Widget */
-                      <div className="space-y-2">
-                        {pdfUploadError[asgn.id] && (
-                          <p className="text-[11px] text-rose-500">{pdfUploadError[asgn.id]}</p>
-                        )}
-
-                        <div className="flex items-center gap-2">
-                          <label className="flex-1 cursor-pointer">
-                            <input
-                              type="file"
-                              accept="application/pdf"
-                              className="hidden"
-                              onChange={(e) =>
-                                handleResponseFileChange(asgn.id, e.target.files?.[0] || null)
-                              }
-                            />
-                            <div className="px-3 py-1.5 rounded bg-surface border border-border-primary text-xs text-text-secondary hover:border-brand truncate text-center font-medium">
-                              {selectedResponseFile[asgn.id]
-                                ? selectedResponseFile[asgn.id]?.name
-                                : "Select Response PDF (Max 5MB)"}
-                            </div>
-                          </label>
-
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            disabled={!selectedResponseFile[asgn.id] || uploadingPdfId === asgn.id}
-                            onClick={() => handleUploadResponsePdf(asgn.id)}
-                            className="text-xs py-1.5 shrink-0"
-                          >
-                            {uploadingPdfId === asgn.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              "Upload PDF"
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
-            <FileText className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-            <h4 className="text-sm font-semibold text-text-primary">No Active Tests Available</h4>
-            <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
-              There are currently no active quizzes or assignments for your class section. Passed and expired tests can be reviewed under "Past Results & Feedback".
-            </p>
-          </div>
-        )
-      ) : (
-        /* PAST RESULTS & FEEDBACK TAB */
-        testResults.length > 0 ? (
-          <div className="space-y-4">
-            {testResults.map((item) => {
-              const asgn = item.assignment;
-              const attempts = item.attempts;
-              const sub = item.submission;
-              const fb = item.teacher_feedback;
-              const latestAttempt = attempts[0];
-              const scorePercent = sub?.percentage ?? latestAttempt?.percentage;
-              const isPassed = sub?.is_passed ?? latestAttempt?.is_passed;
 
-              return (
-                <div
-                  key={asgn.id}
-                  className="glass rounded-[var(--radius-md)] p-5 border border-border-primary space-y-4"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-brand/10 text-brand">
-                          {asgn.assignment_type === "pdf_upload" ? "Manual PDF" : "AI Quiz"}
-                        </span>
-                        {asgn.subject && (
-                          <span className="text-xs text-text-tertiary">• {asgn.subject}</span>
-                        )}
-                      </div>
-                      <h4 className="font-bold text-sm text-text-primary">{asgn.title}</h4>
-                    </div>
-
-                    <div className="flex items-center gap-3">
+                {/* Submission Status & Action */}
+                <div className="pt-3 border-t border-border-primary/50 space-y-3">
+                  {hasAttempts && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-text-tertiary">Latest Status:</span>
                       {scorePercent !== null && scorePercent !== undefined ? (
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-bold border ${
+                          className={`font-bold px-2 py-0.5 rounded text-[11px] ${
                             isPassed
-                              ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
-                              : "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                              ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                              : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
                           }`}
                         >
                           {scorePercent.toFixed(1)}% ({isPassed ? "PASSED" : "FAILED"})
                         </span>
                       ) : (
-                        <span className="text-xs text-text-tertiary italic">Pending Score</span>
+                        <span className="text-brand font-semibold">
+                          Submitted ({attempts.length} Attempt{attempts.length === 1 ? "" : "s"})
+                        </span>
                       )}
+                    </div>
+                  )}
 
-                      {attempts.length > 0 && (
+                  {asgn.assignment_type === "ai_quiz" ? (
+                    /* AI Quiz Attempt Button */
+                    <div className="flex items-center justify-between gap-2">
+                      {isPassed ? (
+                        <span className="text-emerald-500 text-xs font-bold flex items-center gap-1">
+                          <CheckCircle className="w-4 h-4" /> Test Passed (Score ≥ 60%)
+                        </span>
+                      ) : (
                         <Button
-                          variant="secondary"
+                          variant="primary"
                           size="sm"
-                          onClick={() =>
-                            setHistoryModalAsgn({
-                              title: asgn.title,
-                              attempts,
-                              feedback: fb,
-                            })
-                          }
-                          className="text-xs py-1"
+                          onClick={() => setActiveQuizAsgn({ id: asgn.id, title: asgn.title })}
+                          className="w-full text-xs py-1.5 gap-1.5 cursor-pointer"
                         >
-                          View Attempts ({attempts.length})
+                          <Sparkles className="w-3.5 h-3.5" />
+                          {hasAttempts ? "Re-attempt Quiz (Adapted Questions)" : "Attempt AI Quiz (15 Mins)"}
                         </Button>
                       )}
                     </div>
-                  </div>
+                  ) : (
+                    /* Manual PDF Response Upload Widget */
+                    <div className="space-y-2">
+                      {pdfUploadError[asgn.id] && (
+                        <p className="text-[11px] text-rose-500">{pdfUploadError[asgn.id]}</p>
+                      )}
 
-                  {/* Teacher Feedback */}
-                  {fb && (
-                    <div className="p-3 rounded bg-brand/5 border border-border-brand text-xs space-y-1">
-                      <span className="font-bold text-brand block">Teacher Feedback:</span>
-                      <p className="text-text-primary">{fb.feedback_text}</p>
-                    </div>
-                  )}
+                      <div className="flex items-center gap-2">
+                        <label className="flex-1 cursor-pointer">
+                          <input
+                            type="file"
+                            accept="application/pdf"
+                            className="hidden"
+                            onChange={(e) =>
+                              handleResponseFileChange(asgn.id, e.target.files?.[0] || null)
+                            }
+                          />
+                          <div className="px-3 py-1.5 rounded bg-surface border border-border-primary text-xs text-text-secondary hover:border-brand truncate text-center font-medium">
+                            {selectedResponseFile[asgn.id]
+                              ? selectedResponseFile[asgn.id]?.name
+                              : "Select Response PDF (Max 5MB)"}
+                          </div>
+                        </label>
 
-                  {/* Latest AI Advice Summary */}
-                  {latestAttempt?.ai_feedback && (
-                    <div className="p-3 rounded bg-surface/60 border border-border-primary text-xs space-y-1">
-                      <div className="flex items-center gap-1.5 font-bold text-brand">
-                        <Brain className="w-3.5 h-3.5" />
-                        <span>AI Diagnostic Advice & Concept Analysis:</span>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={!selectedResponseFile[asgn.id] || uploadingPdfId === asgn.id}
+                          onClick={() => handleUploadResponsePdf(asgn.id)}
+                          className="text-xs py-1.5 shrink-0 cursor-pointer"
+                        >
+                          {uploadingPdfId === asgn.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            "Upload PDF"
+                          )}
+                        </Button>
                       </div>
-                      <p className="text-text-primary whitespace-pre-line leading-relaxed">
-                        {latestAttempt.ai_feedback}
-                      </p>
                     </div>
                   )}
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-xs text-text-tertiary text-center py-8">
-            No completed tests or feedback records found yet.
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
+          <FileText className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
+          <h4 className="text-sm font-semibold text-text-primary">No Active Tests Available</h4>
+          <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
+            There are currently no active quizzes or assignments for your class section. You can check your past test attempts under "Assessment History".
           </p>
-        )
+        </div>
       )}
 
       {/* Quiz Runner Modal */}
@@ -1440,16 +1710,6 @@ function StudentAssignmentsSection() {
           onSuccess={() => {
             fetchStudentData();
           }}
-        />
-      )}
-
-      {/* Attempt History Modal */}
-      {historyModalAsgn && (
-        <AttemptHistoryModal
-          assignmentTitle={historyModalAsgn.title}
-          attempts={historyModalAsgn.attempts}
-          teacherFeedback={historyModalAsgn.feedback}
-          onClose={() => setHistoryModalAsgn(null)}
         />
       )}
     </div>
