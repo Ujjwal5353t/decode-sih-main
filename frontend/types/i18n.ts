@@ -9,7 +9,7 @@
 import en from "@/locales/en.json";
 
 // ── Supported Languages ──────────────────────────────────────────────────────
-export type SupportedLanguage = "en" | "hi" | "pa" | "ur" | "ta" | "as";
+export type SupportedLanguage = "en" | "hi" | "bn" | "mr" | "pa" | "ur" | "ta" | "as";
 export type TextDirection = "ltr" | "rtl";
 
 // ── Language Metadata ────────────────────────────────────────────────────────
@@ -24,6 +24,8 @@ export interface LanguageMeta {
 export const LANGUAGES: LanguageMeta[] = [
   { code: "en", label: "English",  nativeLabel: "English",   direction: "ltr", fontClass: "" },
   { code: "hi", label: "Hindi",    nativeLabel: "हिन्दी",     direction: "ltr", fontClass: "font-indic" },
+  { code: "bn", label: "Bengali",  nativeLabel: "বাংলা",      direction: "ltr", fontClass: "font-indic" },
+  { code: "mr", label: "Marathi",  nativeLabel: "मराठी",      direction: "ltr", fontClass: "font-indic" },
   { code: "pa", label: "Punjabi",  nativeLabel: "ਪੰਜਾਬੀ",    direction: "ltr", fontClass: "font-indic" },
   { code: "ur", label: "Urdu",     nativeLabel: "اردو",       direction: "rtl", fontClass: "font-urdu" },
   { code: "ta", label: "Tamil",    nativeLabel: "தமிழ்",      direction: "ltr", fontClass: "font-indic" },

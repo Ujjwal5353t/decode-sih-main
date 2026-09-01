@@ -917,6 +917,22 @@ export interface ChapterOut {
   sample_content?: string | null;
 }
 
+export interface ChunkOut {
+  id: string;
+  module_id?: string | null;
+  ncert_book_id?: string | null;
+  branch_name: string;
+  class_number: number;
+  subject: string;
+  chapter_number: number;
+  chapter_title: string;
+  chunk_index: number;
+  content: string;
+  token_count: number;
+  char_count: number;
+  created_at: string;
+}
+
 export interface QuizQuestionPreview {
   id: string;
   question_number: number;
@@ -942,10 +958,27 @@ export interface AssignmentQuizPreviewOut {
 
 export async function getTeacherClassChapters(
   class_number: number,
-  subject?: string
+  subject?: string,
+  module_id?: string
 ): Promise<ChapterOut[]> {
-  const query = subject ? `?subject=${encodeURIComponent(subject)}` : "";
+  const params = new URLSearchParams();
+  if (subject) params.append("subject", subject);
+  if (module_id) params.append("module_id", module_id);
+  const query = params.toString() ? `?${params.toString()}` : "";
   return fetchApi<ChapterOut[]>(`/teacher/classes/${class_number}/chapters${query}`);
+}
+
+export async function getTeacherChapterChunks(
+  class_number: number,
+  chapter_number: number,
+  subject?: string,
+  module_id?: string
+): Promise<ChunkOut[]> {
+  const params = new URLSearchParams();
+  if (subject) params.append("subject", subject);
+  if (module_id) params.append("module_id", module_id);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return fetchApi<ChunkOut[]>(`/teacher/classes/${class_number}/chapters/${chapter_number}/chunks${query}`);
 }
 
 export async function createAiQuizAssignment(

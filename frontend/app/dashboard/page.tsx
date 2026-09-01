@@ -34,6 +34,8 @@ import {
   Check,
   X,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Phone,
   User,
   Menu,
@@ -3335,10 +3337,99 @@ function TeacherDashboardView({
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [loadingStudents, setLoadingStudents] = useState<boolean>(false);
 
-  // Class Modules state (for AI Quiz)
+  // Class Modules state (for AI Quiz & Curriculum View)
   const [classModules, setClassModules] = useState<ModuleOut[]>([]);
   const [classChapters, setClassChapters] = useState<ChapterOut[]>([]);
   const [selectedChapterNumbers, setSelectedChapterNumbers] = useState<number[]>([]);
+  const [quizSubject, setQuizSubject] = useState<string>("");
+  const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
+  const [expandedChapterNumber, setExpandedChapterNumber] = useState<number | null>(null);
+
+  const availableSubjects = useMemo(() => {
+    const set = new Set<string>();
+    if (selectedClass?.subject && selectedClass.subject.toLowerCase() !== "general") {
+      set.add(selectedClass.subject);
+    }
+    for (const m of classModules) {
+      if (m.subject && m.subject.trim() && m.subject.toLowerCase() !== "general") {
+        set.add(m.subject.trim());
+      }
+    }
+    for (const c of classChapters) {
+      if (c.subject && c.subject.trim() && c.subject.toLowerCase() !== "general") {
+        set.add(c.subject.trim());
+      }
+    }
+    const list = Array.from(set);
+    if (list.length === 0) list.push("General");
+    return list;
+  }, [selectedClass, classModules, classChapters]);
+
+  const filteredChaptersForQuiz = useMemo(() => {
+    const activeSub = quizSubject || (availableSubjects[0] ?? "");
+    if (!activeSub || activeSub.toLowerCase() === "general") {
+      return classChapters;
+    }
+    return classChapters.filter(
+      (ch) => (ch.subject || "").trim().toLowerCase() === activeSub.trim().toLowerCase()
+    );
+  }, [classChapters, quizSubject, availableSubjects]);
+
+  const handleToggleModuleChapters = (mod: ModuleOut) => {
+    if (expandedModuleId === mod.id) {
+      setExpandedModuleId(null);
+      setExpandedChapterNumber(null);
+    } else {
+      setExpandedModuleId(mod.id);
+      setExpandedChapterNumber(null);
+      if (selectedClass) {
+        getTeacherClassChapters(selectedClass.class_number, mod.subject || undefined, mod.id)
+          .then((res) => {
+            if (res && res.length > 0) {
+              setClassChapters((prev) => {
+                const map = new Map(prev.map((c) => [`${(c.subject || "").toLowerCase()}-${c.chapter_number}`, c]));
+                for (const ch of res) {
+                  map.set(`${(ch.subject || "").toLowerCase()}-${ch.chapter_number}`, ch);
+                }
+                return Array.from(map.values()).sort(
+                  (a, b) => (a.subject || "").localeCompare(b.subject || "") || a.chapter_number - b.chapter_number
+                );
+              });
+            }
+          })
+          .catch((err) => console.log("Fetch module chapters note:", err.message));
+      }
+    }
+  };
+
+  const handleStartQuizForChapter = (mod: ModuleOut, ch: ChapterOut) => {
+    const targetSub = ch.subject || mod.subject || (availableSubjects[0] ?? "General");
+    setQuizSubject(targetSub);
+    setQuizTitle(`${ch.chapter_title} Quiz`);
+    setSelectedModuleIds(mod.id ? [mod.id] : []);
+    setSelectedChapterNumbers([ch.chapter_number]);
+    setQuizDesc(`Adaptive quiz grounded in ${ch.chapter_title} (${targetSub}).`);
+    setQuizDeadlineDays("");
+    setQuizError(null);
+    setShowQuizModal(true);
+  };
+
+  const handleStartQuizForModule = (mod: ModuleOut) => {
+    const targetSub = mod.subject || (availableSubjects[0] ?? "General");
+    setQuizSubject(targetSub);
+    setQuizTitle(`${mod.title} Quiz`);
+    setSelectedModuleIds(mod.id ? [mod.id] : []);
+    const modChs = classChapters.filter(
+      (c) =>
+        (c.module_id && c.module_id === mod.id) ||
+        (c.subject && mod.subject && c.subject.trim().toLowerCase() === mod.subject.trim().toLowerCase())
+    );
+    setSelectedChapterNumbers(modChs.map((c) => c.chapter_number));
+    setQuizDesc(`Adaptive quiz grounded in ${mod.title} (${targetSub}).`);
+    setQuizDeadlineDays("");
+    setQuizError(null);
+    setShowQuizModal(true);
+  };
 
   // Class Assignments state
   const [assignments, setAssignments] = useState<AssignmentOut[]>([]);
@@ -3538,7 +3629,7 @@ function TeacherDashboardView({
     try {
       await createAiQuizAssignment(selectedClass.class_number, selectedClass.section, {
         title: quizTitle.trim(),
-        subject: selectedClass.subject || undefined,
+        subject: quizSubject || selectedClass.subject || undefined,
         description: quizDesc.trim() || undefined,
         module_ids: selectedModuleIds,
         chapter_numbers: selectedChapterNumbers,
@@ -3939,6 +4030,16 @@ function TeacherDashboardView({
                         variant="primary"
                         size="sm"
                         onClick={() => {
+                          const defaultSub =
+                            selectedClass?.subject && selectedClass.subject.toLowerCase() !== "general"
+                              ? selectedClass.subject
+                              : (availableSubjects[0] ?? "");
+                          setQuizSubject(defaultSub);
+                          setQuizTitle("");
+                          setQuizDesc("");
+                          setSelectedModuleIds([]);
+                          setSelectedChapterNumbers([]);
+                          setQuizDeadlineDays("");
                           setQuizError(null);
                           setShowQuizModal(true);
                         }}
@@ -4241,51 +4342,259 @@ function TeacherDashboardView({
                 <PanelHead
                   icon={BookOpen}
                   title={`${t("teacherDashboard.curriculumModulesFor")} ${t("teacherDashboard.classPrefix")} ${selectedClass.label}`}
+                  description="Click on any module or textbook to view all underlying chapters, learning concepts, and launch AI quizzes."
                   actions={
-                    <span className="text-xs text-text-tertiary">
-                      {classModules.length} Module(s)
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-text-tertiary">
+                        {classModules.length} Module(s) &bull; {classChapters.length} Chapter(s)
+                      </span>
+                    </div>
                   }
                 />
 
                 {classModules.length > 0 ? (
-                  <Stagger className="divide-y divide-[var(--c-line)]">
-                    {classModules.map((mod) => (
-                      <Item
-                        key={mod.id}
-                        className="console-row flex items-center gap-4 px-5 py-3.5"
-                      >
-                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-[var(--c-line)] bg-[var(--c-sunken)] text-text-tertiary">
-                          <FileText className="h-4 w-4" />
-                        </div>
+                  <div className="divide-y divide-[var(--c-line)]">
+                    {classModules.map((mod) => {
+                      const isExpanded = expandedModuleId === mod.id;
 
-                        <div className="min-w-0 flex-1">
-                          <h4 className="truncate text-[13px] font-semibold text-text-primary font-[family-name:var(--font-display)]">
-                            {mod.title}
-                          </h4>
-                          <div className="mt-1">
-                            <Chip tone="brand">{mod.subject}</Chip>
-                          </div>
-                        </div>
+                      // Get all chapters belonging to this module or matching subject
+                      const moduleChapters = classChapters.filter(
+                        (ch) =>
+                          (ch.module_id && ch.module_id === mod.id) ||
+                          (!ch.module_id &&
+                            ch.subject &&
+                            mod.subject &&
+                            ch.subject.trim().toLowerCase() === mod.subject.trim().toLowerCase())
+                      );
 
-                        {mod.file_url ? (
-                          <a
-                            href={formatPdfUrl(mod.file_url)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand hover:underline"
+                      // Fallback: if no direct match, check subject inclusion
+                      const effectiveChapters =
+                        moduleChapters.length > 0
+                          ? moduleChapters
+                          : classChapters.filter(
+                              (ch) =>
+                                ch.subject &&
+                                mod.subject &&
+                                ch.subject.trim().toLowerCase().includes(mod.subject.trim().toLowerCase())
+                            );
+
+                      return (
+                        <div key={mod.id} className="transition-colors">
+                          {/* Module Header Row / Card */}
+                          <div
+                            onClick={() => handleToggleModuleChapters(mod)}
+                            className={`console-row flex cursor-pointer items-center justify-between gap-4 px-5 py-4 transition-all ${
+                              isExpanded
+                                ? "bg-brand/[0.04] border-l-4 border-l-brand"
+                                : "hover:bg-[var(--c-sunken)]"
+                            }`}
                           >
-                            <FileText className="h-3.5 w-3.5" />
-                            {t("teacherDashboard.viewModulePdf")}
-                          </a>
-                        ) : (
-                          <span className="shrink-0 text-xs italic text-text-tertiary">
-                            {t("teacherDashboard.ncertModule")}
-                          </span>
-                        )}
-                      </Item>
-                    ))}
-                  </Stagger>
+                            <div className="flex min-w-0 flex-1 items-center gap-3.5">
+                              <div
+                                className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition-colors ${
+                                  isExpanded
+                                    ? "border-brand/30 bg-brand/10 text-brand"
+                                    : "border-[var(--c-line)] bg-[var(--c-sunken)] text-text-tertiary"
+                                }`}
+                              >
+                                <BookOpen className="h-4.5 w-4.5" />
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h4 className="truncate text-sm font-semibold text-text-primary font-[family-name:var(--font-display)]">
+                                    {mod.title}
+                                  </h4>
+                                  <Chip tone="brand">{mod.subject || "General"}</Chip>
+                                  {mod.source_type === "pdf_upload" && (
+                                    <span className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider bg-[var(--c-sunken)] border border-[var(--c-line)] text-text-tertiary">
+                                      PDF Document
+                                    </span>
+                                  )}
+                                  {mod.source_type === "image_upload" && (
+                                    <span className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
+                                      OCR Book
+                                    </span>
+                                  )}
+                                  {mod.ncert_book_id && (
+                                    <span className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                                      NCERT Official
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="mt-1 flex items-center gap-3 text-xs text-text-tertiary">
+                                  <span className="inline-flex items-center gap-1 font-medium text-brand">
+                                    <Layers className="h-3 w-3" />
+                                    {effectiveChapters.length} {effectiveChapters.length === 1 ? "Chapter" : "Chapters"}
+                                  </span>
+                                  <span>&bull;</span>
+                                  <span>{isExpanded ? "Click to collapse" : "Click to view chapters"}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-3">
+                              {mod.file_url && (
+                                <a
+                                  href={formatPdfUrl(mod.file_url)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--c-line)] bg-[var(--c-panel)] px-2.5 py-1 text-xs font-medium text-text-secondary hover:text-brand hover:border-brand/30 transition-colors"
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                  <span>{t("teacherDashboard.viewModulePdf")}</span>
+                                </a>
+                              )}
+
+                              <div
+                                className={`grid h-7 w-7 place-items-center rounded-full border border-[var(--c-line)] text-text-tertiary transition-transform duration-200 ${
+                                  isExpanded ? "rotate-180 bg-brand text-white border-brand" : "bg-[var(--c-panel)]"
+                                }`}
+                              >
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Segregated Chapters Accordion Content */}
+                          <AnimatePresence>
+                            {isExpanded && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ duration: 0.2, ease: "easeInOut" }}
+                                className="overflow-hidden bg-[var(--c-sunken)]/60 border-t border-[var(--c-line)] px-5 py-4"
+                              >
+                                <div className="mb-3 flex items-center justify-between">
+                                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+                                    <Layers className="h-3.5 w-3.5 text-brand" />
+                                    <span>Underlying Chapters ({effectiveChapters.length})</span>
+                                  </div>
+                                  <span className="text-[11px] text-text-tertiary">
+                                    RAG-indexed for interactive classroom quiz generation
+                                  </span>
+                                </div>
+
+                                {effectiveChapters.length > 0 ? (
+                                  <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2">
+                                    {effectiveChapters.map((ch) => {
+                                      const isChapterExpanded = expandedChapterNumber === ch.chapter_number;
+                                      return (
+                                        <div
+                                          key={`${ch.chapter_number}-${ch.subject}-${ch.chapter_title}`}
+                                          className="flex flex-col justify-between rounded-xl border border-[var(--c-line)] bg-[var(--c-panel)] p-4 shadow-sm transition-all hover:border-brand/30 hover:shadow-md"
+                                        >
+                                          <div>
+                                            <div className="flex items-start justify-between gap-2">
+                                              <div className="flex items-center gap-2">
+                                                <span className="inline-flex h-6 items-center rounded-md bg-brand/10 px-2 text-xs font-bold text-brand">
+                                                  Ch. {ch.chapter_number}
+                                                </span>
+                                                <Chip tone="brand">{ch.subject}</Chip>
+                                              </div>
+                                              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                                {ch.chunk_count} {ch.chunk_count === 1 ? "Concept Chunk" : "Concept Chunks"}
+                                              </span>
+                                            </div>
+
+                                            <h5 className="mt-2.5 text-sm font-bold text-text-primary font-[family-name:var(--font-display)]">
+                                              {ch.chapter_title}
+                                            </h5>
+
+                                            {ch.sample_content && (
+                                              <p className="mt-1.5 text-xs leading-relaxed text-text-secondary line-clamp-3">
+                                                {ch.sample_content}
+                                              </p>
+                                            )}
+                                          </div>
+
+                                          <div className="mt-4 flex items-center justify-between gap-2 border-t border-[var(--c-line)] pt-3">
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                setExpandedChapterNumber(
+                                                  isChapterExpanded ? null : ch.chapter_number
+                                                )
+                                              }
+                                              className="inline-flex items-center gap-1 text-xs font-medium text-text-tertiary hover:text-text-primary transition-colors cursor-pointer"
+                                            >
+                                              <FileText className="h-3 w-3" />
+                                              {isChapterExpanded ? "Hide Excerpt" : "View Excerpt"}
+                                            </button>
+
+                                            <Button
+                                              variant="primary"
+                                              size="sm"
+                                              onClick={() => handleStartQuizForChapter(mod, ch)}
+                                              className="text-xs h-7 px-3"
+                                            >
+                                              <Sparkles className="mr-1 h-3 w-3" />
+                                              Create AI Quiz
+                                            </Button>
+                                          </div>
+
+                                          {/* Expandable full sample / chunk details */}
+                                          {isChapterExpanded && ch.sample_content && (
+                                            <motion.div
+                                              initial={{ opacity: 0, y: -4 }}
+                                              animate={{ opacity: 1, y: 0 }}
+                                              className="mt-3 rounded-lg border border-[var(--c-line)] bg-[var(--c-sunken)] p-3 text-xs leading-relaxed text-text-secondary"
+                                            >
+                                              <div className="font-semibold text-text-primary mb-1">
+                                                Chapter Concept Preview:
+                                              </div>
+                                              <div className="whitespace-pre-wrap">{ch.sample_content}</div>
+                                            </motion.div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="rounded-xl border border-dashed border-[var(--c-line)] bg-[var(--c-panel)] p-6 text-center">
+                                    <div className="mx-auto grid h-8 w-8 place-items-center rounded-full bg-brand/10 text-brand mb-2">
+                                      <BookOpen className="h-4 w-4" />
+                                    </div>
+                                    <h5 className="text-xs font-semibold text-text-primary">
+                                      Module Ready for Practice
+                                    </h5>
+                                    <p className="mt-1 text-[11px] text-text-tertiary max-w-sm mx-auto">
+                                      This module contains complete curriculum content for {mod.subject}. You can generate adaptive quizzes or open the PDF directly.
+                                    </p>
+                                    <div className="mt-3 flex justify-center gap-2">
+                                      {mod.file_url && (
+                                        <a
+                                          href={formatPdfUrl(mod.file_url)}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="inline-flex items-center gap-1 rounded-md border border-[var(--c-line)] bg-[var(--c-panel)] px-3 py-1.5 text-xs font-medium text-text-primary hover:text-brand"
+                                        >
+                                          <FileText className="h-3.5 w-3.5" />
+                                          View PDF
+                                        </a>
+                                      )}
+                                      <Button
+                                        variant="primary"
+                                        size="sm"
+                                        onClick={() => handleStartQuizForModule(mod)}
+                                        className="text-xs h-7"
+                                      >
+                                        <Sparkles className="mr-1 h-3 w-3" />
+                                        Generate AI Quiz
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <EmptyState
                     icon={BookOpen}
@@ -4398,6 +4707,44 @@ function TeacherDashboardView({
               )}
 
               <form onSubmit={handleCreateQuizAssignment} className="space-y-4">
+                {/* Subject Selector / Tag */}
+                <div>
+                  <FieldLabel>Subject *</FieldLabel>
+                  {availableSubjects.length > 1 ? (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {availableSubjects.map((sub) => {
+                        const isSubSelected =
+                          (quizSubject || "").trim().toLowerCase() === sub.trim().toLowerCase();
+                        return (
+                          <button
+                            key={sub}
+                            type="button"
+                            onClick={() => {
+                              setQuizSubject(sub);
+                              setSelectedChapterNumbers([]);
+                              setSelectedModuleIds([]);
+                            }}
+                            className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                              isSubSelected
+                                ? "bg-brand text-white shadow-sm ring-2 ring-brand/30"
+                                : "bg-[var(--c-sunken)] text-text-secondary hover:bg-[var(--c-panel)] hover:text-text-primary border border-[var(--c-line)]"
+                            }`}
+                          >
+                            {sub}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 pt-1">
+                      <Chip tone="brand">{quizSubject || availableSubjects[0] || "General"}</Chip>
+                      <span className="text-[11px] text-text-tertiary">
+                        Class {selectedClass?.label}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <FieldLabel>{t("teacherDashboard.quizTitleRequired")}</FieldLabel>
                   <input
@@ -4411,16 +4758,42 @@ function TeacherDashboardView({
                 </div>
 
                 <div>
-                  <FieldLabel>{t("teacherDashboard.selectModulesRequired")}</FieldLabel>
-                  {classChapters.length > 0 ? (
-                    <div className="max-h-48 space-y-1 overflow-y-auto rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-2 text-xs">
-                      {classChapters.map((ch, idx) => {
+                  <div className="flex items-center justify-between mb-1.5">
+                    <FieldLabel>
+                      {t("teacherDashboard.selectModulesRequired")} ({quizSubject || availableSubjects[0] || "Subject"})
+                    </FieldLabel>
+                    {filteredChaptersForQuiz.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedChapterNumbers.length === filteredChaptersForQuiz.length) {
+                            setSelectedChapterNumbers([]);
+                          } else {
+                            setSelectedChapterNumbers(
+                              filteredChaptersForQuiz.map((c) => c.chapter_number)
+                            );
+                          }
+                        }}
+                        className="text-[11px] font-medium text-brand hover:underline cursor-pointer"
+                      >
+                        {selectedChapterNumbers.length === filteredChaptersForQuiz.length
+                          ? "Deselect All"
+                          : "Select All"}
+                      </button>
+                    )}
+                  </div>
+
+                  {filteredChaptersForQuiz.length > 0 ? (
+                    <div className="max-h-52 space-y-1.5 overflow-y-auto rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-2.5 text-xs">
+                      {filteredChaptersForQuiz.map((ch, idx) => {
                         const isChecked = selectedChapterNumbers.includes(ch.chapter_number);
                         return (
                           <label
-                            key={`${ch.chapter_number}-${ch.module_id || 'seeded'}-${idx}`}
-                            className={`flex cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors ${
-                              isChecked ? "bg-brand/10 border border-brand/20" : "hover:bg-[var(--c-panel)]"
+                            key={`${ch.subject}-${ch.chapter_number}-${ch.module_id || "seeded"}-${idx}`}
+                            className={`flex cursor-pointer items-start gap-2.5 rounded-lg p-2.5 transition-all ${
+                              isChecked
+                                ? "bg-brand/10 border border-brand/30 shadow-xs"
+                                : "hover:bg-[var(--c-panel)] border border-transparent"
                             }`}
                           >
                             <input
@@ -4428,7 +4801,10 @@ function TeacherDashboardView({
                               checked={isChecked}
                               onChange={(e) => {
                                 if (e.target.checked) {
-                                  setSelectedChapterNumbers([...selectedChapterNumbers, ch.chapter_number]);
+                                  setSelectedChapterNumbers([
+                                    ...selectedChapterNumbers,
+                                    ch.chapter_number,
+                                  ]);
                                   if (ch.module_id && !selectedModuleIds.includes(ch.module_id)) {
                                     setSelectedModuleIds([...selectedModuleIds, ch.module_id]);
                                   }
@@ -4441,11 +4817,20 @@ function TeacherDashboardView({
                               className="mt-0.5 rounded border-border-primary text-brand focus:ring-brand"
                             />
                             <div className="min-w-0 flex-1">
-                              <div className="font-semibold text-text-primary">
-                                {ch.chapter_title}
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex h-5 items-center rounded bg-brand/15 px-1.5 text-[10px] font-bold text-brand">
+                                  Ch. {ch.chapter_number}
+                                </span>
+                                <span className="font-semibold text-text-primary">
+                                  {ch.chapter_title}
+                                </span>
                               </div>
-                              <div className="mt-0.5 text-[11px] text-text-tertiary">
-                                {ch.module_title || "Seeded Textbook"} &bull; {ch.chunk_count} RAG chunks
+                              <div className="mt-1 flex items-center gap-2 text-[11px] text-text-tertiary">
+                                <span>{ch.module_title || "Seeded Textbook"}</span>
+                                <span>&bull;</span>
+                                <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                                  {ch.chunk_count} RAG chunks
+                                </span>
                               </div>
                             </div>
                           </label>
@@ -4454,41 +4839,57 @@ function TeacherDashboardView({
                     </div>
                   ) : classModules.length > 0 ? (
                     <div className="max-h-40 space-y-0.5 overflow-y-auto rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-1.5 text-xs">
-                      {classModules.map((m) => {
-                        const isChecked = selectedModuleIds.includes(m.id);
-                        return (
-                          <label
-                            key={m.id}
-                            className={`flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors ${
-                              isChecked ? "bg-brand/8" : "hover:bg-[var(--c-panel)]"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedModuleIds([...selectedModuleIds, m.id]);
-                                } else {
-                                  setSelectedModuleIds(
-                                    selectedModuleIds.filter((id) => id !== m.id)
-                                  );
-                                }
-                              }}
-                              className="rounded border-border-primary text-brand focus:ring-brand"
-                            />
-                            <span className="min-w-0 truncate font-medium text-text-primary">
-                              {m.title}
-                            </span>
-                          </label>
-                        );
-                      })}
+                      {classModules
+                        .filter(
+                          (m) =>
+                            !quizSubject ||
+                            (m.subject || "").trim().toLowerCase() ===
+                              quizSubject.trim().toLowerCase()
+                        )
+                        .map((m) => {
+                          const isChecked = selectedModuleIds.includes(m.id);
+                          return (
+                            <label
+                              key={m.id}
+                              className={`flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors ${
+                                isChecked ? "bg-brand/8" : "hover:bg-[var(--c-panel)]"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedModuleIds([...selectedModuleIds, m.id]);
+                                  } else {
+                                    setSelectedModuleIds(
+                                      selectedModuleIds.filter((id) => id !== m.id)
+                                    );
+                                  }
+                                }}
+                                className="rounded border-border-primary text-brand focus:ring-brand"
+                              />
+                              <span className="min-w-0 truncate font-medium text-text-primary">
+                                {m.title}
+                              </span>
+                            </label>
+                          );
+                        })}
                     </div>
                   ) : (
                     <div className="rounded-[var(--c-radius)] border border-[var(--c-line)] bg-[var(--c-sunken)] p-3 text-xs italic text-text-tertiary">
                       {t("teacherDashboard.noModulesWarning")}
                     </div>
                   )}
+
+                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-text-tertiary">
+                    <span>
+                      {selectedChapterNumbers.length} chapter(s) selected
+                    </span>
+                    <span className="italic">
+                      Grounded in {quizSubject || "selected"} syllabus
+                    </span>
+                  </div>
                 </div>
 
                 <div>
@@ -4518,7 +4919,7 @@ function TeacherDashboardView({
                     variant="primary"
                     size="sm"
                     type="submit"
-                    disabled={isSubmittingQuiz || classModules.length === 0}
+                    disabled={isSubmittingQuiz || (filteredChaptersForQuiz.length === 0 && classModules.length === 0)}
                   >
                     {isSubmittingQuiz ? t("teacherDashboard.generating") : t("teacherDashboard.generateQuizBtn")}
                   </Button>

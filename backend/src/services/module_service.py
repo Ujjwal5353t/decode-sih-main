@@ -98,6 +98,8 @@ async def add_pdf_module(
     session: AsyncSession,
     subject: Optional[str] = None,
 ) -> Module:
+    file_bytes = await file.read()
+    await file.seek(0)
     upload = await upload_pdf(file, folder=f"decode-sih/{branch_name}/class-{class_number}")
     module = Module(
         branch_name=branch_name,
@@ -113,14 +115,27 @@ async def add_pdf_module(
     session.add(module)
     await session.flush()
 
-    # Ingest initial document chunks for RAG & test creation
+    # Extract text from uploaded PDF for chapter segregation & RAG
+    extracted_text = ""
+    try:
+        import io
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(file_bytes))
+        pages_text = [p.extract_text().strip() for p in reader.pages if p.extract_text()]
+        if pages_text:
+            extracted_text = "\n\n".join(pages_text)
+    except Exception as e:
+        logger.warning(f"[PDF Ingest] Could not extract text from PDF for module {title}: {e}")
+
+    initial_text = extracted_text if extracted_text.strip() else f"Chapter 1: {title}\n\nThis module contains curriculum materials for Class {class_number} {subject or 'General'}: {title}."
+
+    # Ingest document chunks & segregated chapters for RAG & test creation
     from src.services.chunk_service import ingest_module_text
-    initial_text = f"Chapter 1: {title}\n\nThis module contains curriculum materials for Class {class_number} {subject}: {title}."
     await ingest_module_text(
         session=session,
         branch_name=branch_name,
         class_number=class_number,
-        subject=subject,
+        subject=subject or "General",
         text=initial_text,
         module_id=module.id,
         module_title=title,
