@@ -5,6 +5,12 @@ is fully populated when create_all() is called at startup.
 from src.models.contact import ContactInquiry  # noqa: F401
 from src.models.admin import Admin  # noqa: F401
 from src.models.learning import LearningEvent  # noqa: F401
+from src.models.gamification import (  # noqa: F401
+    ChestClaim,
+    GamificationProfile,
+    StreakDay,
+    XpTransaction,
+)
 from src.models.lesson import Lesson, LessonSlide  # noqa: F401
 from src.models.module import Module  # noqa: F401
 from src.models.ncert import NCERTBook  # noqa: F401

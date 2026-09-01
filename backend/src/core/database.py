@@ -342,6 +342,94 @@ async def init_db() -> None:
             text("CREATE INDEX IF NOT EXISTS ix_learning_events_occurred_at ON learning_events (occurred_at);")
         )
 
+        # Migration: gamification (streaks, XP ledger, reward chests).
+        # See src/models/gamification.py — the UNIQUE indexes below are the
+        # real enforcement for "pay once / count a day once / claim once".
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS gamification_profiles (
+                    id UUID PRIMARY KEY,
+                    student_id UUID NOT NULL UNIQUE REFERENCES students(id),
+                    total_xp INTEGER NOT NULL DEFAULT 0,
+                    current_streak INTEGER NOT NULL DEFAULT 0,
+                    longest_streak INTEGER NOT NULL DEFAULT 0,
+                    last_active_date DATE,
+                    timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+                    chests_claimed INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+                );
+                """
+            )
+        )
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS xp_transactions (
+                    id UUID PRIMARY KEY,
+                    student_id UUID NOT NULL REFERENCES students(id),
+                    amount INTEGER NOT NULL,
+                    reason VARCHAR(30) NOT NULL,
+                    source_type VARCHAR(30) NOT NULL,
+                    source_id UUID,
+                    idempotency_key VARCHAR(120) NOT NULL,
+                    detail VARCHAR(300),
+                    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+                );
+                """
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_xp_student_key "
+                "ON xp_transactions (student_id, idempotency_key);"
+            )
+        )
+        await conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_xp_transactions_student_id ON xp_transactions (student_id);")
+        )
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS streak_days (
+                    id UUID PRIMARY KEY,
+                    student_id UUID NOT NULL REFERENCES students(id),
+                    local_date DATE NOT NULL,
+                    first_activity VARCHAR(30) NOT NULL,
+                    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+                );
+                """
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_streak_student_day "
+                "ON streak_days (student_id, local_date);"
+            )
+        )
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS chest_claims (
+                    id UUID PRIMARY KEY,
+                    student_id UUID NOT NULL REFERENCES students(id),
+                    chest_index INTEGER NOT NULL,
+                    lessons_at_claim INTEGER NOT NULL,
+                    xp_awarded INTEGER NOT NULL DEFAULT 0,
+                    badge VARCHAR(60),
+                    claimed_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+                );
+                """
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_chest_student_index "
+                "ON chest_claims (student_id, chest_index);"
+            )
+        )
+
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency — yields an async DB session."""

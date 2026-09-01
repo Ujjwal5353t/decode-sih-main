@@ -27,6 +27,8 @@ import { getLanguageDirection, getLanguageMeta, isValidLanguage } from "@/types/
 // ── Static imports for all locale dictionaries ──────────────────────────────
 import en from "@/locales/en.json";
 import hi from "@/locales/hi.json";
+import bn from "@/locales/bn.json";
+import mr from "@/locales/mr.json";
 import pa from "@/locales/pa.json";
 import ur from "@/locales/ur.json";
 import ta from "@/locales/ta.json";
@@ -35,6 +37,8 @@ import as_ from "@/locales/as.json";
 const DICTIONARIES: Record<SupportedLanguage, TranslationDictionary> = {
   en: en as unknown as TranslationDictionary,
   hi: hi as unknown as TranslationDictionary,
+  bn: bn as unknown as TranslationDictionary,
+  mr: mr as unknown as TranslationDictionary,
   pa: pa as unknown as TranslationDictionary,
   ur: ur as unknown as TranslationDictionary,
   ta: ta as unknown as TranslationDictionary,

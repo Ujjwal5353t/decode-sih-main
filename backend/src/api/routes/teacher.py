@@ -157,6 +157,7 @@ async def get_class_modules(
 async def get_class_chapters(
     class_number: int,
     subject: Optional[str] = None,
+    module_id: Optional[uuid.UUID] = Query(None, description="Optional module ID filter"),
     teacher: Teacher = Depends(get_current_teacher),
     session: AsyncSession = Depends(get_session),
 ):
@@ -165,6 +166,7 @@ async def get_class_chapters(
         branch_name=teacher.branch_name,
         class_number=class_number,
         subject=subject,
+        module_id=module_id,
     )
 
 
@@ -177,6 +179,7 @@ async def get_chapter_chunks(
     class_number: int,
     chapter_number: int,
     subject: Optional[str] = None,
+    module_id: Optional[uuid.UUID] = Query(None, description="Optional module ID filter"),
     teacher: Teacher = Depends(get_current_teacher),
     session: AsyncSession = Depends(get_session),
 ):
@@ -186,6 +189,7 @@ async def get_chapter_chunks(
         class_number=class_number,
         chapter_number=chapter_number,
         subject=subject,
+        module_id=module_id,
     )
     return [ChunkOut.model_validate(c) for c in chunks]
 

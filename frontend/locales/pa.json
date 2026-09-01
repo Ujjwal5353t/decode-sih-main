@@ -734,7 +734,9 @@
     "title": "ਨਿਦਾਨਕ ਮੁਲਾਂਕਣ",
     "subtitle": "ਆਪਣੀ ਤਾਕਤ ਅਤੇ ਸੁਧਾਰ ਵਾਲੇ ਵਿਸ਼ਿਆਂ ਦੀ ਪਛਾਣ ਕਰੋ",
     "streak": "ਲਗਾਤਾਰ ਸਹੀ",
-    "points": "XP",
+    "points": "Points",
+    "correctFeedback": "ਸਹੀ!",
+    "incorrectFeedback": "ਲਗਭਗ ਹੋ ਗਿਆ! ਅੱਗੇ ਵਧਦੇ ਰਹੋ।",
     "question": "ਸਵਾਲ",
     "of": "ਵਿੱਚੋਂ",
     "finishQuiz": "ਕੁਇਜ਼ ਸਮਾਪਤ ਕਰੋ",
@@ -743,7 +745,9 @@
     "resultsSubtitle": "ਇੱਥੇ ਤੁਹਾਡੇ ਸਿੱਖਣ ਦੇ ਪਾੜੇ ਦਾ ਵੇਰਵਾ ਹੈ",
     "overallMastery": "ਕੁੱਲ ਵਿਸ਼ਾ ਨਿਪੁੰਨਤਾ",
     "recommendedFocus": "ਸੁਝਾਏ ਗਏ ਮੁੱਖ ਵਿਸ਼ੇ",
-    "viewCurriculum": "ਸਿੱਖਣ ਮੌਡਿਊਲ ਸ਼ੁਰੂ ਕਰੋ"
+    "viewCurriculum": "ਸਿੱਖਣ ਮੌਡਿਊਲ ਸ਼ੁਰੂ ਕਰੋ",
+    "xpEarnedSuffix": "XP ਕਮਾਏ",
+    "correctSuffix": "ਸਹੀ"
   },
   "lessons": {
     "title": "ਐਨੀਮੇਟਡ ਪਾਠ",

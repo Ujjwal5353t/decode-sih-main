@@ -17,7 +17,7 @@ import {
   getLessons,
   getStudentLearningProgress,
 } from "@/lib/api";
-import { readCache, writeCache } from "@/lib/offline/db";
+import { deleteCache, readCache, writeCache } from "@/lib/offline/db";
 
 export interface OfflineAwareResult<T> {
   data: T;
@@ -61,4 +61,8 @@ export function loadStudentProgress(
   studentId: string
 ): Promise<OfflineAwareResult<StudentProgressOut>> {
   return networkFirst(`progress:${studentId}`, getStudentLearningProgress);
+}
+
+export async function invalidateStudentProgressCache(studentId: string): Promise<void> {
+  await deleteCache(`progress:${studentId}`);
 }

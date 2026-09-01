@@ -20,6 +20,7 @@ import {
   ShieldAlert,
   Sliders,
   Sparkle,
+  Bell,
 } from "lucide-react";
 import { Role, RolePermissionsResponse, DashboardPermissionItem } from "@/lib/api";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -73,6 +74,7 @@ export function DashboardSidebar({
   // styling on every branch below, so their sidebar is byte-for-byte what it
   // rendered before.
   const isConsole = role === "school" || role === "teacher" || role === "parent";
+  const isStudent = role === "student";
 
   // Extract user display name & details based on role
   const getUserDisplayName = () => {
@@ -179,15 +181,16 @@ export function DashboardSidebar({
             : "w-72 bg-surface/95 backdrop-blur-md border-r border-border-primary"
         } ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
-        {/* Brand Header */}
+        {/* Brand Header — the student rail runs taller so the logo can be the
+            same lockup and size the public site's navbar uses. */}
         <div
-          className={`flex h-[76px] shrink-0 items-center justify-between border-b ${
-            isConsole
-              ? "border-[var(--c-line)] px-5"
-              : "border-border-primary/60 px-5"
-          }`}
+          className={`flex shrink-0 items-center justify-between border-b ${
+            isStudent ? "h-[104px] px-4" : "h-[76px] px-5"
+          } ${isConsole ? "border-[var(--c-line)]" : "border-border-primary/60"}`}
         >
-          <BrandLogo size="sm" priority />
+          {/* Same component and size the public navbar uses, so the brand is
+              identical across the site rather than a dashboard-only variant. */}
+          <BrandLogo size={isStudent ? "md" : "sm"} priority />
 
           <button
             onClick={onCloseMobile}
@@ -197,39 +200,48 @@ export function DashboardSidebar({
           </button>
         </div>
 
-        {/* User Role Card */}
+        {/* User Role Card — hidden for students: the same name, school and role
+            are already available from the account menu at the foot of the rail,
+            and the learner view wants the space for navigation. */}
         <div
           className={
-            isConsole
+            isStudent
+              ? "hidden"
+              : isConsole
               ? "border-b border-[var(--c-line)] px-4 py-3.5"
               : "p-4 mx-3 my-3 rounded-[var(--radius-lg)] bg-surface-hover/80 border border-border-primary/70"
           }
         >
           <div className="flex items-center gap-3">
-            <div
-              className={`flex shrink-0 items-center justify-center ${
-                isConsole
-                  ? "h-9 w-9 rounded-xl border border-brand/20 bg-brand/10 text-brand shadow-2xs"
-                  : "w-10 h-10 rounded-[var(--radius-md)] shadow-sm"
-              }`}
-              style={isConsole ? undefined : { background: "var(--gradient-brand)" }}
-            >
-              {role === "student" && <GraduationCap className="h-5 w-5 text-white" />}
-              {role === "teacher" && <UserCog className={isConsole ? "h-[18px] w-[18px]" : "w-5 h-5 text-white"} />}
-              {role === "school" && <Building2 className={isConsole ? "h-[18px] w-[18px]" : "w-5 h-5 text-white"} />}
-              {role === "parent" && <Users className={isConsole ? "h-[18px] w-[18px]" : "w-5 h-5 text-white"} />}
-              {role === "admin" && <ShieldCheck className="h-5 w-5 text-white" />}
-            </div>
+            {role === "parent" ? (
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-150 font-bold text-slate-700 shadow-2xs dark:bg-slate-800 dark:text-slate-200">
+                {(getUserDisplayName().slice(0, 1) || "P").toUpperCase()}
+              </div>
+            ) : (
+              <div
+                className={`flex shrink-0 items-center justify-center ${
+                  isConsole
+                    ? "h-9 w-9 rounded-xl border border-brand/20 bg-brand/10 text-brand shadow-2xs"
+                    : "w-10 h-10 rounded-[var(--radius-md)] shadow-sm"
+                }`}
+                style={isConsole ? undefined : { background: "var(--gradient-brand)" }}
+              >
+                {role === "student" && <GraduationCap className="h-5 w-5 text-white" />}
+                {role === "teacher" && <UserCog className={isConsole ? "h-[18px] w-[18px]" : "w-5 h-5 text-white"} />}
+                {role === "school" && <Building2 className={isConsole ? "h-[18px] w-[18px]" : "w-5 h-5 text-white"} />}
+                {role === "admin" && <ShieldCheck className="h-5 w-5 text-white" />}
+              </div>
+            )}
 
             <div className="min-w-0 flex-1">
               <div className="text-xs font-bold text-text-primary truncate">
                 {getUserDisplayName()}
               </div>
               <div className="text-[11px] text-text-secondary truncate mt-0.5">
-                {getUserSubtitle()}
+                {role === "parent" ? "Parent / Guardian" : getUserSubtitle()}
               </div>
-              <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-brand/10 text-brand border border-brand/20">
-                {getRoleBadgeLabel()}
+              <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-sky-500/10 text-sky-600 border border-sky-500/20 dark:bg-sky-500/15 dark:text-sky-400">
+                {role === "parent" ? "PARENT DASHBOARD" : getRoleBadgeLabel()}
               </span>
             </div>
           </div>
@@ -260,6 +272,39 @@ export function DashboardSidebar({
                   const Icon = ICON_MAP[item.icon] || LayoutDashboard;
                   const isActive = activeTab === item.id;
                   const itemLabel = getNavItemLabel(item);
+
+                  if (isStudent) {
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          onSelectTab(item.id);
+                          onCloseMobile();
+                        }}
+                        className={`group flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3 py-2 text-[13px] font-semibold transition-colors ${
+                          isActive
+                            ? "bg-brand/10 text-brand"
+                            : "text-text-secondary hover:bg-[var(--c-sunken)] hover:text-text-primary"
+                        }`}
+                      >
+                        <span
+                          className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-colors ${
+                            isActive
+                              ? "bg-brand text-white shadow-sm shadow-brand/30"
+                              : "bg-[var(--c-sunken)] text-text-tertiary group-hover:text-brand"
+                          }`}
+                        >
+                          <Icon className="h-[18px] w-[18px]" />
+                        </span>
+                        <span className="truncate">{itemLabel}</span>
+                        {item.badge && (
+                          <span className="ml-auto shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-brand">
+                            {item.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  }
 
                   if (isConsole) {
                     return (
@@ -367,6 +412,62 @@ export function DashboardSidebar({
               <div className="text-[11px] font-medium text-text-secondary truncate">
                 {user.school_name || "VidyaSetu Institution"}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Parent Stay Connected Card */}
+        {role === "parent" && (
+          <div className="px-3 pb-3">
+            <div className="relative overflow-hidden rounded-2xl border border-sky-100 bg-sky-50/50 p-3.5 shadow-xs dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                    Stay Connected
+                  </h4>
+                  <p className="mt-0.5 text-[11px] font-medium leading-tight text-slate-500 dark:text-slate-400">
+                    Enable notifications to never miss an update
+                  </p>
+                </div>
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white text-sky-600 shadow-2xs dark:bg-slate-800 dark:text-sky-400">
+                  <Bell className="h-4 w-4" />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== "undefined" && "Notification" in window) {
+                    Notification.requestPermission();
+                  }
+                }}
+                className="mt-3 w-full rounded-xl bg-[#0284c7] py-2 text-center text-xs font-bold text-white shadow-sm shadow-sky-500/20 transition-all hover:bg-sky-700 active:scale-95 cursor-pointer"
+              >
+                Enable Notifications
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Student Scholar Perks Card (Lingora Plus matching design) */}
+        {isStudent && (
+          <div className="px-3 pb-3">
+            <div className="relative overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 via-sky-50 to-indigo-50 p-3.5 shadow-xs dark:border-amber-900/40 dark:from-slate-900 dark:via-sky-950/20 dark:to-indigo-950/30">
+              <div className="flex items-center gap-2 text-xs font-black text-amber-600 dark:text-amber-400">
+                <span className="grid h-6 w-6 place-items-center rounded-lg bg-amber-400/20 text-sm">
+                  👑
+                </span>
+                <span>VidyaSetu Scholar</span>
+              </div>
+              <p className="mt-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 leading-tight">
+                Unlock all NCERT modules, adaptive AI quizzes &amp; badges.
+              </p>
+              <button
+                type="button"
+                onClick={() => onSelectTab("modules")}
+                className="mt-2.5 w-full rounded-xl bg-sky-500 py-1.5 text-center text-xs font-bold text-white shadow-sm shadow-sky-500/20 transition-all hover:bg-sky-600 active:scale-95 cursor-pointer"
+              >
+                Explore Modules
+              </button>
             </div>
           </div>
         )}

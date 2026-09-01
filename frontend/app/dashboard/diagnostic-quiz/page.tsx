@@ -6,6 +6,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
+  ArrowRight,
   Target,
   Volume2,
   VolumeX,
@@ -16,6 +17,8 @@ import {
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { AnimatedNumber, Stagger, Item } from "@/components/dashboard/console/motion";
 import { Mascot, MascotMood } from "@/components/quiz/Mascot";
 import { QuizIllustration } from "@/components/quiz/illustrations/QuizIllustration";
 import { ConfettiBurst } from "@/components/quiz/ConfettiBurst";
@@ -112,6 +115,10 @@ function QuizFlow({ student }: { student: StudentProfile }) {
   const [mascotMood, setMascotMood] = useState<MascotMood>("dance");
   const [confettiTrigger, setConfettiTrigger] = useState<number>(0);
   const [muted, setMuted] = useState<boolean>(() => isSoundMuted());
+  // Per-question instant feedback: which option was picked and whether it
+  // was right, so the button itself can flash green/red for a beat before
+  // the next question slides in — set null the moment we move on.
+  const [feedback, setFeedback] = useState<{ index: number; correct: boolean } | null>(null);
 
   const toggleMute = () => {
     setMuted((prev) => {
@@ -238,7 +245,7 @@ function QuizFlow({ student }: { student: StudentProfile }) {
   };
 
   const handleAnswer = async (optionIndex: number) => {
-    if (!attemptId || !question || submitting) return;
+    if (!attemptId || !question || submitting || feedback) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -247,6 +254,7 @@ function QuizFlow({ student }: { student: StudentProfile }) {
         selected_option_index: optionIndex,
       });
 
+      setFeedback({ index: optionIndex, correct: res.was_correct });
       setAnswerHistory((prev) => [...prev, res.was_correct]);
 
       if (res.was_correct) {
@@ -269,13 +277,20 @@ function QuizFlow({ student }: { student: StudentProfile }) {
         triggerHaptic([20, 40, 20]);
       }
 
+      // A short beat so the green/red flash on the chosen option and the
+      // panda's reaction actually register before the view moves on —
+      // long enough to read, short enough to never feel like a blocker.
+      await new Promise((resolve) => setTimeout(resolve, res.was_correct ? 550 : 800));
+
       if (res.finished || !res.next_question) {
-        if (res.was_correct) {
-          if (!muted) playCelebrationSound();
-          setConfettiTrigger(Date.now());
-        }
+        // Finishing the diagnostic is the achievement being celebrated here,
+        // regardless of whether the very last question was right — so the
+        // fanfare always plays on completion, not just on a correct finish.
+        if (!muted) playCelebrationSound();
+        setConfettiTrigger(Date.now());
         await finishWithResult(attemptId);
       } else {
+        setFeedback(null);
         setQuestion(res.next_question);
         setQuestionCount((c) => c + 1);
       }
@@ -366,6 +381,7 @@ function QuizFlow({ student }: { student: StudentProfile }) {
                   questionCount={questionCount}
                   subjectsInScope={selectedSubjects}
                   submitting={submitting}
+                  feedback={feedback}
                   onAnswer={handleAnswer}
                 />
               </AnimatePresence>
@@ -472,15 +488,18 @@ function QuestionCard({
   questionCount,
   subjectsInScope,
   submitting,
+  feedback,
   onAnswer,
 }: {
   question: QuestionOut;
   questionCount: number;
   subjectsInScope: string[];
   submitting: boolean;
+  feedback: { index: number; correct: boolean } | null;
   onAnswer: (optionIndex: number) => void;
 }) {
   const { t } = useTranslation();
+  const reducedMotion = useReducedMotion();
   const subjectPosition = subjectsInScope.indexOf(question.subject) + 1;
   const canReadAloud = typeof window !== "undefined" && "speechSynthesis" in window;
 
@@ -541,22 +560,63 @@ function QuestionCard({
         )}
       </div>
 
+      <AnimatePresence>
+        {feedback && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className={`mt-4 flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold w-fit ${
+              feedback.correct
+                ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-600"
+                : "bg-amber-500/10 border border-amber-500/30 text-amber-600"
+            }`}
+          >
+            {feedback.correct ? (
+              <>🎉 {t("diagnosticQuiz.correctFeedback")} +{POINTS_PER_CORRECT}</>
+            ) : (
+              <>💪 {t("diagnosticQuiz.incorrectFeedback")}</>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
         {question.options.map((option, idx) => {
           const assetKey = question.option_asset_keys?.[idx];
           const emoji = question.option_emojis?.[idx];
           const hasPicture = Boolean(assetKey || emoji);
+          const isSelected = feedback?.index === idx;
+          const showCorrect = isSelected && feedback?.correct;
+          const showWrong = isSelected && feedback ? !feedback.correct : false;
           return (
             <motion.button
               key={idx}
               type="button"
-              disabled={submitting}
+              disabled={submitting || feedback !== null}
               onClick={() => onAnswer(idx)}
-              whileTap={{ scale: 0.95 }}
-              className={`text-left rounded-[var(--radius-md)] bg-surface border border-border-primary text-text-primary hover:border-brand hover:bg-surface-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+              whileTap={!feedback ? { scale: 0.95 } : undefined}
+              animate={
+                showWrong && !reducedMotion
+                  ? { x: [0, -8, 8, -6, 6, 0] }
+                  : showCorrect && !reducedMotion
+                  ? { scale: [1, 1.04, 1] }
+                  : { x: 0, scale: 1 }
+              }
+              transition={{ duration: showWrong ? 0.4 : 0.3 }}
+              className={`text-left rounded-[var(--radius-md)] border transition-colors cursor-pointer disabled:cursor-not-allowed ${
+                showCorrect
+                  ? "bg-emerald-500/10 border-emerald-500 text-emerald-700 ring-2 ring-emerald-500/40"
+                  : showWrong
+                  ? "bg-rose-500/10 border-rose-500 text-rose-700 ring-2 ring-rose-500/30"
+                  : "bg-surface border-border-primary text-text-primary hover:border-brand hover:bg-surface-hover"
+              } ${feedback && !isSelected ? "opacity-40" : ""} ${
+                submitting && !feedback ? "opacity-70" : ""
+              } ${
                 hasPicture
                   ? "flex flex-col items-center gap-2 px-4 py-5 text-center"
-                  : "px-4 py-3 text-sm"
+                  : "px-4 py-3 text-sm flex items-center gap-2"
               }`}
             >
               {assetKey ? (
@@ -566,7 +626,8 @@ function QuestionCard({
                   {emoji}
                 </span>
               ) : null}
-              <span className={hasPicture ? "text-sm font-medium" : ""}>{option}</span>
+              <span className={hasPicture ? "text-sm font-medium" : "flex-1"}>{option}</span>
+              {showCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />}
             </motion.button>
           );
         })}
@@ -589,104 +650,139 @@ function GapReportView({
   bestStreak: number;
 }) {
   const { t } = useTranslation();
+  const reducedMotion = useReducedMotion();
   const gapsBySubject: Record<string, GapReportOut["gaps"]> = {};
   for (const subject of report.subjects_covered) {
     gapsBySubject[subject] = report.gaps.filter((g) => g.subject === subject);
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-5"
-    >
-      <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary text-center">
-        <div className="flex justify-center mb-2">
-          <Mascot mood="celebrate" size={72} />
-        </div>
-        <h1 className="text-lg font-bold text-text-primary">{t("diagnosticQuiz.resultsTitle")}</h1>
-        {report.overall_score !== null && (
-          <div className="mt-3 flex items-center justify-center gap-2">
-            <span className="text-4xl font-bold text-brand">{report.overall_score}%</span>
-            <span className="text-xs text-text-tertiary">{t("diagnosticQuiz.overallMastery")}</span>
-          </div>
-        )}
-        <p className="text-xs text-text-secondary mt-2">
-          {t("diagnosticQuiz.resultsSubtitle")}
-        </p>
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs font-bold">
-            ⭐ {points} {t("diagnosticQuiz.points")}
-          </span>
-          {bestStreak >= 2 && (
-            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-500 text-xs font-bold">
-              🔥 {t("diagnosticQuiz.streak")}: {bestStreak}
+    <Stagger className="space-y-5">
+      <Item>
+        <div className="glass rounded-[var(--radius-lg)] p-6 border border-border-primary text-center">
+          <motion.div
+            className="flex justify-center mb-2"
+            initial={reducedMotion ? { opacity: 0 } : { scale: 0, rotate: -12 }}
+            animate={reducedMotion ? { opacity: 1 } : { scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 260, damping: 16, delay: 0.1 }}
+          >
+            <Mascot mood="celebrate" size={72} />
+          </motion.div>
+          <h1 className="text-lg font-bold text-text-primary">{t("diagnosticQuiz.resultsTitle")}</h1>
+
+          {report.overall_score !== null && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="mt-3 flex items-center justify-center gap-2"
+            >
+              <AnimatedNumber value={report.overall_score} suffix="%" className="text-4xl font-bold text-brand" />
+              <span className="text-xs text-text-tertiary">{t("diagnosticQuiz.overallMastery")}</span>
+            </motion.div>
+          )}
+
+          {/* Real, backend-computed reward for this attempt — not the
+              client-side "points" pill below, which is only a game-feel
+              counter for the duration of the quiz. */}
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.55 }}
+            className="mt-4 flex items-center justify-center gap-2 flex-wrap"
+          >
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-600 text-xs font-bold">
+              <Sparkles className="w-3.5 h-3.5" />
+              +<AnimatedNumber value={report.xp_awarded} /> {t("diagnosticQuiz.xpEarnedSuffix")}
             </span>
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 text-xs font-bold">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <AnimatedNumber value={report.correct_count} />/{report.total_questions} {t("diagnosticQuiz.correctSuffix")}
+            </span>
+          </motion.div>
+
+          <p className="text-xs text-text-secondary mt-3">
+            {t("diagnosticQuiz.resultsSubtitle")}
+          </p>
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs font-bold">
+              ⭐ {points} {t("diagnosticQuiz.points")}
+            </span>
+            {bestStreak >= 2 && (
+              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-500 text-xs font-bold">
+                🔥 {t("diagnosticQuiz.streak")}: {bestStreak}
+              </span>
+            )}
+          </div>
+        </div>
+      </Item>
+
+      <Item>
+        <div className="glass rounded-[var(--radius-lg)] p-5 border border-border-primary">
+          <h2 className="text-sm font-bold text-text-primary flex items-center gap-1.5 mb-2">
+            <Sparkles className="w-4 h-4 text-brand" />
+            {t("diagnosticQuiz.recommendedFocus")}
+          </h2>
+          {report.ai_summary_status === "ready" && report.ai_summary ? (
+            <p className="text-sm text-text-secondary leading-relaxed">{report.ai_summary}</p>
+          ) : report.ai_summary_status === "failed" ? (
+            <p className="text-xs text-text-tertiary italic">Summary not available for this attempt.</p>
+          ) : (
+            <div className="flex items-center gap-3 text-xs text-text-secondary">
+              <Mascot mood="dance" size={40} />
+              <span>{t("dashboard.common.loading")}</span>
+            </div>
           )}
         </div>
-      </div>
-
-      <div className="glass rounded-[var(--radius-lg)] p-5 border border-border-primary">
-        <h2 className="text-sm font-bold text-text-primary flex items-center gap-1.5 mb-2">
-          <Sparkles className="w-4 h-4 text-brand" />
-          {t("diagnosticQuiz.recommendedFocus")}
-        </h2>
-        {report.ai_summary_status === "ready" && report.ai_summary ? (
-          <p className="text-sm text-text-secondary leading-relaxed">{report.ai_summary}</p>
-        ) : report.ai_summary_status === "failed" ? (
-          <p className="text-xs text-text-tertiary italic">Summary not available for this attempt.</p>
-        ) : (
-          <div className="flex items-center gap-3 text-xs text-text-secondary">
-            <Mascot mood="dance" size={40} />
-            <span>{t("dashboard.common.loading")}</span>
-          </div>
-        )}
-      </div>
+      </Item>
 
       {report.subjects_covered.map((subject) => {
         const gaps = gapsBySubject[subject] || [];
         const subjectScore = report.subject_scores[subject];
         return (
-          <div key={subject} className="glass rounded-[var(--radius-md)] p-5 border border-border-primary">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-text-primary">{subject}</h2>
-              {subjectScore && (
-                <div className="flex items-center gap-3 text-xs text-text-secondary">
-                  <span className="font-bold text-text-primary">{subjectScore.score}%</span>
+          <Item key={subject}>
+            <div className="glass rounded-[var(--radius-md)] p-5 border border-border-primary">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-bold text-text-primary">{subject}</h2>
+                {subjectScore && (
+                  <div className="flex items-center gap-3 text-xs text-text-secondary">
+                    <span className="font-bold text-text-primary">{subjectScore.score}%</span>
+                  </div>
+                )}
+              </div>
+              {gaps.length === 0 ? (
+                <p className="text-xs text-text-secondary flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  {t("dashboard.student.activeBadge")} · 100%
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {gaps.map((gap) => (
+                    <div
+                      key={gap.topic_code}
+                      className="flex items-center justify-between px-3.5 py-2.5 rounded-[var(--radius-sm)] bg-surface border border-border-primary"
+                    >
+                      <span className="text-xs font-medium text-text-primary">{gap.topic_name}</span>
+                      <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded shrink-0 ml-3">
+                        {t("dashboard.student.class")} {gap.originating_class}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-            {gaps.length === 0 ? (
-              <p className="text-xs text-text-secondary flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                {t("dashboard.student.activeBadge")} · 100%
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {gaps.map((gap) => (
-                  <div
-                    key={gap.topic_code}
-                    className="flex items-center justify-between px-3.5 py-2.5 rounded-[var(--radius-sm)] bg-surface border border-border-primary"
-                  >
-                    <span className="text-xs font-medium text-text-primary">{gap.topic_name}</span>
-                    <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded shrink-0 ml-3">
-                      {t("dashboard.student.class")} {gap.originating_class}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          </Item>
         );
       })}
 
-      <div className="text-center pt-2">
+      <Item className="text-center pt-2">
         <Link href="/dashboard">
-          <Button variant="secondary" size="md">
+          <Button variant="primary" size="md" className="gap-2">
             {t("diagnosticQuiz.backToDashboard")}
+            <ArrowRight className="w-4 h-4" />
           </Button>
         </Link>
-      </div>
-    </motion.div>
+      </Item>
+    </Stagger>
   );
 }

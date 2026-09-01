@@ -10,6 +10,18 @@
 
 @import "tailwindcss";
 
+/* ── Bind Tailwind's dark: variant to this app's theme switch ──────────────
+   The ThemeProvider sets data-theme="dark" on <html>, but Tailwind v4's
+   dark: variant defaults to the prefers-color-scheme media query. Without
+   this declaration every dark: utility in the codebase ignores the in-app
+   toggle and follows the OS instead — which is why toggling to dark left
+   cards white, and why an OS-dark user saw dark styling even in light mode.
+
+   Declaring the variant here makes the existing dark: classes respond to the
+   toggle. Light theme is unaffected: data-theme is always "light" or "dark",
+   so in light mode no dark: rule matches. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* Indic script font stack (Hindi, Punjabi, Tamil, Assamese) */
 html.font-indic {
   --font-body: "Noto Sans Devanagari", "Noto Sans Gurmukhi", "Noto Sans Tamil", "Noto Sans Bengali", "Inter", system-ui, sans-serif;
@@ -854,3 +866,102 @@ button, a, [role="button"] {
   }
 }
 
+
+/* ─── Student dashboard surface ───────────────────────────────────────
+   The learner's dashboard deliberately diverges from the staff consoles:
+   daylight rather than an operations console. Softer radii, a sky wash,
+   and lifted cards. Scoped to .student-* so no console surface is
+   affected. */
+.student-hero {
+  background:
+    radial-gradient(120% 130% at 88% 12%, rgba(125, 211, 252, 0.55) 0%, transparent 60%),
+    radial-gradient(100% 120% at 10% 90%, rgba(191, 219, 254, 0.65) 0%, transparent 58%),
+    linear-gradient(135deg, #EAF4FF 0%, #DCEBFF 55%, #E8F6FF 100%);
+  border: 1px solid rgba(147, 197, 253, 0.5);
+  box-shadow: 0 6px 28px rgba(11, 46, 91, 0.07);
+}
+
+/* Dark theme keeps the same daylight character but drops the luminance so
+   it doesn't glare — the panda and copy stay legible either way. */
+[data-theme="dark"] .student-hero {
+  background:
+    radial-gradient(120% 130% at 88% 12%, rgba(56, 189, 248, 0.22) 0%, transparent 60%),
+    radial-gradient(100% 120% at 10% 90%, rgba(59, 130, 246, 0.18) 0%, transparent 58%),
+    linear-gradient(135deg, #16233C 0%, #172A47 55%, #14293F 100%);
+  border-color: rgba(56, 189, 248, 0.22);
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="dark"] .student-hero h1 {
+  color: #EAF4FF;
+}
+[data-theme="dark"] .student-hero .student-hero-sub {
+  color: #A9C9EE;
+}
+
+.student-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: box-shadow 0.25s cubic-bezier(0.22, 0.68, 0, 1),
+              border-color 0.25s cubic-bezier(0.22, 0.68, 0, 1);
+}
+.student-card:hover {
+  border-color: rgba(59, 130, 246, 0.35);
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.10);
+}
+[data-theme="dark"] .student-card:hover {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .student-card {
+    transition: none;
+  }
+}
+
+/* Learner canvas — a barely-there sky tint so the white cards lift off the
+   page, matching the reference's light-blue workspace. Scoped to the student
+   view only; staff consoles keep the neutral background. */
+.student-canvas {
+  background:
+    radial-gradient(90% 55% at 50% 0%, rgba(219, 234, 254, 0.5) 0%, transparent 70%);
+}
+
+[data-theme="dark"] .student-canvas {
+  background:
+    radial-gradient(90% 55% at 50% 0%, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
+}
+
+/* ─── Staggered card reveal ───────────────────────────────────────────
+   Done in CSS rather than by wrapping each card in a motion component:
+   the cards are deeply nested JSX and re-tagging them risks breaking the
+   markup for a purely decorative effect. nth-child delays give the same
+   sequenced entrance with no structural change. */
+.stat-reveal > * {
+  animation: stat-rise 0.45s cubic-bezier(0.22, 0.68, 0, 1) both;
+}
+.stat-reveal > *:nth-child(1) { animation-delay: 0.04s; }
+.stat-reveal > *:nth-child(2) { animation-delay: 0.10s; }
+.stat-reveal > *:nth-child(3) { animation-delay: 0.16s; }
+.stat-reveal > *:nth-child(4) { animation-delay: 0.22s; }
+
+@keyframes stat-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Lift on hover, so the cards respond to the pointer without the layout
+   shifting around them. */
+.stat-reveal > *:hover {
+  transform: translateY(-3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-reveal > * {
+    animation: none;
+  }
+  .stat-reveal > *:hover {
+    transform: none;
+  }
+}

@@ -29,6 +29,7 @@ import {
   idbPut,
   isOfflineStorageAvailable,
 } from "@/lib/offline/db";
+import { invalidateStudentProgressCache } from "@/lib/offline/contentCache";
 
 /** Largest batch we hand the server in one request (its cap is 200). */
 const SYNC_BATCH_SIZE = 100;
@@ -75,6 +76,20 @@ function newEventId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
+/** Device-local Y-M-D, used only to scope the LESSON_COMPLETED dedupe key
+ * below to "this lesson, today" — not the streak's own day boundary (that
+ * stays server-side, in the student's stored timezone; see
+ * gamification_service.local_date_for). Coarse alignment here is fine: this
+ * key only decides whether two writes are "the same completion" or two
+ * separate ones, never whether a streak day counts. */
+function localDateKey(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function moduleKeyFor(subject: string, classNumber: number): string {
   return `${subject}|${classNumber}`;
 }
@@ -105,8 +120,28 @@ export async function recordLearningEvent(input: {
 }): Promise<void> {
   if (!input.studentId) return;
 
+  // LESSON_COMPLETED gets a deterministic, same-day id — `lesson-complete:
+  // {lessonId}:{today}` — instead of a random one. A same-click double-fire,
+  // a page remount racing the same "Finish" tap, or a retried sync all
+  // produce the identical id and dedupe at the server's (student_id,
+  // client_event_id) unique index, so they can never insert a second row
+  // (XP for a lesson is already idempotent too — idempotency key
+  // `lesson:{lesson_id}` — this closes the same gap one layer earlier).
+  // Scoped to the day, not just the lesson: a lesson genuinely re-finished
+  // on a *later* day (e.g. revisited for review) must still get its own
+  // row, because that is what makes register_active_day count that day
+  // toward the streak — collapsing it into the very first completion ever
+  // would silently stop later replays from ever registering a streak day.
+  // Every other event type keeps a random id: re-attempting a check slide
+  // or restarting a lesson within one sitting is real, separate activity
+  // worth its own row.
+  const client_event_id =
+    input.eventType === "LESSON_COMPLETED" && input.lessonId
+      ? `lesson-complete:${input.lessonId}:${localDateKey()}`
+      : newEventId();
+
   const event: QueuedLearningEvent = {
-    client_event_id: newEventId(),
+    client_event_id,
     student_id: input.studentId,
     event_type: input.eventType,
     occurred_at: new Date().toISOString(),
@@ -161,15 +196,45 @@ export interface FlushResult {
 // One flush at a time per tab — two concurrent drains would send the same
 // rows twice. Harmless server-side (it dedupes) but wasteful, and it makes
 // the pending count flicker.
+//
+// A drain snapshots the queue once at its start (see drainQueue), so an
+// event recorded *while* a drain is already in flight would previously be
+// invisible to it — the caller just got handed the same, already-stale
+// promise. That event then sat queued until some unrelated later trigger
+// (the next recorded event, an `online` transition, or the next mount)
+// happened to call flush again — which is exactly how a just-finished
+// lesson could fail to show up immediately, or still be missing after a
+// quick reload. `rerunRequested` fixes that: a flush call that arrives
+// mid-drain no longer just rides the stale promise, it also schedules
+// another full pass the moment the current one finishes, so anything
+// queued in between is always picked up without needing an external nudge.
 let inFlight: Promise<FlushResult> | null = null;
+let rerunRequested = false;
 
 export function flushLearningEvents(studentId: string): Promise<FlushResult> {
   if (!studentId) return Promise.resolve({ synced: 0, remaining: 0 });
-  if (inFlight) return inFlight;
-  inFlight = drainQueue(studentId).finally(() => {
+  if (inFlight) {
+    rerunRequested = true;
+    return inFlight;
+  }
+  inFlight = runDrainPasses(studentId).finally(() => {
     inFlight = null;
   });
   return inFlight;
+}
+
+async function runDrainPasses(studentId: string): Promise<FlushResult> {
+  let totalSynced = 0;
+  let result = await drainQueue(studentId);
+  totalSynced += result.synced;
+
+  while (rerunRequested) {
+    rerunRequested = false;
+    result = await drainQueue(studentId);
+    totalSynced += result.synced;
+  }
+
+  return { synced: totalSynced, remaining: result.remaining };
 }
 
 async function drainQueue(studentId: string): Promise<FlushResult> {
@@ -216,6 +281,8 @@ async function drainQueue(studentId: string): Promise<FlushResult> {
     synced += response.accepted.length;
   }
 
+  // Invalidate cached progress so the next read fetches fresh data from server
+  await invalidateStudentProgressCache(studentId);
   queued = await getQueuedEvents(studentId);
   notifyQueueChanged();
   return { synced, remaining: queued.length };

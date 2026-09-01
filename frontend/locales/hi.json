@@ -792,7 +792,9 @@
     "title": "निदानात्मक मूल्यांकन",
     "subtitle": "अपनी ताकत और समीक्षा के विषयों की पहचान करें",
     "streak": "लगातार सही",
-    "points": "XP",
+    "points": "Points",
+    "correctFeedback": "सही!",
+    "incorrectFeedback": "लगभग हो गया! आगे बढ़ते रहें।",
     "question": "प्रश्न",
     "of": "का",
     "finishQuiz": "प्रश्नोत्तरी समाप्त करें",
@@ -801,7 +803,9 @@
     "resultsSubtitle": "यहाँ आपका व्यक्तिगत सीखने का अंतराल विवरण है",
     "overallMastery": "कुल विषय दक्षता",
     "recommendedFocus": "अनुशंसित प्राथमिकता विषय",
-    "viewCurriculum": "शिक्षण मॉड्यूल शुरू करें"
+    "viewCurriculum": "शिक्षण मॉड्यूल शुरू करें",
+    "xpEarnedSuffix": "XP अर्जित",
+    "correctSuffix": "सही"
   },
   "lessons": {
     "title": "एनिमेटेड पाठ",
