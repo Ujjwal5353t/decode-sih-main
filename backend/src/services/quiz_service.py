@@ -118,6 +118,15 @@ async def _pick_question(
     module content is preferred even unreviewed over the generic bank,
     since it's what the school actually teaches from.
 
+    Within the chosen tier, an illustrated question (image_asset_key or
+    image_emoji set) is preferred over a plain-text one whenever the tier
+    has at least one -- most of the bank is still plain text (Gemini leaves
+    the picture off far more often than it sets one), so picking uniformly
+    at random would show a picture only rarely even on topics where
+    illustrated questions do exist. This never surfaces a *worse* question
+    to satisfy that preference: it only reorders which one of an otherwise
+    equally-ranked set gets served.
+
     One round trip instead of up to four sequential tier queries — this was
     a real, measurable chunk of the per-question latency on a remote DB,
     stacked on top of every "serve the next question" step in the quiz.
@@ -142,7 +151,9 @@ async def _pick_question(
             by_tier.setdefault(rank, []).append(q)
 
     for rank in sorted(by_tier):
-        return random.choice(by_tier[rank])
+        tier = by_tier[rank]
+        illustrated = [q for q in tier if q.image_asset_key or q.image_emoji]
+        return random.choice(illustrated or tier)
     return None
 
 
