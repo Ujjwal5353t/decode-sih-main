@@ -36,10 +36,25 @@ async def ingest_module_text(
 
     clean_subject = (subject and subject.strip()) or "General"
 
-    # If module_id specified, delete existing chunks first for idempotency
+    # Idempotent replacement: delete pre-existing chunks first.
+    # - module_id set: delete this module's chunks (school-uploaded modules,
+    #   branch-specific NCERT module copies, OCR re-ingestion, etc).
+    # - module_id absent but ncert_book_id set: this is a book-level "template"
+    #   ingestion (branch_name="SELF", module_id=None -- see seed.py and
+    #   ncert_service.py). Delete only prior template chunks for this book
+    #   (module_id IS NULL) so re-uploading the same book's PDF doesn't leave
+    #   stale duplicates, while leaving branch-specific copies made by
+    #   module_service.add_ncert_module (which have module_id set) untouched.
     if module_id:
         await session.execute(
             delete(DocumentChunk).where(DocumentChunk.module_id == module_id)
+        )
+    elif ncert_book_id:
+        await session.execute(
+            delete(DocumentChunk).where(
+                DocumentChunk.ncert_book_id == ncert_book_id,
+                DocumentChunk.module_id.is_(None),
+            )
         )
 
     chunks_data = extract_chapters_and_chunks(
