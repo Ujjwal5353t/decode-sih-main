@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, AlertCircle, Layers, BookOpen, ChevronRight, Sparkles, CloudOff } from "lucide-react";
+import { ArrowLeft, AlertCircle, Layers, BookOpen, ChevronRight, Sparkles, CloudOff, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
 import { StudentProfile, LessonListItemOut } from "@/lib/api";
-import { loadLessons } from "@/lib/offline/contentCache";
-import { recordLearningEvent } from "@/lib/offline/learningEvents";
+import { loadLessons, loadStudentProgress } from "@/lib/offline/contentCache";
+import { applyPendingEvents, getQueuedEvents, recordLearningEvent } from "@/lib/offline/learningEvents";
 
 export default function LearnPage() {
   const router = useRouter();
@@ -64,6 +64,33 @@ function LessonListFlow({ student }: { student: StudentProfile }) {
   const [lessons, setLessons] = useState<LessonListItemOut[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState<boolean>(false);
+  const [completedLessonIds, setCompletedLessonIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [progressResult, pending] = await Promise.all([
+          loadStudentProgress(student.id).catch(() => null),
+          getQueuedEvents(student.id).catch(() => []),
+        ]);
+        if (cancelled || !progressResult) return;
+        const projected = applyPendingEvents(progressResult.data, pending);
+        const ids = new Set<string>();
+        for (const m of projected.modules) {
+          for (const lid of m.completed_lesson_ids) {
+            ids.add(lid);
+          }
+        }
+        setCompletedLessonIds(ids);
+      } catch {
+        // non-blocking
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [student.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,35 +193,49 @@ function LessonListFlow({ student }: { student: StudentProfile }) {
                   {group.subject}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {group.items.map((lesson, idx) => (
-                    <motion.div
-                      key={lesson.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2, delay: idx * 0.03 }}
-                    >
-                      <Link
-                        href={`/dashboard/learn/${lesson.id}`}
-                        className="block glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all h-full"
+                  {group.items.map((lesson, idx) => {
+                    const isCompleted = completedLessonIds.has(lesson.id);
+                    return (
+                      <motion.div
+                        key={lesson.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, delay: idx * 0.03 }}
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                            {t("lessons.slide")} {lesson.chapter_number}
-                          </span>
-                          <span className="text-[10px] text-text-tertiary">
-                            {lesson.slide_count} {t("lessons.slide")}
-                          </span>
-                        </div>
-                        <h3 className="text-sm font-bold text-text-primary">{lesson.chapter_title}</h3>
-                        <div className="mt-4 pt-3 border-t border-border-primary/50 flex items-center justify-between">
-                          <span className="text-[11px] text-text-tertiary">{t("dashboard.student.class")} {lesson.class_number}</span>
-                          <span className="inline-flex items-center gap-1 text-xs text-brand font-semibold">
-                            {t("lessons.startLesson")} <ChevronRight className="w-3.5 h-3.5" />
-                          </span>
-                        </div>
-                      </Link>
-                    </motion.div>
-                  ))}
+                        <Link
+                          href={`/dashboard/learn/${lesson.id}`}
+                          className={`block glass rounded-[var(--radius-md)] p-5 border transition-all h-full ${
+                            isCompleted
+                              ? "border-emerald-500/30 hover:border-emerald-500 bg-emerald-500/[0.02]"
+                              : "border-border-primary hover:border-brand"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
+                                {t("lessons.slide")} {lesson.chapter_number}
+                              </span>
+                              {isCompleted && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 inline-flex items-center gap-1">
+                                  <CheckCircle className="w-3 h-3" /> Done
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-text-tertiary">
+                              {lesson.slide_count} {t("lessons.slide")}
+                            </span>
+                          </div>
+                          <h3 className="text-sm font-bold text-text-primary">{lesson.chapter_title}</h3>
+                          <div className="mt-4 pt-3 border-t border-border-primary/50 flex items-center justify-between">
+                            <span className="text-[11px] text-text-tertiary">{t("dashboard.student.class")} {lesson.class_number}</span>
+                            <span className={`inline-flex items-center gap-1 text-xs font-semibold ${isCompleted ? "text-emerald-500" : "text-brand"}`}>
+                              {isCompleted ? "Review Lesson" : t("lessons.startLesson")} <ChevronRight className="w-3.5 h-3.5" />
+                            </span>
+                          </div>
+                        </Link>
+                      </motion.div>
+                    );
+                  })}
                 </div>
               </div>
             ))}

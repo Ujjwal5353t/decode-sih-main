@@ -15,11 +15,12 @@ from src.core.database import get_session
 from src.core.dependencies import get_current_parent
 from src.models.parent import Parent
 from src.schemas.auth import AddChildRequest
+from src.schemas.learning import StudentDetailedProgressOut, StudentProgressOut
 from src.schemas.parent import ChildLinkOut, ParentProfile
 from src.schemas.quiz import GapReportOut
 from src.schemas.student import StudentProfile
 from src.schemas.teacher import StudentTestResultSummaryOut
-from src.services import parent_service, quiz_service
+from src.services import learning_progress_service, parent_service, quiz_service
 
 router = APIRouter(prefix="/parent", tags=["Parent Dashboard"])
 
@@ -119,4 +120,35 @@ async def get_child_test_results(
             teacher_feedback=fb_out,
         ))
     return out
+
+
+@router.get(
+    "/children/{student_unique_number}/progress",
+    response_model=StudentProgressOut,
+    summary="Get a specific child's per-module learning progress, points, and daily streaks",
+)
+async def get_child_learning_progress(
+    student_unique_number: str,
+    parent: Parent = Depends(get_current_parent),
+    session: AsyncSession = Depends(get_session),
+):
+    student = await parent_service.get_owned_student(parent, student_unique_number, session)
+    return await learning_progress_service.get_student_progress(student, session)
+
+
+@router.get(
+    "/children/{student_unique_number}/detailed-progress",
+    response_model=StudentDetailedProgressOut,
+    summary="Get a specific child's comprehensive assessment growth, consecutive test trends, lagging topics, and curriculum progress",
+)
+async def get_child_detailed_progress(
+    student_unique_number: str,
+    parent: Parent = Depends(get_current_parent),
+    session: AsyncSession = Depends(get_session),
+):
+    from src.services import assessment_progress_service
+    student = await parent_service.get_owned_student(parent, student_unique_number, session)
+    return await assessment_progress_service.calculate_student_detailed_progress(student, session)
+
+
 

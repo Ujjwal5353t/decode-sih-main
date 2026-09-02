@@ -148,8 +148,12 @@ export interface RolePermissionsResponse {
 
 export async function getRolePermissions(
   role?: Role,
+  lang?: string,
 ): Promise<RolePermissionsResponse> {
-  const q = role ? `?role=${encodeURIComponent(role)}` : "";
+  const params = new URLSearchParams();
+  if (role) params.set("role", role);
+  if (lang) params.set("lang", lang);
+  const q = params.toString() ? `?${params.toString()}` : "";
   return fetchApi<RolePermissionsResponse>(`/auth/permissions${q}`);
 }
 
@@ -284,8 +288,13 @@ async function fetchApi<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const token = getStoredToken();
+  const preferredLang =
+    typeof window !== "undefined"
+      ? localStorage.getItem("preferred_language") || "en"
+      : "en";
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "Accept-Language": preferredLang,
     ...(options.headers as Record<string, string>),
   };
 
@@ -294,7 +303,7 @@ async function fetchApi<T>(
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const timeoutId = setTimeout(() => controller.abort(), 45000);
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -341,7 +350,7 @@ async function fetchApi<T>(
     clearTimeout(timeoutId);
     if (err.name === "AbortError") {
       const error = new Error(
-        "Server request timed out after 15 seconds. Please check if the backend server is running.",
+        "Server request timed out. The remote database or backend server is taking longer than usual to respond. Please try again."
       ) as ApiError;
       error.status = 504;
       throw error;
@@ -1858,6 +1867,9 @@ export interface StudentProgressOut {
   modules_completed: number;
   modules_in_progress: number;
   modules_not_started: number;
+  points?: number;
+  current_streak?: number;
+  longest_streak?: number;
   last_activity_at: string | null;
   modules: ModuleProgressOut[];
   recent_activity: RecentLearningActivityOut[];
@@ -1876,8 +1888,15 @@ export interface ClassStudentProgressOut {
   overall_percent: number;
   modules_completed: number;
   modules_in_progress: number;
+  points?: number;
+  current_streak?: number;
   last_activity_at: string | null;
   subjects: StudentSubjectProgressOut[];
+  total_assessments_taken?: number;
+  average_test_score?: number;
+  assessments_passed?: number;
+  assessments_lagging?: number;
+  holistic_mastery_percent?: number;
 }
 
 export interface ClassProgressOut {
@@ -1905,20 +1924,135 @@ export async function getStudentLearningProgress(): Promise<StudentProgressOut> 
   return fetchApi<StudentProgressOut>("/student/progress");
 }
 
-export async function getClassLearningProgress(
-  class_number: number,
-  section: string,
-): Promise<ClassProgressOut> {
-  return fetchApi<ClassProgressOut>(
-    `/teacher/classes/${class_number}/${section}/progress`,
+export async function getChildLearningProgress(
+  studentUniqueNumber: string
+): Promise<StudentProgressOut> {
+  return fetchApi<StudentProgressOut>(
+    `/parent/children/${encodeURIComponent(studentUniqueNumber)}/progress`
   );
 }
 
+export async function getClassLearningProgress(
+  class_number: number,
+  section: string,
+  subject?: string
+): Promise<ClassProgressOut> {
+  const q = subject ? `?subject=${encodeURIComponent(subject)}` : "";
+  return fetchApi<ClassProgressOut>(
+    `/teacher/classes/${class_number}/${section}/progress${q}`
+  );
+}
+
+export async function getTeacherStudentDetailedProgress(
+  studentUniqueNumber: string,
+  subject?: string
+): Promise<StudentDetailedProgressOut> {
+  const q = subject ? `?subject=${encodeURIComponent(subject)}` : "";
+  return fetchApi<StudentDetailedProgressOut>(
+    `/teacher/students/${encodeURIComponent(studentUniqueNumber)}/detailed-progress${q}`
+  );
+}
+
+export interface AssessmentAttemptTrend {
+  attempt_number: number;
+  score: number;
+  max_score: number;
+  percentage: number;
+  is_passed: boolean;
+  status: string;
+  completed_at: string;
+  delta_from_previous: number | null;
+}
+
+export interface AssessmentGrowthItem {
+  assignment_id: string;
+  title: string;
+  subject: string;
+  assignment_type: string;
+  chapter_numbers: number[];
+  total_attempts: number;
+  initial_score: number;
+  latest_score: number;
+  best_score: number;
+  score_delta: number;
+  trend: "improving" | "declining" | "stable" | "mastered";
+  status: "mastered" | "progressing" | "needs_attention" | "lagging";
+  is_lagging: boolean;
+  latest_attempt_at: string;
+  attempts_history: AssessmentAttemptTrend[];
+  teacher_feedback: string | null;
+  ai_feedback: string | null;
+}
+
+export interface SubjectAssessmentProgressOut {
+  subject: string;
+  overall_mastery_percent: number;
+  assessment_count: number;
+  average_score: number;
+  growth_delta: number;
+  trend: "improving" | "declining" | "stable" | "mastered";
+  status: "mastered" | "progressing" | "needs_attention" | "lagging";
+  lagging_topics_count: number;
+  assessments: AssessmentGrowthItem[];
+}
+
+export interface DiagnosticGapSummary {
+  subject: string;
+  topic_code: string;
+  topic_name: string;
+  originating_class: number;
+  student_current_class: number;
+}
+
+export interface StudentDetailedProgressOut {
+  student_id: string;
+  student_unique_number: string;
+  full_name: string;
+  class_number: number | null;
+  section: string | null;
+  school_name: string | null;
+  branch_name: string | null;
+  enrollment_type: string;
+
+  holistic_mastery_percent: number;
+  curriculum_completion_percent: number;
+  average_test_score: number;
+  consecutive_growth_rate: number;
+  consecutive_trend: "improving" | "declining" | "stable" | "mastered";
+
+  total_assessments_taken: number;
+  assessments_passed: number;
+  assessments_lagging: number;
+
+  points: number;
+  current_streak: number;
+  longest_streak: number;
+  last_activity_at: string | null;
+
+  subjects: SubjectAssessmentProgressOut[];
+  modules: ModuleProgressOut[];
+  diagnostic_gaps: DiagnosticGapSummary[];
+  diagnostic_overall_score: number | null;
+  recent_activity: RecentLearningActivityOut[];
+}
+
+export async function getChildDetailedProgress(
+  studentUniqueNumber: string
+): Promise<StudentDetailedProgressOut> {
+  return fetchApi<StudentDetailedProgressOut>(
+    `/parent/children/${encodeURIComponent(studentUniqueNumber)}/detailed-progress`
+  );
+}
+
+export async function getStudentDetailedProgress(): Promise<StudentDetailedProgressOut> {
+  return fetchApi<StudentDetailedProgressOut>("/student/detailed-progress");
+}
+
 export async function getAssignmentQuizForStudent(
-  assignmentId: string,
+  assignmentId: string
 ): Promise<AssignmentQuizPreviewOut> {
   return fetchApi<AssignmentQuizPreviewOut>(
-    `/student/assignments/${assignmentId}/quiz`,
+    `/student/assignments/${assignmentId}/quiz`
   );
 }
 
