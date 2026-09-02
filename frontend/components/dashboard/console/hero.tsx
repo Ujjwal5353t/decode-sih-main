@@ -1,15 +1,21 @@
 "use client";
 
 /**
- * The dashboard hero — generous, asymmetric banner for the School / Admin dashboard.
+ * Admin / School Dashboard Hero — premium institutional banner.
  *
- * Recreates the exact design from reference:
- * - Large rounded card with soft pale-blue background
- * - Top blue decorative accent bar
- * - Bold greeting & supportive subtitle
- * - Primary blue CTA button + Secondary white CTA button
- * - Subtle geometric floating shapes (rings, dots, dot matrix grid)
- * - Prominently positioned transparent teacher laptop illustration on the right
+ * Layout:
+ *   ┌──────────────────────────────────────────────────────┐
+ *   │  [accent bar]                                        │
+ *   │  [eyebrow pill]                         [illustration]│
+ *   │  [H1 title]                                          │
+ *   │  [subtitle]                                          │
+ *   │  [CTA buttons]                                       │
+ *   ├──────────────────────────────────────────────────────┤
+ *   │  [stat] │ [stat] │ [stat] │ [stat]  ← always 1 row  │
+ *   └──────────────────────────────────────────────────────┘
+ *
+ * Facts are rendered in their own full-width 4-column grid strip so they
+ * always stay on a single row on desktop, regardless of copy length.
  */
 
 import { ReactNode } from "react";
@@ -30,7 +36,7 @@ export function Hero({
   eyebrow?: ReactNode;
   title: ReactNode;
   subtitle?: ReactNode;
-  /** Inline supporting figures, rendered as a divided strip beneath the copy. */
+  /** 4 stat tiles — always rendered in a single horizontal row. */
   facts?: ReactNode;
   actions?: ReactNode;
   illustration?: ReactNode;
@@ -39,87 +45,104 @@ export function Hero({
 }) {
   return (
     <motion.section
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: EASE }}
+      transition={{ duration: 0.45, ease: EASE }}
       className={cn(
-        "relative overflow-hidden rounded-[32px] border border-blue-100/90 bg-gradient-to-r from-[#EFF6FF] via-[#EBF3FE] to-[#E3EEFD] shadow-[0_10px_30px_rgba(37,99,235,0.06)] dark:border-blue-900/30 dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-850",
+        // Light: soft pale-blue gradient, clean card
+        "relative overflow-hidden rounded-[28px] border border-blue-100/80 bg-gradient-to-br from-[#EEF5FF] via-[#F2F7FF] to-[#E0EDFB]",
+        "shadow-[0_8px_32px_rgba(37,99,235,0.07)]",
+        // Dark: genuine dark surface — deep navy, no grey-white artifacts
+        "dark:border-slate-800 dark:bg-[#0B1628] dark:bg-none dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
         className
       )}
     >
-      {/* ── Subtle Geometric & Decorative Accents ───────────────────────── */}
+      {/* ── Decorative Dots + Geometric Accents ───────────────────────────── */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        {/* Top-right dot matrix grid */}
-        <div className="absolute top-6 right-8 grid grid-cols-6 gap-2 opacity-25">
+        {/* Top-right dot matrix grid (6 × 4 = 24 dots) — preserved as requested */}
+        <div className="absolute top-5 right-7 grid grid-cols-6 gap-[7px] opacity-[0.28] dark:opacity-[0.18]">
           {Array.from({ length: 24 }).map((_, i) => (
-            <div key={i} className="h-1 w-1 rounded-full bg-blue-500" />
+            <div key={i} className="h-[5px] w-[5px] rounded-full bg-blue-500 dark:bg-blue-400" />
           ))}
         </div>
 
-        {/* Floating amber outline circle */}
-        <div className="absolute top-9 left-[45%] h-5 w-5 rounded-full border-2 border-amber-400 opacity-90" />
+        {/* Floating amber outline ring */}
+        <div className="absolute top-8 left-[43%] h-[22px] w-[22px] rounded-full border-2 border-amber-400 opacity-80 dark:border-amber-500 dark:opacity-60" />
 
         {/* Floating concentric blue target */}
-        <div className="absolute top-12 right-[42%] flex h-6 w-6 items-center justify-center rounded-full border-2 border-blue-400 opacity-80">
-          <div className="h-2 w-2 rounded-full bg-blue-500" />
+        <div className="absolute top-[52px] right-[41%] flex h-6 w-6 items-center justify-center rounded-full border-2 border-blue-400/80 dark:border-blue-500/70 opacity-75">
+          <div className="h-[7px] w-[7px] rounded-full bg-blue-500 dark:bg-blue-400" />
         </div>
 
         {/* Floating emerald dot */}
-        <div className="absolute top-20 right-[32%] h-2.5 w-2.5 rounded-full bg-emerald-400 opacity-90" />
+        <div className="absolute top-20 right-[31%] h-[10px] w-[10px] rounded-full bg-emerald-400 opacity-80 dark:opacity-60" />
 
-        {/* Thin vertical decorative accent lines */}
-        <div className="absolute top-4 left-[28%] h-12 w-[1.5px] bg-blue-200/50" />
-        <div className="absolute top-8 right-[52%] h-14 w-[1.5px] bg-blue-200/40" />
-
-        {/* Soft corner glows */}
-        <div className="absolute -top-16 -right-16 h-64 w-64 rounded-full bg-blue-400/10 blur-3xl" />
-        <div className="absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-indigo-400/8 blur-3xl" />
+        {/* Ambient glow — light */}
+        <div className="absolute -top-24 -right-24 h-80 w-80 rounded-full bg-blue-400/[0.09] blur-3xl dark:bg-blue-600/[0.12]" />
+        <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-indigo-400/[0.07] blur-3xl dark:bg-indigo-700/[0.14]" />
       </div>
 
-      {/* ── Content Grid: Left Copy & Actions + Right Illustration ──────── */}
-      <div className="relative z-10 grid grid-cols-1 gap-6 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_440px] lg:items-end lg:gap-8 lg:p-10">
-        <div className="min-w-0 pb-2">
-          {/* Small blue decorative accent pill above greeting */}
-          <div className="mb-4 h-1.5 w-12 rounded-full bg-[#2563EB]" aria-hidden="true" />
+      {/* ── Two-column content row: copy (left) + illustration (right) ─────── */}
+      <div className="relative z-10 grid grid-cols-1 gap-4 px-6 pt-7 pb-5 sm:px-8 sm:pt-8 lg:grid-cols-[1fr_auto] lg:items-center lg:gap-6 lg:px-10 lg:pt-9 lg:pb-6">
+        {/* Left column: eyebrow / title / subtitle / actions */}
+        <div className="min-w-0">
+          {/* Blue accent bar */}
+          <div className="mb-4 h-[5px] w-10 rounded-full bg-blue-600 dark:bg-blue-500" aria-hidden="true" />
 
-          {eyebrow && <div className="mb-3">{eyebrow}</div>}
+          {eyebrow && (
+            <div className="mb-3">
+              {eyebrow}
+            </div>
+          )}
 
-          <h1 className="text-balance text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-[1.2] tracking-tight text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+          <h1 className="text-balance text-[1.6rem] font-extrabold leading-[1.2] tracking-tight text-slate-900 dark:text-white sm:text-3xl lg:text-[2rem] xl:text-[2.2rem] font-[family-name:var(--font-display)]">
             {title}
           </h1>
 
           {subtitle && (
-            <div className="mt-3 max-w-xl text-sm sm:text-base font-normal leading-relaxed text-slate-600 dark:text-slate-300">
+            <div className="mt-2.5 max-w-lg text-[0.9rem] leading-relaxed text-slate-600 dark:text-slate-300 sm:text-[0.95rem]">
               {subtitle}
             </div>
           )}
 
-          {actions && <div className="mt-6 flex flex-wrap items-center gap-3.5">{actions}</div>}
-
-          {facts && (
-            <div className="mt-7 flex flex-wrap items-stretch gap-3">
-              {facts}
+          {actions && (
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              {actions}
             </div>
           )}
         </div>
 
+        {/* Right column: illustration — bottom-aligned, desktop only */}
         {illustration && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            initial={{ opacity: 0, scale: 0.94, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
-            className="hidden justify-self-end self-end lg:flex items-end"
+            transition={{ duration: 0.55, ease: EASE, delay: 0.08 }}
+            className="hidden lg:flex items-end justify-end self-end"
           >
             {illustration}
           </motion.div>
         )}
       </div>
+
+      {/* ── Facts strip — full-width, always 4 cols on desktop ────────────── */}
+      {facts && (
+        <div className="relative z-10 px-6 pb-6 sm:px-8 sm:pb-7 lg:px-10 lg:pb-8">
+          {/* Thin separator */}
+          <div className="mb-4 h-px w-full bg-blue-200/50 dark:bg-slate-700/70" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {facts}
+          </div>
+        </div>
+      )}
     </motion.section>
   );
 }
 
 /**
- * Fact tile for the hero strip
+ * Stat tile for the hero facts strip.
+ * Compact: single-row label + large number + subtle hint.
+ * Designed to sit flush in the 4-column grid without wrapping.
  */
 export function HeroFact({
   label,
@@ -135,27 +158,39 @@ export function HeroFact({
   variant?: "default" | "vibrant";
 }) {
   return (
-    <div className="min-w-[125px] rounded-2xl border border-white/90 bg-white/90 px-4 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-800/70">
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className={cn(
+        "group flex min-w-0 flex-col rounded-2xl px-4 py-3 transition-all duration-200",
+        // Light: white glass card
+        "border border-white/80 bg-white/85 shadow-[0_2px_10px_rgba(0,0,0,0.04)] backdrop-blur-md",
+        "hover:shadow-[0_4px_16px_rgba(37,99,235,0.10)] hover:border-blue-200/80",
+        // Dark: deep slate glass card — no light bleed
+        "dark:border-slate-700/60 dark:bg-slate-800/70 dark:shadow-none dark:hover:border-blue-600/50 dark:hover:bg-slate-800/90"
+      )}
+    >
       <div className="flex items-center gap-1.5">
         {accent && (
           <span
-            className="h-2 w-2 shrink-0 rounded-full"
+            className="h-1.5 w-1.5 shrink-0 rounded-full"
             style={{ background: accent }}
             aria-hidden
           />
         )}
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">
+        <span className="truncate text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
           {label}
         </span>
       </div>
-      <div className="console-num mt-1 text-xl font-extrabold leading-none tracking-tight text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
+      <div className="console-num mt-1 text-[1.35rem] font-extrabold leading-none tracking-tight text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
         {value}
       </div>
       {hint && (
-        <div className="mt-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+        <div className="mt-1 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
           {hint}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
