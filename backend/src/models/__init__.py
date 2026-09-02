@@ -8,7 +8,6 @@ from src.models.learning import LearningEvent  # noqa: F401
 from src.models.gamification import (  # noqa: F401
     ChestClaim,
     GamificationProfile,
-    StreakDay,
     XpTransaction,
 )
 from src.models.lesson import Lesson, LessonSlide  # noqa: F401

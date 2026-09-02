@@ -1,5 +1,5 @@
 """
-Gamification — streaks, XP and reward chests.
+Gamification — XP and reward chests.
 
 Design notes
 ------------
@@ -15,17 +15,23 @@ Everything that grants something is idempotent by construction:
   XpTransaction.idempotency_key   UNIQUE per student, so the same lesson or
                                   quiz attempt can never pay out twice no
                                   matter how often the client retries.
-  StreakDay(student, local_date)  UNIQUE, so a day counts once however many
-                                  lessons are finished in it.
   ChestClaim(student, chest_index) UNIQUE, so a chest cannot be claimed twice.
 
-Those three constraints are the real enforcement. The service layer checks
+Those two constraints are the real enforcement. The service layer checks
 first for a clean response, but the database is what makes it safe under
 concurrent or duplicated requests.
+
+Note: this module used to also track a daily streak (a `StreakDay` model and
+`current_streak` / `longest_streak` / `last_active_date` / `timezone` fields
+on GamificationProfile). That concept was removed — closing knowledge gaps
+isn't necessarily a daily activity, so a daily-streak mechanic didn't fit the
+product. The underlying `streak_days` table is left in place in the database
+(unused, not written to or read from here) rather than dropped, since this
+runs against a live database — see src/core/database.py's migration comment.
 """
 
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 
@@ -48,7 +54,7 @@ class GamificationProfile(SQLModel, table=True):
     """
     One row per student holding only *derived reward state* — never learning
     data. Totals here are maintained by the service and are always
-    reconstructible from XpTransaction / StreakDay if they ever need repair.
+    reconstructible from XpTransaction if they ever need repair.
     """
 
     __tablename__ = "gamification_profiles"
@@ -58,20 +64,6 @@ class GamificationProfile(SQLModel, table=True):
 
     # Running total, kept as the sum of this student's XpTransaction rows.
     total_xp: int = Field(default=0)
-
-    current_streak: int = Field(default=0)
-    longest_streak: int = Field(default=0)
-
-    # The student's local calendar date of their last qualifying activity.
-    # A date, not a timestamp: the streak question is "which day was it", and
-    # storing the answer avoids re-deriving it from a timestamp under a
-    # timezone that may since have changed.
-    last_active_date: Optional[date] = Field(default=None)
-
-    # IANA zone used to decide which calendar day activity falls in. Persisted
-    # rather than taken per-request so a student cannot harvest extra streak
-    # days by hopping timezones between calls.
-    timezone: str = Field(default="UTC", max_length=64)
 
     # How many chests have been claimed. Chest N unlocks at
     # (N + 1) * LESSONS_PER_CHEST lifetime lesson completions.
@@ -110,29 +102,6 @@ class XpTransaction(SQLModel, table=True):
     detail: Optional[str] = Field(default=None, max_length=300)
 
     created_at: datetime = Field(default_factory=_utcnow, index=True)
-
-
-class StreakDay(SQLModel, table=True):
-    """
-    One row per student per local calendar day on which they did something
-    that counts. The unique constraint is what stops a day being counted more
-    than once, and the rows are what let the dashboard draw a real week strip
-    instead of assuming which days were active.
-    """
-
-    __tablename__ = "streak_days"
-    __table_args__ = (
-        UniqueConstraint("student_id", "local_date", name="uq_streak_student_day"),
-    )
-
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    student_id: uuid.UUID = Field(foreign_key="students.id", index=True)
-
-    local_date: date = Field(index=True)
-
-    # What made the day qualify — kept for auditing why a streak advanced.
-    first_activity: str = Field(max_length=30)
-    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class ChestClaim(SQLModel, table=True):

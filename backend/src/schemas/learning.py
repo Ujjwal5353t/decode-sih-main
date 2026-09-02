@@ -123,12 +123,7 @@ class ClassProgressOut(BaseModel):
     students: list[ClassStudentProgressOut]
 
 
-# ── Gamification (streak / XP / chests) ───────────────────────────────────────
-
-class StreakDayOut(BaseModel):
-    date: str
-    active: bool
-
+# ── Gamification (XP / chests) ──────────────────────────────────────────────
 
 class ChestStateOut(BaseModel):
     index: int
@@ -140,15 +135,9 @@ class ChestStateOut(BaseModel):
 
 
 class GamificationSummaryOut(BaseModel):
-    """Everything the dashboard's streak / XP / chest widgets render."""
+    """Everything the dashboard's XP / chest widgets render."""
 
     total_xp: int
-    current_streak: int
-    longest_streak: int
-    last_active_date: Optional[str] = None
-    active_today: bool
-    timezone: str
-    week: list[StreakDayOut]
     lessons_completed: int
     chest: ChestStateOut
     badges: list[str] = Field(default_factory=list)
