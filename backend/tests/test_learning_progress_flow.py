@@ -27,7 +27,6 @@ from sqlmodel import SQLModel, select
 from src.models.gamification import (
     ChestClaim,
     GamificationProfile,
-    StreakDay,
     XpTransaction,
 )
 from src.models.learning import LearningEvent, LearningEventType
@@ -57,11 +56,10 @@ async def _fresh_db():
                 TeacherClassAssignment.__table__,
                 Lesson.__table__,
                 LearningEvent.__table__,
-                # ingest_events awards XP / streak days in the same
-                # transaction, so these must exist here too.
+                # ingest_events awards XP in the same transaction, so these
+                # must exist here too.
                 GamificationProfile.__table__,
                 XpTransaction.__table__,
-                StreakDay.__table__,
                 ChestClaim.__table__,
             ],
         )

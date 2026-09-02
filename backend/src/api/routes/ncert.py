@@ -94,8 +94,10 @@ async def upload_ncert_book_pdf(
     _: Annotated[object, Depends(get_current_school_or_admin)],
     session: AsyncSession = Depends(get_session),
 ):
-    book = await ncert_service.upload_ncert_pdf(book_id, file, session)
-    return NCERTBookOut.model_validate(book)
+    book, ingestion_status = await ncert_service.upload_ncert_pdf(book_id, file, session)
+    out = NCERTBookOut.model_validate(book)
+    out.chunk_ingestion_status = ingestion_status
+    return out
 
 
 @router.post(
@@ -119,8 +121,10 @@ async def create_ncert_book(
         title=title,
         description=description,
     )
-    book = await ncert_service.create_ncert_book(data, file, session)
-    return NCERTBookOut.model_validate(book)
+    book, ingestion_status = await ncert_service.create_ncert_book(data, file, session)
+    out = NCERTBookOut.model_validate(book)
+    out.chunk_ingestion_status = ingestion_status
+    return out
 
 
 @router.put(

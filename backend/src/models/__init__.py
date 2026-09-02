@@ -8,7 +8,6 @@ from src.models.learning import LearningEvent  # noqa: F401
 from src.models.gamification import (  # noqa: F401
     ChestClaim,
     GamificationProfile,
-    StreakDay,
     XpTransaction,
 )
 from src.models.lesson import Lesson, LessonSlide  # noqa: F401
@@ -40,4 +39,5 @@ from src.models.teacher import (  # noqa: F401
 )
 from src.models.chunk import DocumentChunk  # noqa: F401
 from src.models.module_translation import ModuleTranslation, TranslationStatus  # noqa: F401
+from src.models.remediation import RemediationAttempt  # noqa: F401
 

@@ -75,7 +75,12 @@ export interface AdminProfile {
 export type ModuleSourceType = "pdf_upload" | "image_upload" | "ncert";
 
 /** Mirrors backend `OcrStatus` — pending | processing | done | failed | na. */
-export type OcrStatusValue = "pending" | "processing" | "done" | "failed" | "na";
+export type OcrStatusValue =
+  | "pending"
+  | "processing"
+  | "done"
+  | "failed"
+  | "na";
 
 export interface ModuleOut {
   id: string;
@@ -141,7 +146,9 @@ export interface RolePermissionsResponse {
   navigation: DashboardPermissionItem[];
 }
 
-export async function getRolePermissions(role?: Role): Promise<RolePermissionsResponse> {
+export async function getRolePermissions(
+  role?: Role,
+): Promise<RolePermissionsResponse> {
   const q = role ? `?role=${encodeURIComponent(role)}` : "";
   return fetchApi<RolePermissionsResponse>(`/auth/permissions${q}`);
 }
@@ -274,7 +281,7 @@ export interface ApiError extends Error {
 // Universal Fetch Wrapper
 async function fetchApi<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
   const token = getStoredToken();
   const headers: Record<string, string> = {
@@ -287,7 +294,7 @@ async function fetchApi<T>(
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -298,7 +305,9 @@ async function fetchApi<T>(
     clearTimeout(timeoutId);
 
     // Sliding window token update check from backend header
-    const refreshedToken = response.headers.get("x-access-token") || response.headers.get("X-Access-Token");
+    const refreshedToken =
+      response.headers.get("x-access-token") ||
+      response.headers.get("X-Access-Token");
     if (refreshedToken) {
       const currentRole = getStoredRole();
       if (currentRole) {
@@ -331,12 +340,19 @@ async function fetchApi<T>(
   } catch (err: any) {
     clearTimeout(timeoutId);
     if (err.name === "AbortError") {
-      const error = new Error("Server request timed out after 15 seconds. Please check if the backend server is running.") as ApiError;
+      const error = new Error(
+        "Server request timed out after 15 seconds. Please check if the backend server is running.",
+      ) as ApiError;
       error.status = 504;
       throw error;
     }
-    if (err instanceof TypeError && (err.message.includes("fetch") || err.message.includes("NetworkError"))) {
-      const error = new Error("Unable to connect to backend server. Please check if the backend is running on http://localhost:8000.") as ApiError;
+    if (
+      err instanceof TypeError &&
+      (err.message.includes("fetch") || err.message.includes("NetworkError"))
+    ) {
+      const error = new Error(
+        "Unable to connect to backend server. Please check if the backend is running on http://localhost:8000.",
+      ) as ApiError;
       error.status = 503;
       throw error;
     }
@@ -353,7 +369,10 @@ export async function sendOTP(phone_number: string): Promise<OTPResponse> {
   });
 }
 
-export async function verifyOTP(phone_number: string, otp_code: string): Promise<OTPResponse> {
+export async function verifyOTP(
+  phone_number: string,
+  otp_code: string,
+): Promise<OTPResponse> {
   return fetchApi<OTPResponse>("/auth/otp/verify", {
     method: "POST",
     body: JSON.stringify({ phone_number, otp_code }),
@@ -486,7 +505,9 @@ export async function loginAdmin(payload: {
   return res;
 }
 
-export async function refreshAuthToken(access_token: string): Promise<TokenResponse> {
+export async function refreshAuthToken(
+  access_token: string,
+): Promise<TokenResponse> {
   const res = await fetchApi<TokenResponse>("/auth/token/refresh", {
     method: "POST",
     body: JSON.stringify({ access_token }),
@@ -550,15 +571,17 @@ export async function getSchoolClasses(): Promise<number[]> {
 }
 
 export async function getSchoolClassModules(
-  class_number: number
+  class_number: number,
 ): Promise<ModuleOut[]> {
   return fetchApi<ModuleOut[]>(`/school/classes/${class_number}/modules`);
 }
 
 export async function getSchoolClassQuizSummaries(
-  class_number: number
+  class_number: number,
 ): Promise<StudentQuizSummaryOut[]> {
-  return fetchApi<StudentQuizSummaryOut[]>(`/school/classes/${class_number}/quiz-summaries`);
+  return fetchApi<StudentQuizSummaryOut[]>(
+    `/school/classes/${class_number}/quiz-summaries`,
+  );
 }
 
 export async function getParentChildren(): Promise<ChildLinkOut[]> {
@@ -575,38 +598,46 @@ export async function addParentChild(payload: {
 }
 
 export async function getChildProfile(
-  student_unique_number: string
+  student_unique_number: string,
 ): Promise<StudentProfile> {
   return fetchApi<StudentProfile>(
-    `/parent/children/${student_unique_number}/profile`
+    `/parent/children/${student_unique_number}/profile`,
   );
 }
 
 // Returns null (not thrown) if the child hasn't completed the diagnostic yet,
 // since that's an expected state a parent dashboard needs to render around.
 export async function getChildQuizResult(
-  student_unique_number: string
+  student_unique_number: string,
 ): Promise<GapReportOut | null> {
   try {
     return await fetchApi<GapReportOut>(
-      `/parent/children/${student_unique_number}/quiz-result`
+      `/parent/children/${student_unique_number}/quiz-result`,
     );
   } catch (err: any) {
-    if (err?.message?.includes("has not completed their diagnostic")) return null;
+    if (err?.message?.includes("has not completed their diagnostic"))
+      return null;
     throw err;
   }
 }
 
-export async function searchSchools(query?: string): Promise<SchoolSearchResult[]> {
+export async function searchSchools(
+  query?: string,
+): Promise<SchoolSearchResult[]> {
   const param = query ? `?query=${encodeURIComponent(query)}` : "";
   return fetchApi<SchoolSearchResult[]>(`/auth/schools/search${param}`);
 }
 
-export async function getNCERTBooksForClass(class_number: number): Promise<NCERTBookOut[]> {
+export async function getNCERTBooksForClass(
+  class_number: number,
+): Promise<NCERTBookOut[]> {
   return fetchApi<NCERTBookOut[]>(`/ncert/books/class/${class_number}`);
 }
 
-export async function getAllNCERTBooks(class_number?: number, subject?: string): Promise<NCERTBookOut[]> {
+export async function getAllNCERTBooks(
+  class_number?: number,
+  subject?: string,
+): Promise<NCERTBookOut[]> {
   const params = new URLSearchParams();
   if (class_number) params.append("class_number", class_number.toString());
   if (subject) params.append("subject", subject);
@@ -614,27 +645,37 @@ export async function getAllNCERTBooks(class_number?: number, subject?: string):
   return fetchApi<NCERTBookOut[]>(`/ncert/books${q}`);
 }
 
-export async function uploadNCERTBookPdf(book_id: string, file: File): Promise<NCERTBookOut> {
+export async function uploadNCERTBookPdf(
+  book_id: string,
+  file: File,
+): Promise<NCERTBookOut> {
   const token = getStoredToken();
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API_BASE_URL}/ncert/books/${book_id}/upload-pdf`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/ncert/books/${book_id}/upload-pdf`,
+    {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    },
+  );
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     throw new Error(
-      typeof err.detail === "string" ? err.detail : "Failed to upload NCERT PDF file."
+      typeof err.detail === "string"
+        ? err.detail
+        : "Failed to upload NCERT PDF file.",
     );
   }
   return response.json();
 }
 
-export async function createNCERTBook(formData: FormData): Promise<NCERTBookOut> {
+export async function createNCERTBook(
+  formData: FormData,
+): Promise<NCERTBookOut> {
   const token = getStoredToken();
   const response = await fetch(`${API_BASE_URL}/ncert/books`, {
     method: "POST",
@@ -645,7 +686,9 @@ export async function createNCERTBook(formData: FormData): Promise<NCERTBookOut>
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     throw new Error(
-      typeof err.detail === "string" ? err.detail : "Failed to create NCERT book."
+      typeof err.detail === "string"
+        ? err.detail
+        : "Failed to create NCERT book.",
     );
   }
   return response.json();
@@ -653,7 +696,12 @@ export async function createNCERTBook(formData: FormData): Promise<NCERTBookOut>
 
 export async function updateNCERTBook(
   book_id: string,
-  payload: { title?: string; subject?: string; description?: string; class_number?: number }
+  payload: {
+    title?: string;
+    subject?: string;
+    description?: string;
+    class_number?: number;
+  },
 ): Promise<NCERTBookOut> {
   return fetchApi<NCERTBookOut>(`/ncert/books/${book_id}`, {
     method: "PUT",
@@ -661,7 +709,9 @@ export async function updateNCERTBook(
   });
 }
 
-export async function detachNCERTBookFile(book_id: string): Promise<NCERTBookOut> {
+export async function detachNCERTBookFile(
+  book_id: string,
+): Promise<NCERTBookOut> {
   return fetchApi<NCERTBookOut>(`/ncert/books/${book_id}/file`, {
     method: "DELETE",
   });
@@ -676,7 +726,7 @@ export async function deleteNCERTBook(book_id: string): Promise<void> {
 export async function addNCERTModuleToSchool(
   class_number: number,
   ncert_book_id: string,
-  title?: string
+  title?: string,
 ): Promise<ModuleOut> {
   return fetchApi<ModuleOut>(`/school/classes/${class_number}/modules/ncert`, {
     method: "POST",
@@ -722,7 +772,7 @@ export interface TeacherClassOut {
   class_number: number;
   section: string;
   subject: string;
-  label: string;  // e.g. "4A • Mathematics"
+  label: string; // e.g. "4A • Mathematics"
   assigned_at: string;
 }
 
@@ -737,7 +787,7 @@ export interface AssignmentOut {
   description: string | null;
   assignment_type: "pdf_upload" | "ai_quiz";
   file_url: string | null;
-  module_ids: string | null;  // JSON array string
+  module_ids: string | null; // JSON array string
   deadline_at: string | null;
   is_locked: boolean;
   created_at: string;
@@ -808,7 +858,6 @@ export interface StudentTestResultSummaryOut {
   teacher_feedback: FeedbackOut | null;
 }
 
-
 export interface FeedbackOut {
   id: string;
   assignment_id: string;
@@ -870,31 +919,37 @@ export async function getTeacherClasses(): Promise<TeacherClassOut[]> {
 
 export async function getTeacherClassStudents(
   class_number: number,
-  section: string
+  section: string,
 ): Promise<StudentProfile[]> {
-  return fetchApi<StudentProfile[]>(`/teacher/classes/${class_number}/${section}/students`);
+  return fetchApi<StudentProfile[]>(
+    `/teacher/classes/${class_number}/${section}/students`,
+  );
 }
 
 export async function getTeacherClassModules(
   class_number: number,
   section: string,
-  subject?: string
+  subject?: string,
 ): Promise<ModuleOut[]> {
   const query = subject ? `?subject=${encodeURIComponent(subject)}` : "";
-  return fetchApi<ModuleOut[]>(`/teacher/classes/${class_number}/${section}/modules${query}`);
+  return fetchApi<ModuleOut[]>(
+    `/teacher/classes/${class_number}/${section}/modules${query}`,
+  );
 }
 
 export async function getTeacherAssignments(
   class_number: number,
-  section: string
+  section: string,
 ): Promise<AssignmentOut[]> {
-  return fetchApi<AssignmentOut[]>(`/teacher/classes/${class_number}/${section}/assignments`);
+  return fetchApi<AssignmentOut[]>(
+    `/teacher/classes/${class_number}/${section}/assignments`,
+  );
 }
 
 export async function createPdfAssignment(
   class_number: number,
   section: string,
-  formData: FormData
+  formData: FormData,
 ): Promise<AssignmentOut> {
   const token = getStoredToken();
   const response = await fetch(
@@ -903,12 +958,14 @@ export async function createPdfAssignment(
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
-    }
+    },
   );
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     throw new Error(
-      typeof err.detail === "string" ? err.detail : "Failed to create PDF assignment."
+      typeof err.detail === "string"
+        ? err.detail
+        : "Failed to create PDF assignment.",
     );
   }
   return response.json();
@@ -967,26 +1024,30 @@ export interface AssignmentQuizPreviewOut {
 export async function getTeacherClassChapters(
   class_number: number,
   subject?: string,
-  module_id?: string
+  module_id?: string,
 ): Promise<ChapterOut[]> {
   const params = new URLSearchParams();
   if (subject) params.append("subject", subject);
   if (module_id) params.append("module_id", module_id);
   const query = params.toString() ? `?${params.toString()}` : "";
-  return fetchApi<ChapterOut[]>(`/teacher/classes/${class_number}/chapters${query}`);
+  return fetchApi<ChapterOut[]>(
+    `/teacher/classes/${class_number}/chapters${query}`,
+  );
 }
 
 export async function getTeacherChapterChunks(
   class_number: number,
   chapter_number: number,
   subject?: string,
-  module_id?: string
+  module_id?: string,
 ): Promise<ChunkOut[]> {
   const params = new URLSearchParams();
   if (subject) params.append("subject", subject);
   if (module_id) params.append("module_id", module_id);
   const query = params.toString() ? `?${params.toString()}` : "";
-  return fetchApi<ChunkOut[]>(`/teacher/classes/${class_number}/chapters/${chapter_number}/chunks${query}`);
+  return fetchApi<ChunkOut[]>(
+    `/teacher/classes/${class_number}/chapters/${chapter_number}/chunks${query}`,
+  );
 }
 
 export async function createAiQuizAssignment(
@@ -999,23 +1060,25 @@ export async function createAiQuizAssignment(
     module_ids?: string[];
     chapter_numbers?: number[];
     deadline_days?: number | null;
-  }
+  },
 ): Promise<AssignmentOut> {
   return fetchApi<AssignmentOut>(
     `/teacher/classes/${class_number}/${section}/assignments/ai-quiz`,
-    { method: "POST", body: JSON.stringify(payload) }
+    { method: "POST", body: JSON.stringify(payload) },
   );
 }
 
 export async function getAssignmentQuizPreview(
-  assignment_id: string
+  assignment_id: string,
 ): Promise<AssignmentQuizPreviewOut> {
-  return fetchApi<AssignmentQuizPreviewOut>(`/teacher/assignments/${assignment_id}/quiz-preview`);
+  return fetchApi<AssignmentQuizPreviewOut>(
+    `/teacher/assignments/${assignment_id}/quiz-preview`,
+  );
 }
 
 export async function updateAssignment(
   assignment_id: string,
-  payload: { title?: string; description?: string; deadline_days?: number }
+  payload: { title?: string; description?: string; deadline_days?: number },
 ): Promise<AssignmentOut> {
   return fetchApi<AssignmentOut>(`/teacher/assignments/${assignment_id}`, {
     method: "PATCH",
@@ -1024,44 +1087,48 @@ export async function updateAssignment(
 }
 
 export async function deleteAssignment(assignment_id: string): Promise<void> {
-  await fetchApi<{}>(`/teacher/assignments/${assignment_id}`, { method: "DELETE" });
+  await fetchApi<{}>(`/teacher/assignments/${assignment_id}`, {
+    method: "DELETE",
+  });
 }
 
 export async function getAssignmentSubmissions(
-  assignment_id: string
+  assignment_id: string,
 ): Promise<SubmissionOut[]> {
-  return fetchApi<SubmissionOut[]>(`/teacher/assignments/${assignment_id}/submissions`);
+  return fetchApi<SubmissionOut[]>(
+    `/teacher/assignments/${assignment_id}/submissions`,
+  );
 }
 
 export async function setSubmissionScore(
   assignment_id: string,
   student_id: string,
   score: number,
-  max_score: number
+  max_score: number,
 ): Promise<SubmissionOut> {
   return fetchApi<SubmissionOut>(
     `/teacher/assignments/${assignment_id}/submissions/${student_id}/score`,
-    { method: "PATCH", body: JSON.stringify({ score, max_score }) }
+    { method: "PATCH", body: JSON.stringify({ score, max_score }) },
   );
 }
 
 export async function postStudentFeedback(
   assignment_id: string,
   student_id: string,
-  feedback_text: string
+  feedback_text: string,
 ): Promise<FeedbackOut> {
   return fetchApi<FeedbackOut>(
     `/teacher/assignments/${assignment_id}/students/${student_id}/feedback`,
-    { method: "POST", body: JSON.stringify({ feedback_text }) }
+    { method: "POST", body: JSON.stringify({ feedback_text }) },
   );
 }
 
 export async function getStudentFeedbackForAssignment(
   assignment_id: string,
-  student_id: string
+  student_id: string,
 ): Promise<FeedbackOut | null> {
   return fetchApi<FeedbackOut | null>(
-    `/teacher/assignments/${assignment_id}/students/${student_id}/feedback`
+    `/teacher/assignments/${assignment_id}/students/${student_id}/feedback`,
   );
 }
 
@@ -1072,18 +1139,23 @@ export async function getStudentAssignments(): Promise<AssignmentOut[]> {
 }
 
 export async function submitStudentAssignment(
-  assignment_id: string
+  assignment_id: string,
 ): Promise<SubmissionOut> {
-  return fetchApi<SubmissionOut>(`/student/assignments/${assignment_id}/submit`, {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
+  return fetchApi<SubmissionOut>(
+    `/student/assignments/${assignment_id}/submit`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
 }
 
 export async function getStudentAssignmentFeedback(
-  assignment_id: string
+  assignment_id: string,
 ): Promise<FeedbackOut | null> {
-  return fetchApi<FeedbackOut | null>(`/student/assignments/${assignment_id}/feedback`);
+  return fetchApi<FeedbackOut | null>(
+    `/student/assignments/${assignment_id}/feedback`,
+  );
 }
 
 // ── School Admin Teacher Management ───────────────────────────────────────────
@@ -1096,12 +1168,15 @@ export async function assignClassToTeacher(
   teacher_id: string,
   class_number: number,
   section: string,
-  subject: string
+  subject: string,
 ): Promise<TeacherClassOut> {
-  return fetchApi<TeacherClassOut>(`/school/teachers/${teacher_id}/assign-class`, {
-    method: "POST",
-    body: JSON.stringify({ class_number, section, subject }),
-  });
+  return fetchApi<TeacherClassOut>(
+    `/school/teachers/${teacher_id}/assign-class`,
+    {
+      method: "POST",
+      body: JSON.stringify({ class_number, section, subject }),
+    },
+  );
 }
 
 export async function deassignClassFromTeacher(
@@ -1109,18 +1184,18 @@ export async function deassignClassFromTeacher(
   class_number?: number,
   section?: string,
   subject?: string,
-  assignment_id?: string
+  assignment_id?: string,
 ): Promise<void> {
   if (assignment_id) {
     await fetchApi<{}>(
       `/school/teachers/${teacher_id}/assignments/${assignment_id}`,
-      { method: "DELETE" }
+      { method: "DELETE" },
     );
   } else {
     const q = subject ? `?subject=${encodeURIComponent(subject)}` : "";
     await fetchApi<{}>(
       `/school/teachers/${teacher_id}/assign-class/${class_number}/${section}${q}`,
-      { method: "DELETE" }
+      { method: "DELETE" },
     );
   }
 }
@@ -1135,7 +1210,9 @@ export async function deassignClassFromTeacher(
  * Mirrors `GET /files/view-pdf`, which streams both local `/uploads/...` paths
  * and remote Cloudinary URLs with the right `Content-Type`.
  */
-export function buildPdfViewUrl(url: string | null | undefined): string | undefined {
+export function buildPdfViewUrl(
+  url: string | null | undefined,
+): string | undefined {
   if (!url) return undefined;
   return `${API_BASE_URL}/files/view-pdf?url=${encodeURIComponent(url)}`;
 }
@@ -1150,7 +1227,10 @@ export function buildPdfViewUrl(url: string | null | undefined): string | undefi
 function uploadFormData<T>(
   endpoint: string,
   formData: FormData,
-  options: { method?: "POST" | "PUT"; onProgress?: (percent: number) => void } = {}
+  options: {
+    method?: "POST" | "PUT";
+    onProgress?: (percent: number) => void;
+  } = {},
 ): Promise<T> {
   const { method = "POST", onProgress } = options;
 
@@ -1225,7 +1305,7 @@ export async function uploadSchoolPdfModule(
   title: string,
   file: File,
   onProgress?: (percent: number) => void,
-  subject?: string
+  subject?: string,
 ): Promise<ModuleOut> {
   const formData = new FormData();
   formData.append("title", title);
@@ -1234,7 +1314,7 @@ export async function uploadSchoolPdfModule(
   return uploadFormData<ModuleOut>(
     `/school/classes/${class_number}/modules/pdf`,
     formData,
-    { onProgress }
+    { onProgress },
   );
 }
 
@@ -1248,7 +1328,7 @@ export async function uploadSchoolImagesModule(
   title: string,
   files: File[],
   onProgress?: (percent: number) => void,
-  subject?: string
+  subject?: string,
 ): Promise<ModuleOut> {
   const formData = new FormData();
   formData.append("title", title);
@@ -1257,10 +1337,9 @@ export async function uploadSchoolImagesModule(
   return uploadFormData<ModuleOut>(
     `/school/classes/${class_number}/modules/images`,
     formData,
-    { onProgress }
+    { onProgress },
   );
 }
-
 
 /**
  * PUT /school/classes/{class_number}/modules/{module_id}/replace-images
@@ -1272,7 +1351,7 @@ export async function replaceSchoolModuleImages(
   module_id: string,
   files: File[],
   title?: string,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
 ): Promise<ModuleOut> {
   const formData = new FormData();
   if (title) formData.append("title", title);
@@ -1280,17 +1359,17 @@ export async function replaceSchoolModuleImages(
   return uploadFormData<ModuleOut>(
     `/school/classes/${class_number}/modules/${module_id}/replace-images`,
     formData,
-    { method: "PUT", onProgress }
+    { method: "PUT", onProgress },
   );
 }
 
 /** GET /school/classes/{class_number}/modules/{module_id}/ocr — poll OCR state. */
 export async function getModuleOcrStatus(
   class_number: number,
-  module_id: string
+  module_id: string,
 ): Promise<OcrStatusOut> {
   return fetchApi<OcrStatusOut>(
-    `/school/classes/${class_number}/modules/${module_id}/ocr`
+    `/school/classes/${class_number}/modules/${module_id}/ocr`,
   );
 }
 
@@ -1298,18 +1377,18 @@ export async function getModuleOcrStatus(
 export async function updateSchoolModuleTitle(
   class_number: number,
   module_id: string,
-  title: string
+  title: string,
 ): Promise<ModuleOut> {
   return fetchApi<ModuleOut>(
     `/school/classes/${class_number}/modules/${module_id}/title`,
-    { method: "PATCH", body: JSON.stringify({ title }) }
+    { method: "PATCH", body: JSON.stringify({ title }) },
   );
 }
 
 /** DELETE /school/classes/{class_number}/modules/{module_id} */
 export async function deleteSchoolModule(
   class_number: number,
-  module_id: string
+  module_id: string,
 ): Promise<void> {
   await fetchApi<void>(`/school/classes/${class_number}/modules/${module_id}`, {
     method: "DELETE",
@@ -1396,16 +1475,20 @@ export interface OwnerClaimListItem {
 }
 
 /** List all textbook publishers and their available subjects */
-export async function getPublishersWithSubjects(): Promise<PublisherWithSubjectsOut[]> {
-  return fetchApi<PublisherWithSubjectsOut[]>("/school-verification/publishers");
+export async function getPublishersWithSubjects(): Promise<
+  PublisherWithSubjectsOut[]
+> {
+  return fetchApi<PublisherWithSubjectsOut[]>(
+    "/school-verification/publishers",
+  );
 }
 
 /** Official school record by UDISE code. */
 export async function lookupSchoolByUdise(
-  udise_code: string
+  udise_code: string,
 ): Promise<SchoolRecordOut> {
   return fetchApi<SchoolRecordOut>(
-    `/school-verification/lookup?udise_code=${encodeURIComponent(udise_code)}`
+    `/school-verification/lookup?udise_code=${encodeURIComponent(udise_code)}`,
   );
 }
 
@@ -1420,27 +1503,33 @@ export async function searchSchoolDirectory(params: {
   if (params.state?.trim()) query.append("state", params.state.trim());
   if (params.district?.trim()) query.append("district", params.district.trim());
   return fetchApi<SchoolRecordOut[]>(
-    `/school-verification/search?${query.toString()}`
+    `/school-verification/search?${query.toString()}`,
   );
 }
 
 export async function sendSchoolEmailCode(
-  email: string
+  email: string,
 ): Promise<EmailVerificationResponse> {
-  return fetchApi<EmailVerificationResponse>("/school-verification/email/send", {
-    method: "POST",
-    body: JSON.stringify({ email }),
-  });
+  return fetchApi<EmailVerificationResponse>(
+    "/school-verification/email/send",
+    {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    },
+  );
 }
 
 export async function verifySchoolEmailCode(
   email: string,
-  code: string
+  code: string,
 ): Promise<EmailVerificationResponse> {
-  return fetchApi<EmailVerificationResponse>("/school-verification/email/verify", {
-    method: "POST",
-    body: JSON.stringify({ email, code }),
-  });
+  return fetchApi<EmailVerificationResponse>(
+    "/school-verification/email/verify",
+    {
+      method: "POST",
+      body: JSON.stringify({ email, code }),
+    },
+  );
 }
 
 export async function createSchoolClaim(payload: {
@@ -1458,20 +1547,22 @@ export async function createSchoolClaim(payload: {
   });
 }
 
-export async function getSchoolClaim(claim_id: string): Promise<ClaimStatusOut> {
+export async function getSchoolClaim(
+  claim_id: string,
+): Promise<ClaimStatusOut> {
   return fetchApi<ClaimStatusOut>(`/school-verification/claims/${claim_id}`);
 }
 
 /** Attach a supporting authority document. Never approves the claim by itself. */
 export async function uploadClaimEvidence(
   claim_id: string,
-  file: File
+  file: File,
 ): Promise<ClaimStatusOut> {
   const formData = new FormData();
   formData.append("file", file);
   return uploadFormData<ClaimStatusOut>(
     `/school-verification/claims/${claim_id}/evidence`,
-    formData
+    formData,
   );
 }
 
@@ -1480,11 +1571,11 @@ export async function uploadClaimEvidence(
  * Fails with 403 while the claim is pending or rejected.
  */
 export async function activateSchoolClaim(
-  claim_id: string
+  claim_id: string,
 ): Promise<TokenResponse> {
   const res = await fetchApi<TokenResponse>(
     `/school-verification/claims/${claim_id}/activate`,
-    { method: "POST", body: JSON.stringify({}) }
+    { method: "POST", body: JSON.stringify({}) },
   );
   setStoredAuth(res.access_token, "school");
   return res;
@@ -1498,21 +1589,21 @@ export async function getOwnerClaimRequests(): Promise<OwnerClaimListItem[]> {
 
 export async function approveOwnerClaim(
   claim_id: string,
-  reason?: string
+  reason?: string,
 ): Promise<ClaimStatusOut> {
   return fetchApi<ClaimStatusOut>(
     `/school-verification/owner/requests/${claim_id}/approve`,
-    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) }
+    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) },
   );
 }
 
 export async function rejectOwnerClaim(
   claim_id: string,
-  reason?: string
+  reason?: string,
 ): Promise<ClaimStatusOut> {
   return fetchApi<ClaimStatusOut>(
     `/school-verification/owner/requests/${claim_id}/reject`,
-    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) }
+    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) },
   );
 }
 
@@ -1544,9 +1635,8 @@ export interface SchoolRequestListItem {
   admin_access_granted: boolean;
 }
 
-
 export async function getSchoolRegistrationRequests(
-  status?: ClaimStatusValue
+  status?: ClaimStatusValue,
 ): Promise<SchoolRequestListItem[]> {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
   return fetchApi<SchoolRequestListItem[]>(`/admin/school-requests${query}`);
@@ -1554,21 +1644,21 @@ export async function getSchoolRegistrationRequests(
 
 export async function approveSchoolRequest(
   claim_id: string,
-  reason?: string
+  reason?: string,
 ): Promise<SchoolRequestListItem> {
   return fetchApi<SchoolRequestListItem>(
     `/admin/school-requests/${claim_id}/approve`,
-    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) }
+    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) },
   );
 }
 
 export async function rejectSchoolRequest(
   claim_id: string,
-  reason?: string
+  reason?: string,
 ): Promise<SchoolRequestListItem> {
   return fetchApi<SchoolRequestListItem>(
     `/admin/school-requests/${claim_id}/reject`,
-    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) }
+    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) },
   );
 }
 
@@ -1601,14 +1691,14 @@ export interface SchoolSubjectDetail {
 }
 
 export async function getSchoolSubjects(
-  class_number?: number
+  class_number?: number,
 ): Promise<SchoolSubjectDetail[]> {
   const q = class_number ? `?class_number=${class_number}` : "";
   return fetchApi<SchoolSubjectDetail[]>(`/school/subjects${q}`);
 }
 
 export async function saveSchoolSubjectSetup(
-  classes: { class_number: number; subjects: string[] }[]
+  classes: { class_number: number; subjects: string[] }[],
 ): Promise<SubjectSetupOut> {
   return fetchApi<SubjectSetupOut>("/school/subject-setup", {
     method: "PUT",
@@ -1629,7 +1719,7 @@ export async function startQuiz(payload?: {
 
 export async function answerQuiz(
   attemptId: string,
-  payload: { question_id: string; selected_option_index: number }
+  payload: { question_id: string; selected_option_index: number },
 ): Promise<AnswerResponse> {
   return fetchApi<AnswerResponse>(`/quiz/${attemptId}/answer`, {
     method: "POST",
@@ -1689,7 +1779,7 @@ export interface LessonOut {
 
 export async function getLessons(
   subject?: string,
-  classNumber?: number
+  classNumber?: number,
 ): Promise<LessonListItemOut[]> {
   const params = new URLSearchParams();
   if (subject) params.append("subject", subject);
@@ -1803,17 +1893,9 @@ export interface ClassProgressOut {
  * rather than recording them twice.
  */
 export async function syncLearningEvents(
-  events: LearningEventPayload[]
+  events: LearningEventPayload[],
 ): Promise<LearningEventSyncResponse> {
-  // Same IANA zone /student/gamification sends, adopted at most once by the
-  // backend (see gamification_service.get_or_create_profile). A lesson
-  // completion is often what creates a student's gamification profile in
-  // the first place, so this needs to carry the real zone too — otherwise
-  // that first-ever profile silently stamps to UTC instead of the
-  // student's actual local day.
-  const tz = browserTimeZone();
-  const q = tz ? `?tz=${encodeURIComponent(tz)}` : "";
-  return fetchApi<LearningEventSyncResponse>(`/student/learning-events${q}`, {
+  return fetchApi<LearningEventSyncResponse>(`/student/learning-events`, {
     method: "POST",
     body: JSON.stringify({ events }),
   });
@@ -1825,73 +1907,92 @@ export async function getStudentLearningProgress(): Promise<StudentProgressOut> 
 
 export async function getClassLearningProgress(
   class_number: number,
-  section: string
+  section: string,
 ): Promise<ClassProgressOut> {
   return fetchApi<ClassProgressOut>(
-    `/teacher/classes/${class_number}/${section}/progress`
+    `/teacher/classes/${class_number}/${section}/progress`,
   );
 }
 
-export async function getAssignmentQuizForStudent(assignmentId: string): Promise<AssignmentQuizPreviewOut> {
-  return fetchApi<AssignmentQuizPreviewOut>(`/student/assignments/${assignmentId}/quiz`);
+export async function getAssignmentQuizForStudent(
+  assignmentId: string,
+): Promise<AssignmentQuizPreviewOut> {
+  return fetchApi<AssignmentQuizPreviewOut>(
+    `/student/assignments/${assignmentId}/quiz`,
+  );
 }
 
 export async function submitAssignmentQuiz(
   assignmentId: string,
-  answers: QuizAnswerInput[]
+  answers: QuizAnswerInput[],
 ): Promise<SubmitQuizAttemptResult> {
-  return fetchApi<SubmitQuizAttemptResult>(`/student/assignments/${assignmentId}/submit-quiz`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ answers }),
-  });
+  return fetchApi<SubmitQuizAttemptResult>(
+    `/student/assignments/${assignmentId}/submit-quiz`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers }),
+    },
+  );
 }
 
 export async function uploadAssignmentResponsePdf(
   assignmentId: string,
-  formData: FormData
+  formData: FormData,
 ): Promise<SubmissionOut> {
   const token = getStoredToken();
-  const res = await fetch(`${API_BASE_URL}/student/assignments/${assignmentId}/upload-response`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
+  const res = await fetch(
+    `${API_BASE_URL}/student/assignments/${assignmentId}/upload-response`,
+    {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    },
+  );
 
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({ detail: "Upload failed." }));
-    throw new Error(errorData.detail || `Upload failed with status ${res.status}`);
+    const errorData = await res
+      .json()
+      .catch(() => ({ detail: "Upload failed." }));
+    throw new Error(
+      errorData.detail || `Upload failed with status ${res.status}`,
+    );
   }
   return res.json();
 }
 
-export async function getStudentAssignmentAttempts(assignmentId: string): Promise<AssignmentAttemptOut[]> {
-  return fetchApi<AssignmentAttemptOut[]>(`/student/assignments/${assignmentId}/attempts`);
+export async function getStudentAssignmentAttempts(
+  assignmentId: string,
+): Promise<AssignmentAttemptOut[]> {
+  return fetchApi<AssignmentAttemptOut[]>(
+    `/student/assignments/${assignmentId}/attempts`,
+  );
 }
 
-export async function getStudentTestResults(): Promise<StudentTestResultSummaryOut[]> {
+export async function getStudentTestResults(): Promise<
+  StudentTestResultSummaryOut[]
+> {
   return fetchApi<StudentTestResultSummaryOut[]>("/student/test-results");
 }
 
-export async function getChildTestResults(studentUniqueNumber: string): Promise<StudentTestResultSummaryOut[]> {
-  return fetchApi<StudentTestResultSummaryOut[]>(`/parent/children/${studentUniqueNumber}/test-results`);
+export async function getChildTestResults(
+  studentUniqueNumber: string,
+): Promise<StudentTestResultSummaryOut[]> {
+  return fetchApi<StudentTestResultSummaryOut[]>(
+    `/parent/children/${studentUniqueNumber}/test-results`,
+  );
 }
 
 export async function getTeacherStudentAttempts(
   assignmentId: string,
-  studentId: string
+  studentId: string,
 ): Promise<AssignmentAttemptOut[]> {
   return fetchApi<AssignmentAttemptOut[]>(
-    `/teacher/assignments/${assignmentId}/students/${studentId}/attempts`
+    `/teacher/assignments/${assignmentId}/students/${studentId}/attempts`,
   );
 }
 
-// ── Gamification: streak, XP, reward chests ───────────────────────────────────
-
-export interface StreakDayOut {
-  date: string;
-  active: boolean;
-}
+// ── Gamification: XP, reward chests ────────────────────────────────────────────
 
 export interface ChestStateOut {
   index: number;
@@ -1904,12 +2005,6 @@ export interface ChestStateOut {
 
 export interface GamificationSummaryOut {
   total_xp: number;
-  current_streak: number;
-  longest_streak: number;
-  last_active_date: string | null;
-  active_today: boolean;
-  timezone: string;
-  week: StreakDayOut[];
   lessons_completed: number;
   chest: ChestStateOut;
   badges: string[];
@@ -1926,31 +2021,74 @@ export interface ClaimChestResponse {
   badge?: string | null;
 }
 
-/**
- * The browser's IANA zone, used only to decide which calendar day activity
- * falls in. The server adopts it once and then pins it, so this can shift a
- * day boundary but never manufacture streak days.
- */
-function browserTimeZone(): string | undefined {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Read-only: fetching this never extends the streak. */
 export async function getGamificationSummary(): Promise<GamificationSummaryOut> {
-  const tz = browserTimeZone();
-  const q = tz ? `?tz=${encodeURIComponent(tz)}` : "";
-  return fetchApi<GamificationSummaryOut>(`/student/gamification${q}`);
+  return fetchApi<GamificationSummaryOut>(`/student/gamification`);
 }
 
 /** Idempotent — a repeat click returns claimed:false rather than paying twice. */
 export async function claimRewardChest(): Promise<ClaimChestResponse> {
-  const tz = browserTimeZone();
-  const q = tz ? `?tz=${encodeURIComponent(tz)}` : "";
-  return fetchApi<ClaimChestResponse>(`/student/gamification/claim-chest${q}`, {
+  return fetchApi<ClaimChestResponse>(`/student/gamification/claim-chest`, {
     method: "POST",
   });
 }
+
+// ── Gap-driven learning modules ─────────────────────────────────────────────
+//
+// Each module is the crux of one earlier-class chapter the diagnostic quiz
+// traced a specific gap back to — not a generic chapter listing. There is no
+// "generate" step: GET always reflects the student's current open gaps.
+
+export interface LearningModuleOut {
+  gap_id: string;
+  subject: string;
+  topic_name: string;
+  topic_description: string | null;
+  origin_class: number;
+  student_current_class: number;
+  chapter_title: string | null;
+  crux_points: string[];
+  quiz_available: boolean;
+  quiz_question_count: number;
+  updated_at: string;
+}
+
+export interface ModuleQuizStartOut {
+  gap_id: string;
+  questions: QuestionOut[];
+}
+
+export interface ModuleQuizResultOut {
+  gap_id: string;
+  correct_count: number;
+  total_count: number;
+  score_percent: number;
+  passed: boolean;
+  gap_resolved: boolean;
+  xp_awarded: number;
+}
+
+export async function getLearningModules(): Promise<LearningModuleOut[]> {
+  const res = await fetchApi<{ modules: LearningModuleOut[] }>("/student/learning-modules");
+  return res.modules;
+}
+
+export async function getLearningModule(gapId: string): Promise<LearningModuleOut> {
+  return fetchApi<LearningModuleOut>(`/student/learning-modules/${gapId}`);
+}
+
+export async function startModuleQuiz(gapId: string): Promise<ModuleQuizStartOut> {
+  return fetchApi<ModuleQuizStartOut>(`/student/learning-modules/${gapId}/quiz/start`, {
+    method: "POST",
+  });
+}
+
+export async function submitModuleQuiz(
+  gapId: string,
+  answers: { question_id: string; selected_option_index: number }[]
+): Promise<ModuleQuizResultOut> {
+  return fetchApi<ModuleQuizResultOut>(`/student/learning-modules/${gapId}/quiz/submit`, {
+    method: "POST",
+    body: JSON.stringify({ answers }),
+  });
+}
+

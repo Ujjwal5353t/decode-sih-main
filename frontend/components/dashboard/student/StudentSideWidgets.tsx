@@ -3,9 +3,7 @@
 import { motion } from "framer-motion";
 import Image from "next/image";
 import {
-  Flame,
   Trophy,
-  Check,
   Sparkles,
   ChevronRight,
   Gift,
@@ -14,8 +12,6 @@ import {
 } from "lucide-react";
 import { GamificationSummaryOut, StudentProfile } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
-
-const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function StudentSideWidgets({
   student,
@@ -33,26 +29,8 @@ export function StudentSideWidgets({
 
   // Every figure below comes from the server. Nothing is defaulted to a
   // flattering number — before the fetch resolves the widgets read zero.
-  const streakDays = summary?.current_streak ?? 0;
   const totalXp = summary?.total_xp ?? 0;
   const chest = summary?.chest;
-
-  // The week strip is built from real StreakDay rows, labelled from each
-  // row's own date rather than assuming the week starts on Monday.
-  const daysOfWeek = (summary?.week ?? []).map((d) => {
-    const parsed = new Date(`${d.date}T00:00:00`);
-    return {
-      day: WEEKDAY_LABELS[parsed.getDay()] ?? "",
-      active: d.active,
-    };
-  });
-
-  // The ring tracks days active this week — the only "goal" the backend can
-  // actually evidence. There is no study-minutes source, so none is invented.
-  const activeThisWeek = daysOfWeek.filter((d) => d.active).length;
-  const dailyGoalProgress = daysOfWeek.length
-    ? Math.round((activeThisWeek / daysOfWeek.length) * 100)
-    : 0;
 
   const leaderboard = [
     { rank: 1, name: "Sophie", xp: 1240, avatar: "👑", isUser: false },
@@ -68,109 +46,9 @@ export function StudentSideWidgets({
     { rank: 5, name: "Liam", xp: 650, avatar: "⚡", isUser: false },
   ];
 
-  // Circular progress calculations for the Daily Goal
-  const radius = 46;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (dailyGoalProgress / 100) * circumference;
-
   return (
     <div className="space-y-6">
-      {/* ── 1. YOUR DAILY GOAL WIDGET ─────────────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-extrabold text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
-            Your Daily Goal
-          </h3>
-          <span className="flex items-center gap-1 text-xs font-bold text-amber-500">
-            <Flame className="h-4 w-4 fill-amber-500 text-amber-500" />
-            <span>{streakDays}d Streak</span>
-          </span>
-        </div>
-
-        {/* Circular Progress Ring */}
-        <div className="my-5 flex flex-col items-center justify-center">
-          <div className="relative flex items-center justify-center">
-            <svg width="128" height="128" className="-rotate-90">
-              {/* Background Ring */}
-              <circle
-                cx="64"
-                cy="64"
-                r={radius}
-                className="stroke-sky-100 dark:stroke-slate-800"
-                strokeWidth="10"
-                fill="transparent"
-              />
-              {/* Animated Progress Ring */}
-              <motion.circle
-                cx="64"
-                cy="64"
-                r={radius}
-                className="stroke-sky-500"
-                strokeWidth="10"
-                strokeDasharray={circumference}
-                initial={{ strokeDashoffset: circumference }}
-                animate={{ strokeDashoffset }}
-                transition={{ duration: 1, ease: "easeOut" }}
-                strokeLinecap="round"
-                fill="transparent"
-              />
-            </svg>
-
-            <div className="absolute flex flex-col items-center justify-center text-center">
-              <Flame className="h-5 w-5 fill-amber-500 text-amber-500" />
-              <span className="text-base font-black leading-tight text-slate-900 dark:text-white">
-                {activeThisWeek}
-                <span className="text-xs font-bold text-slate-400">
-                  /{daysOfWeek.length || 7}d
-                </span>
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                This week
-              </span>
-            </div>
-          </div>
-
-          <p className="mt-3 text-center text-xs font-semibold text-slate-600 dark:text-slate-300">
-            {streakDays > 0 ? (
-              <>
-                Great job! You&apos;re on a{" "}
-                <span className="font-bold text-sky-600 dark:text-sky-400">
-                  {streakDays} day streak
-                </span>
-                .
-              </>
-            ) : (
-              <>Finish a lesson today to start your streak.</>
-            )}
-          </p>
-        </div>
-
-        {/* Days of the week row */}
-        <div className="flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800/80">
-          {daysOfWeek.map((d) => (
-            <div key={d.day} className="flex flex-col items-center gap-1.5">
-              <span
-                className={`grid h-8 w-8 place-items-center rounded-full text-xs font-bold transition-transform ${
-                  d.active
-                    ? "bg-sky-500 text-white shadow-sm shadow-sky-500/30 scale-105"
-                    : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500"
-                }`}
-              >
-                {d.active ? <Check className="h-4 w-4 stroke-[3]" /> : d.day.slice(0, 1)}
-              </span>
-              <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
-                {d.day}
-              </span>
-            </div>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* ── 2. LEADERBOARD WIDGET ─────────────────────────────────────────── */}
+      {/* ── 1. LEADERBOARD WIDGET ─────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -236,7 +114,7 @@ export function StudentSideWidgets({
         </div>
       </motion.div>
 
-      {/* ── 3. REWARD / MYSTERY CHEST CARD ────────────────────────────────── */}
+      {/* ── 2. REWARD / MYSTERY CHEST CARD ────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

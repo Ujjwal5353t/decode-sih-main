@@ -45,6 +45,12 @@ class NCERTBookOut(BaseModel):
     title: str
     description: Optional[str]
     file_url: Optional[str]
+    # Transient — only set (non-None) on the response of the upload/create
+    # endpoints right after a PDF was attached, reporting whether its text
+    # was successfully chunked into document_chunks for RAG/quiz grounding.
+    # "ingested" | "failed_needs_ocr" | "error" | None (no file attached / not
+    # freshly uploaded this request). See src/services/ncert_service.py.
+    chunk_ingestion_status: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
