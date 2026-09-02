@@ -48,6 +48,7 @@ class XpReason(str, Enum):
     LESSON_COMPLETED = "LESSON_COMPLETED"
     QUIZ_COMPLETED = "QUIZ_COMPLETED"
     CHEST_CLAIMED = "CHEST_CLAIMED"
+    GAP_MODULE_COMPLETED = "GAP_MODULE_COMPLETED"
 
 
 class GamificationProfile(SQLModel, table=True):

@@ -39,4 +39,5 @@ from src.models.teacher import (  # noqa: F401
 )
 from src.models.chunk import DocumentChunk  # noqa: F401
 from src.models.module_translation import ModuleTranslation, TranslationStatus  # noqa: F401
+from src.models.remediation import RemediationAttempt  # noqa: F401
 

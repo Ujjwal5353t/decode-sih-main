@@ -55,6 +55,13 @@ XP_QUIZ_SCORE_BONUS = 60
 #: Paid out when a chest is opened.
 XP_PER_CHEST = 50
 
+#: Gap-module retention quiz XP = base + (score/100 * bonus), same shape as
+#: the diagnostic quiz's own award — paid only on a pass (see
+#: on_gap_module_completed), since the reward is for actually closing the
+#: gap, not merely attempting the review.
+XP_GAP_MODULE_BASE = 15
+XP_GAP_MODULE_SCORE_BONUS = 25
+
 #: Badge awarded with each chest, by index. Cycles once exhausted.
 CHEST_BADGES = [
     "First Steps",
@@ -224,6 +231,39 @@ async def on_quiz_completed(
         detail=f"score={score}",
     )
     return granted
+
+
+async def on_gap_module_completed(
+    session: AsyncSession,
+    *,
+    student_id: uuid.UUID,
+    attempt_id: uuid.UUID,
+    score_percent: float,
+    passed: bool,
+) -> int:
+    """
+    Called once a gap-driven remediation quiz (src/services/remediation_service.py)
+    is graded. XP is paid only on a pass — this reward is for actually closing
+    the gap, not for merely attempting the review, since an unlimited-retry
+    quiz with a participation-only reward could be farmed by resubmitting.
+    """
+    if not passed:
+        return 0
+
+    profile = await get_or_create_profile(student_id, session)
+    score = max(0.0, min(100.0, score_percent))
+    amount = XP_GAP_MODULE_BASE + round(XP_GAP_MODULE_SCORE_BONUS * score / 100)
+
+    return await grant_xp(
+        session,
+        profile=profile,
+        amount=amount,
+        reason=XpReason.GAP_MODULE_COMPLETED,
+        source_type="remediation_attempt",
+        source_id=attempt_id,
+        idempotency_key=f"remediation_attempt:{attempt_id}",
+        detail=f"score={score}",
+    )
 
 
 async def get_xp_for_source(
