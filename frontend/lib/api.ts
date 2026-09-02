@@ -2032,3 +2032,59 @@ export async function claimRewardChest(): Promise<ClaimChestResponse> {
   });
 }
 
+// ── Gap-driven learning modules ─────────────────────────────────────────────
+//
+// Each module is the crux of one earlier-class chapter the diagnostic quiz
+// traced a specific gap back to — not a generic chapter listing. There is no
+// "generate" step: GET always reflects the student's current open gaps.
+
+export interface LearningModuleOut {
+  gap_id: string;
+  subject: string;
+  topic_name: string;
+  topic_description: string | null;
+  origin_class: number;
+  student_current_class: number;
+  chapter_title: string | null;
+  crux_points: string[];
+  quiz_available: boolean;
+  quiz_question_count: number;
+  updated_at: string;
+}
+
+export interface ModuleQuizStartOut {
+  gap_id: string;
+  questions: QuestionOut[];
+}
+
+export interface ModuleQuizResultOut {
+  gap_id: string;
+  correct_count: number;
+  total_count: number;
+  score_percent: number;
+  passed: boolean;
+  gap_resolved: boolean;
+  xp_awarded: number;
+}
+
+export async function getLearningModules(): Promise<LearningModuleOut[]> {
+  const res = await fetchApi<{ modules: LearningModuleOut[] }>("/student/learning-modules");
+  return res.modules;
+}
+
+export async function startModuleQuiz(gapId: string): Promise<ModuleQuizStartOut> {
+  return fetchApi<ModuleQuizStartOut>(`/student/learning-modules/${gapId}/quiz/start`, {
+    method: "POST",
+  });
+}
+
+export async function submitModuleQuiz(
+  gapId: string,
+  answers: { question_id: string; selected_option_index: number }[]
+): Promise<ModuleQuizResultOut> {
+  return fetchApi<ModuleQuizResultOut>(`/student/learning-modules/${gapId}/quiz/submit`, {
+    method: "POST",
+    body: JSON.stringify({ answers }),
+  });
+}
+

@@ -59,6 +59,7 @@ import {
   ContinueLearningHeroCard,
 } from "@/components/dashboard/student/LearningCards";
 import { StudentSideWidgets } from "@/components/dashboard/student/StudentSideWidgets";
+import { GapModulesPanel } from "@/components/dashboard/student/GapModulesPanel";
 import { ParentHero, ParentHeroFact } from "@/components/dashboard/parent/ParentHero";
 import { useStudentProgress } from "@/hooks/useStudentProgress";
 import { subscribeToLearningQueue } from "@/lib/offline/learningEvents";
@@ -1151,6 +1152,12 @@ function StudentDashboardView({
               <Link href="/dashboard/diagnostic-quiz" className="text-xs text-brand font-semibold hover:underline">
                 {t("dashboard.student.viewResults")}
               </Link>
+            </div>
+          )}
+
+          {!needsSetup && quizStatus?.completed && (
+            <div className="mb-8">
+              <GapModulesPanel />
             </div>
           )}
 
