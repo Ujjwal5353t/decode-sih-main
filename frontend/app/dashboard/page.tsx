@@ -42,7 +42,6 @@ import {
   RefreshCw,
   Target,
   Flame,
-  Zap,
   Play,
   Bell,
   TrendingUp,
@@ -62,6 +61,7 @@ import {
   ContinueLearningHeroCard,
 } from "@/components/dashboard/student/LearningCards";
 import { StudentSideWidgets } from "@/components/dashboard/student/StudentSideWidgets";
+import { GapModulesPanel } from "@/components/dashboard/student/GapModulesPanel";
 import { ParentHero, ParentHeroFact } from "@/components/dashboard/parent/ParentHero";
 import { useStudentProgress } from "@/hooks/useStudentProgress";
 import { subscribeToLearningQueue } from "@/lib/offline/learningEvents";
@@ -292,14 +292,11 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
 
-  // ── Gamification (streak / XP / chest) ──────────────────────────────────
-  // Lives here, not inside StudentDashboardView, because the topbar's streak
-  // and XP pills need the same real numbers as the Daily Goal / Mystery
-  // Chest widgets further down — one fetch, one source of truth, instead of
-  // the topbar guessing at its own figures. Read-only on mount: loading the
-  // dashboard deliberately does not extend the streak — only finishing a
-  // lesson or an assessment does, and those are recorded by their own flows
-  // on the server.
+  // ── Gamification (XP / chest) ────────────────────────────────────────────
+  // Lives here, not inside StudentDashboardView, because the topbar's XP
+  // pill needs the same real numbers as the Mystery Chest widget further
+  // down — one fetch, one source of truth, instead of the topbar guessing at
+  // its own figures.
   const [gamification, setGamification] = useState<GamificationSummaryOut | null>(null);
   const [claimingChest, setClaimingChest] = useState<boolean>(false);
 
@@ -518,15 +515,11 @@ export default function DashboardPage() {
           )}
 
           <div className="flex items-center gap-2.5 sm:gap-3">
-            {/* Student Streaks & XP Counter Badges — real /student/gamification
-                data, the same summary the Daily Goal and Mystery Chest
-                widgets read, so the topbar can never disagree with them. */}
+            {/* Student XP Counter Badge — real /student/gamification data, the
+                same summary the Mystery Chest widget reads, so the topbar can
+                never disagree with it. */}
             {role === "student" && (
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-xs font-black text-amber-600 dark:text-amber-400 shadow-xs">
-                  <Flame className="h-4 w-4 fill-amber-500 text-amber-500" />
-                  <AnimatedNumber value={gamification?.current_streak ?? 0} />
-                </div>
                 <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-xs font-black text-sky-600 dark:text-sky-400 shadow-xs">
                   <Sparkles className="h-4 w-4 text-sky-500" />
                   <AnimatedNumber value={gamification?.total_xp ?? 0} />
@@ -638,8 +631,8 @@ function StudentDashboardView({
   student: StudentProfile;
   setupClass: (data: { class_number: number; section: string }) => Promise<void>;
   activeTab?: string;
-  /** Real streak/XP/chest state from /student/gamification, lifted to
-   * DashboardPage so the topbar pills and these widgets never disagree. */
+  /** Real XP/chest state from /student/gamification, lifted to
+   * DashboardPage so the topbar pill and these widgets never disagree. */
   gamification: GamificationSummaryOut | null;
   claimingChest: boolean;
   onClaimChest: () => void;
@@ -1165,6 +1158,12 @@ function StudentDashboardView({
               <Link href="/dashboard/diagnostic-quiz" className="text-xs text-brand font-semibold hover:underline">
                 {t("dashboard.student.viewResults")}
               </Link>
+            </div>
+          )}
+
+          {!needsSetup && quizStatus?.completed && (
+            <div className="mb-8">
+              <GapModulesPanel />
             </div>
           )}
 

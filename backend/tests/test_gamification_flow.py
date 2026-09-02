@@ -1,10 +1,9 @@
 """
-Gamification: streak, XP and reward chests.
+Gamification: XP and reward chests.
 
-The point of this file is the abuse cases, not the happy path. Each of the
-three features has a rule that must hold no matter how a client behaves:
+The point of this file is the abuse cases, not the happy path. Each feature
+has a rule that must hold no matter how a client behaves:
 
-  · a day counts once, however much work is done in it
   · XP is paid once per lesson / per attempt, however often it is replayed
   · a chest is claimed once, however many times the button is pressed
 
@@ -15,7 +14,7 @@ the quiz tables use Postgres-only JSONB columns that SQLite cannot compile.
 import asyncio
 import sys
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -26,7 +25,6 @@ from sqlmodel import SQLModel, select
 from src.models.gamification import (
     ChestClaim,
     GamificationProfile,
-    StreakDay,
     XpTransaction,
 )
 from src.models.learning import LearningEvent, LearningEventType
@@ -51,7 +49,6 @@ async def _fresh_db():
                 LearningEvent.__table__,
                 GamificationProfile.__table__,
                 XpTransaction.__table__,
-                StreakDay.__table__,
                 ChestClaim.__table__,
             ],
         )
@@ -110,75 +107,6 @@ async def _complete(session: AsyncSession, student, lesson, when: datetime):
         )
     )
     await session.flush()
-
-
-# ── Streak ────────────────────────────────────────────────────────────────────
-
-async def test_streak_counts_a_day_once_and_resets_on_a_gap():
-    engine, factory = await _fresh_db()
-    async with factory() as session:
-        student, lessons = await _seed(session)
-        profile = await gs.get_or_create_profile(
-            student.id, session, timezone_name="Asia/Kolkata"
-        )
-        assert profile.timezone == "Asia/Kolkata"
-
-        day1 = datetime(2026, 3, 1, 6, 0)   # 11:30 IST
-        day2 = day1 + timedelta(days=1)
-        day3 = day1 + timedelta(days=2)
-
-        # Three separate activities in one day -> the day counts once.
-        assert await gs.register_active_day(session, profile=profile, activity="L", moment=day1)
-        assert not await gs.register_active_day(session, profile=profile, activity="L", moment=day1)
-        assert not await gs.register_active_day(session, profile=profile, activity="Q", moment=day1)
-        assert profile.current_streak == 1
-
-        # Consecutive day advances it.
-        assert await gs.register_active_day(session, profile=profile, activity="L", moment=day2)
-        assert profile.current_streak == 2
-        assert profile.longest_streak == 2
-
-        # Skip day3 entirely; return on day4 -> run restarts at 1.
-        day5 = day1 + timedelta(days=4)
-        assert await gs.register_active_day(session, profile=profile, activity="L", moment=day5)
-        assert profile.current_streak == 1
-        assert profile.longest_streak == 2, "longest must survive a reset"
-
-        rows = (
-            await session.execute(
-                select(StreakDay).where(StreakDay.student_id == student.id)
-            )
-        ).scalars().all()
-        assert len(rows) == 3, "one row per active day, not per activity"
-
-        # A missed day expires the displayed streak without any write.
-        assert gs.effective_streak(profile, gs.local_date_for(profile, day5)) == 1
-        assert gs.effective_streak(profile, gs.local_date_for(profile, day5 + timedelta(days=1))) == 1
-        assert gs.effective_streak(profile, gs.local_date_for(profile, day5 + timedelta(days=3))) == 0
-        _ = day3
-    await engine.dispose()
-    print("PASS streak: one day counted once, gap resets, longest preserved")
-
-
-async def test_timezone_is_pinned_after_first_use():
-    """A student cannot mint extra streak days by switching timezone."""
-    engine, factory = await _fresh_db()
-    async with factory() as session:
-        student, _ = await _seed(session)
-        profile = await gs.get_or_create_profile(student.id, session, timezone_name="Asia/Kolkata")
-        await session.commit()
-
-        # A later request claiming a wildly different zone must not take hold.
-        again = await gs.get_or_create_profile(
-            student.id, session, timezone_name="Pacific/Kiritimati"
-        )
-        assert again.timezone == "Asia/Kolkata"
-
-        # Garbage degrades to UTC rather than raising.
-        assert gs.resolve_timezone("Not/AZone") == "UTC"
-        assert gs.resolve_timezone(None) == "UTC"
-    await engine.dispose()
-    print("PASS timezone: pinned after first use, invalid input falls back")
 
 
 # ── XP ────────────────────────────────────────────────────────────────────────
@@ -303,38 +231,7 @@ async def test_chest_unlocks_on_real_lessons_and_claims_once():
     print("PASS chest: real lessons only, claimed once, cycle advances")
 
 
-async def test_summary_week_strip_reflects_real_days():
-    engine, factory = await _fresh_db()
-    async with factory() as session:
-        student, _ = await _seed(session)
-        profile = await gs.get_or_create_profile(student.id, session)
-        today = gs.local_date_for(profile)
-
-        for delta in (0, 2):
-            session.add(
-                StreakDay(
-                    student_id=student.id,
-                    local_date=today - timedelta(days=delta),
-                    first_activity="LESSON_COMPLETED",
-                )
-            )
-        await session.flush()
-
-        summary = await gs.get_summary(student.id, session)
-        assert len(summary["week"]) == 7
-        active = {d["date"] for d in summary["week"] if d["active"]}
-        assert today.isoformat() in active
-        assert (today - timedelta(days=2)).isoformat() in active
-        assert (today - timedelta(days=1)).isoformat() not in active
-        _ = date
-    await engine.dispose()
-    print("PASS summary: week strip built from real streak rows")
-
-
 if __name__ == "__main__":
-    asyncio.run(test_streak_counts_a_day_once_and_resets_on_a_gap())
-    asyncio.run(test_timezone_is_pinned_after_first_use())
     asyncio.run(test_xp_is_never_paid_twice_for_the_same_source())
     asyncio.run(test_chest_unlocks_on_real_lessons_and_claims_once())
-    asyncio.run(test_summary_week_strip_reflects_real_days())
     print("\nAll gamification tests passed.")

@@ -95,7 +95,6 @@ async def ingest_events(
     student: Student,
     events: list[LearningEventIn],
     session: AsyncSession,
-    timezone_name: Optional[str] = None,
 ) -> LearningEventSyncResponse:
     """
     Append a batch of queued events for one student.
@@ -120,8 +119,8 @@ async def ingest_events(
     seen_in_batch: set[str] = set()
     touched_module_keys: set[str] = set()
     # Lessons this batch actually completed for the first time — the trigger
-    # for streak/XP below. Duplicates never reach here, so replaying a synced
-    # batch cannot pay out twice.
+    # for XP below. Duplicates never reach here, so replaying a synced batch
+    # cannot pay out twice.
     completed_lesson_ids: set[uuid.UUID] = set()
 
     for incoming in events:
@@ -237,14 +236,13 @@ async def ingest_events(
         await _append_derived_events(student.id, touched_module_keys, session)
 
     # Gamification rides on the same transaction: if the events roll back, so
-    # do the XP and the streak day. Reward state can never claim a lesson that
-    # was not durably stored.
+    # does the XP. Reward state can never claim a lesson that was not durably
+    # stored.
     if completed_lesson_ids:
         await gamification_service.on_lessons_completed(
             session,
             student_id=student.id,
             lesson_ids=sorted(completed_lesson_ids),
-            timezone_name=timezone_name,
         )
 
     return response

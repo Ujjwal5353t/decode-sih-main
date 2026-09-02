@@ -352,9 +352,16 @@ async def init_db() -> None:
             text("CREATE INDEX IF NOT EXISTS ix_learning_events_occurred_at ON learning_events (occurred_at);")
         )
 
-        # Migration: gamification (streaks, XP ledger, reward chests).
+        # Migration: gamification (XP ledger, reward chests).
         # See src/models/gamification.py — the UNIQUE indexes below are the
-        # real enforcement for "pay once / count a day once / claim once".
+        # real enforcement for "pay once / claim once".
+        #
+        # NOTE: current_streak / longest_streak / last_active_date / timezone
+        # below are leftover columns from the removed daily-streak feature.
+        # GamificationProfile no longer declares them, so nothing reads or
+        # writes them — left in place (orphaned) rather than dropped, since
+        # this IF NOT EXISTS migration runs against a live production
+        # database and a DROP COLUMN here would be destructive.
         await conn.execute(
             text(
                 """
@@ -399,6 +406,14 @@ async def init_db() -> None:
         await conn.execute(
             text("CREATE INDEX IF NOT EXISTS ix_xp_transactions_student_id ON xp_transactions (student_id);")
         )
+        # NOTE: the daily-streak feature that wrote to this table was removed
+        # (see src/models/gamification.py, src/services/gamification_service.py)
+        # — closing knowledge gaps isn't necessarily a daily activity, so a
+        # daily-streak mechanic didn't fit the product. Nothing reads from or
+        # writes to streak_days anymore. Left as an orphaned, harmless
+        # CREATE TABLE IF NOT EXISTS rather than dropped, since this migration
+        # runs against a live production database and a DROP here would be
+        # destructive to a table that may still hold real historical rows.
         await conn.execute(
             text(
                 """

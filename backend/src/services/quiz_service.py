@@ -118,6 +118,15 @@ async def _pick_question(
     module content is preferred even unreviewed over the generic bank,
     since it's what the school actually teaches from.
 
+    Within the chosen tier, an illustrated question (image_asset_key or
+    image_emoji set) is preferred over a plain-text one whenever the tier
+    has at least one -- most of the bank is still plain text (Gemini leaves
+    the picture off far more often than it sets one), so picking uniformly
+    at random would show a picture only rarely even on topics where
+    illustrated questions do exist. This never surfaces a *worse* question
+    to satisfy that preference: it only reorders which one of an otherwise
+    equally-ranked set gets served.
+
     One round trip instead of up to four sequential tier queries — this was
     a real, measurable chunk of the per-question latency on a remote DB,
     stacked on top of every "serve the next question" step in the quiz.
@@ -142,7 +151,9 @@ async def _pick_question(
             by_tier.setdefault(rank, []).append(q)
 
     for rank in sorted(by_tier):
-        return random.choice(by_tier[rank])
+        tier = by_tier[rank]
+        illustrated = [q for q in tier if q.image_asset_key or q.image_emoji]
+        return random.choice(illustrated or tier)
     return None
 
 
@@ -313,11 +324,11 @@ async def _finalize_attempt(attempt: QuizAttempt, session: AsyncSession) -> None
     session.add(attempt)
     await _sync_student_topic_gaps(attempt, session)
 
-    # Gamification: XP for the attempt (scaled by its own score) plus a streak
-    # day. Runs before the commit below so reward state lands atomically with
-    # the finalised attempt; the per-attempt idempotency key means the guard
-    # at the top of this function is belt-and-braces rather than the only
-    # thing preventing a second payout.
+    # Gamification: XP for the attempt (scaled by its own score). Runs before
+    # the commit below so reward state lands atomically with the finalised
+    # attempt; the per-attempt idempotency key means the guard at the top of
+    # this function is belt-and-braces rather than the only thing preventing
+    # a second payout.
     from src.services import gamification_service
 
     await gamification_service.on_quiz_completed(
@@ -394,7 +405,7 @@ async def submit_answer(
     """Returns (finished, next_question, was_correct). was_correct reports
     the just-submitted answer — kept separate from the adaptive engine's own
     scoring so the UI can give the student instant right/wrong feedback
-    (points, streaks, mascot reactions) without exposing engine internals."""
+    (points, mascot reactions) without exposing engine internals."""
     if attempt.status != AttemptStatus.IN_PROGRESS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="This attempt is not in progress."

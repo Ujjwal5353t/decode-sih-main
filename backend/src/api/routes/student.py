@@ -11,6 +11,10 @@ GET  /student/lessons          — animated lessons for a class/subject (NCERT-g
 GET  /student/lessons/{lesson_id} — one lesson with its full slide list
 POST /student/learning-events  — sync queued offline learning activity (idempotent)
 GET  /student/progress         — per-module learning progress, projected from those events
+GET  /student/learning-modules — gap-driven remediation modules, from open diagnostic gaps
+GET  /student/learning-modules/{gap_id} — one module's crux content
+POST /student/learning-modules/{gap_id}/quiz/start  — retention-quiz questions
+POST /student/learning-modules/{gap_id}/quiz/submit — grade it; resolves the gap on a pass
 """
 
 import uuid
@@ -33,6 +37,13 @@ from src.schemas.learning import (
 from src.schemas.lesson import LessonListItemOut, LessonOut, LessonSlideOut
 from src.schemas.module import ModuleOut
 from src.schemas.quiz import SubjectPriorityOut
+from src.schemas.remediation import (
+    LearningModuleListOut,
+    LearningModuleOut,
+    ModuleQuizResultOut,
+    ModuleQuizStartOut,
+    ModuleQuizSubmitRequest,
+)
 from src.schemas.student import StudentProfile
 from src.schemas.teacher import (
     AssignmentAttemptOut,
@@ -50,6 +61,7 @@ from src.services import (
     lesson_service,
     module_service,
     quiz_service,
+    remediation_service,
     teacher_service,
 )
 
@@ -351,7 +363,6 @@ async def get_student_lesson(
 )
 async def sync_learning_events(
     body: LearningEventSyncRequest,
-    tz: Optional[str] = None,
     student: Student = Depends(get_current_student),
     session: AsyncSession = Depends(get_session),
 ):
@@ -364,19 +375,8 @@ async def sync_learning_events(
     Deliberately not gated on class setup or the diagnostic quiz: an event
     that was recorded while offline must still be storable later, whatever
     the student's account state has become in the meantime.
-
-    `tz` is the same IANA zone `/student/gamification` accepts, adopted only
-    once (see gamification_service.get_or_create_profile). Threading it
-    through here too matters because a lesson completion is what actually
-    creates the gamification profile and claims the streak day for that
-    calendar date — without it, a device whose first-ever gamification
-    contact is a lesson completion (rather than the dashboard's own
-    /student/gamification read) would stamp that student's profile to UTC,
-    and streak-day boundaries would drift from their real local day.
     """
-    return await learning_progress_service.ingest_events(
-        student, body.events, session, timezone_name=tz
-    )
+    return await learning_progress_service.ingest_events(student, body.events, session)
 
 
 @router.get(
@@ -404,30 +404,22 @@ async def get_student_detailed_progress(
     return await assessment_progress_service.calculate_student_detailed_progress(student, session)
 
 
-# ── Gamification: streak, XP, reward chests ───────────────────────────────────
+# ── Gamification: XP, reward chests ────────────────────────────────────────────
 
 @router.get(
     "/gamification",
     response_model=GamificationSummaryOut,
-    summary="This student's streak, XP total and reward-chest progress",
+    summary="This student's XP total and reward-chest progress",
 )
 async def get_gamification_summary(
-    tz: Optional[str] = None,
     student: Student = Depends(get_current_student),
     session: AsyncSession = Depends(get_session),
 ):
     """
-    Read-only. Opening the dashboard deliberately does NOT extend the streak —
-    only finishing a lesson or completing an assessment does, and those are
-    recorded by their own flows.
-
-    `tz` is an IANA zone (e.g. "Asia/Kolkata") used to decide which calendar
-    day activity belongs to. It is adopted only the first time, then the
-    stored zone wins — otherwise a student could harvest extra streak days by
-    switching timezone between calls. An unknown value silently falls back to
-    UTC rather than failing the request.
+    Read-only. Reports total XP, lessons completed, and reward-chest
+    progress.
     """
-    return await gamification_service.get_summary(student.id, session, timezone_name=tz)
+    return await gamification_service.get_summary(student.id, session)
 
 
 @router.post(
@@ -436,7 +428,6 @@ async def get_gamification_summary(
     summary="Claim the next unlocked reward chest (idempotent)",
 )
 async def claim_reward_chest(
-    tz: Optional[str] = None,
     student: Student = Depends(get_current_student),
     session: AsyncSession = Depends(get_session),
 ):
@@ -448,6 +439,65 @@ async def claim_reward_chest(
     instead of paying out twice; the UNIQUE constraint on
     (student_id, chest_index) is what guarantees that under concurrency.
     """
-    return await gamification_service.claim_chest(
-        session, student_id=student.id, timezone_name=tz
-    )
+    return await gamification_service.claim_chest(session, student_id=student.id)
+
+
+# ── Gap-driven learning modules ─────────────────────────────────────────────────
+#
+# Each module is the crux of one earlier-class chapter the diagnostic quiz
+# traced a gap back to (see src/services/remediation_service.py), plus a
+# short retention quiz. There is no "generate module" step to call first —
+# GET always reflects the student's current open gaps, computed live.
+
+@router.get(
+    "/learning-modules",
+    response_model=LearningModuleListOut,
+    summary="This student's gap-driven remediation modules (from open diagnostic gaps)",
+)
+async def list_learning_modules(
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    modules = await remediation_service.list_learning_modules(student, session)
+    return LearningModuleListOut(modules=modules)
+
+
+@router.get(
+    "/learning-modules/{gap_id}",
+    response_model=LearningModuleOut,
+    summary="One learning module's crux content",
+)
+async def get_learning_module(
+    gap_id: uuid.UUID,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    return await remediation_service.get_module_detail(gap_id, student, session)
+
+
+@router.post(
+    "/learning-modules/{gap_id}/quiz/start",
+    response_model=ModuleQuizStartOut,
+    summary="Get this module's retention-quiz questions",
+)
+async def start_learning_module_quiz(
+    gap_id: uuid.UUID,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    return await remediation_service.start_module_quiz(gap_id, student, session)
+
+
+@router.post(
+    "/learning-modules/{gap_id}/quiz/submit",
+    response_model=ModuleQuizResultOut,
+    summary="Grade this module's retention quiz; resolves the gap on a pass",
+)
+async def submit_learning_module_quiz(
+    gap_id: uuid.UUID,
+    body: ModuleQuizSubmitRequest,
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    answers = [(a.question_id, a.selected_option_index) for a in body.answers]
+    return await remediation_service.submit_module_quiz(gap_id, answers, student, session)
