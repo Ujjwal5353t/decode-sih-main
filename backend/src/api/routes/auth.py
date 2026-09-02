@@ -15,7 +15,7 @@ POST /auth/token/refresh          (sliding-window explicit refresh)
 """
 
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from jose import JWTError
 from pydantic import BaseModel
@@ -240,9 +240,12 @@ async def login_with_otp(
 )
 async def get_current_role_permissions(
     role: Optional[str] = None,
+    lang: Optional[str] = Query(default=None),
+    accept_language: Optional[str] = Header(default="en", alias="Accept-Language"),
 ):
     target_role = role or "student"
-    return get_permissions_for_role(target_role)
+    target_lang = lang or accept_language or "en"
+    return get_permissions_for_role(target_role, target_lang)
 
 
 @router.get(
@@ -250,8 +253,13 @@ async def get_current_role_permissions(
     response_model=RolePermissionsResponse,
     summary="Get permission capabilities and navigation items for a specific role",
 )
-async def get_role_permissions(role: str):
-    return get_permissions_for_role(role)
+async def get_role_permissions(
+    role: str,
+    lang: Optional[str] = Query(default=None),
+    accept_language: Optional[str] = Header(default="en", alias="Accept-Language"),
+):
+    target_lang = lang or accept_language or "en"
+    return get_permissions_for_role(role, target_lang)
 
 
 # ── School Search ──────────────────────────────────────────────────────────────

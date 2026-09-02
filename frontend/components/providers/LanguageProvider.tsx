@@ -47,6 +47,9 @@ const DICTIONARIES: Record<SupportedLanguage, TranslationDictionary> = {
 
 const STORAGE_KEY = "preferred_language";
 
+import { translatePhrase } from "@/lib/universalTranslator";
+import { domAutoTranslator } from "@/lib/domAutoTranslator";
+
 // ── Nested key resolver with English fallback ───────────────────────────────
 function getNestedValue(obj: unknown, path: string): unknown {
   const parts = path.split(".");
@@ -62,14 +65,22 @@ export function translate(
   key: string,
   dict: TranslationDictionary,
   fallbackDict: TranslationDictionary = en as TranslationDictionary,
-  params?: Record<string, string | number>
+  params?: Record<string, string | number>,
+  activeLang: SupportedLanguage = "en"
 ): any {
   let result = getNestedValue(dict, key);
   if (result === undefined) {
     result = getNestedValue(fallbackDict, key);
   }
-  if (result === undefined) {
-    return key;
+
+  // If key is not in JSON dictionary, check the Universal Phrase Registry
+  if (result === undefined || result === key) {
+    const universal = translatePhrase(key, activeLang);
+    if (universal && universal !== key) {
+      result = universal;
+    } else {
+      result = key;
+    }
   }
 
   if (typeof result === "string" && params) {
@@ -114,26 +125,20 @@ export function useLanguage() {
 
 // ── Provider ────────────────────────────────────────────────────────────────
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<SupportedLanguage>("en");
-  const [mounted, setMounted] = useState(false);
-
-  // On mount, read stored preference
-  useEffect(() => {
-    setMounted(true);
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored && isValidLanguage(stored)) {
-        setLanguageState(stored);
-      }
-    } catch {
-      // localStorage unavailable — keep default
+  const [language, setLanguageState] = useState<SupportedLanguage>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored && isValidLanguage(stored)) {
+          return stored as SupportedLanguage;
+        }
+      } catch {}
     }
-  }, []);
+    return "en";
+  });
 
-  // When language changes, sync DOM attributes + localStorage
+  // When language changes or on mount, sync DOM attributes + localStorage + auto translator
   useEffect(() => {
-    if (!mounted) return;
-
     const dir = getLanguageDirection(language);
     const meta = getLanguageMeta(language);
 
@@ -152,10 +157,18 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     } catch {
       // localStorage unavailable
     }
-  }, [language, mounted]);
+
+    // Automatically translate the live DOM for all dashboards
+    domAutoTranslator.init(language);
+    domAutoTranslator.setLanguage(language);
+  }, [language]);
 
   const setLanguage = useCallback((lang: SupportedLanguage) => {
     setLanguageState(lang);
+    try {
+      localStorage.setItem(STORAGE_KEY, lang);
+    } catch {}
+    domAutoTranslator.setLanguage(lang);
   }, []);
 
   const direction = getLanguageDirection(language);
@@ -163,8 +176,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const t = useCallback(
     (key: string, params?: Record<string, string | number>): string =>
-      translate(key, dictionary, en as TranslationDictionary, params),
-    [dictionary]
+      translate(key, dictionary, en as TranslationDictionary, params, language),
+    [dictionary, language]
   );
 
   return (

@@ -52,7 +52,12 @@ export function LanguageSwitcher({ placement = "down", className }: LanguageSwit
   const isUp = placement === "up";
 
   return (
-    <div ref={containerRef} className={`relative ${className || ""}`}>
+    <div
+      ref={containerRef}
+      className={`relative notranslate ${className || ""}`}
+      translate="no"
+      data-no-translate="true"
+    >
       {/* Trigger */}
       <motion.button
         whileHover={{ scale: 1.05 }}
@@ -62,13 +67,17 @@ export function LanguageSwitcher({ placement = "down", className }: LanguageSwit
                    bg-surface-hover hover:bg-muted border border-border-primary
                    hover:border-[var(--border-brand)] transition-colors duration-200
                    cursor-pointer text-sm font-medium text-text-secondary
-                   hover:text-text-primary"
+                   hover:text-text-primary notranslate"
+        translate="no"
+        data-no-translate="true"
         aria-label={t("languageSwitcher.ariaLabel")}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
       >
         <Globe className="w-4 h-4 shrink-0" />
-        <span className="hidden sm:inline">{currentLang.nativeLabel}</span>
+        <span className="hidden sm:inline notranslate" translate="no">
+          {currentLang.nativeLabel}
+        </span>
         <ChevronDown
           className={`w-3 h-3 transition-transform duration-200 ${isOpen ? (isUp ? "-rotate-180" : "rotate-180") : ""}`}
         />
@@ -84,7 +93,9 @@ export function LanguageSwitcher({ placement = "down", className }: LanguageSwit
             transition={{ duration: 0.15, ease: [0.22, 0.68, 0, 1] }}
             className={`absolute ${isUp ? "bottom-full mb-2" : "top-full mt-2"} right-0 min-w-[200px] py-1.5
                        bg-surface border border-border-primary rounded-[var(--radius-lg)]
-                       shadow-[var(--shadow-lg)] z-[100] overflow-hidden`}
+                       shadow-[var(--shadow-lg)] z-[100] overflow-hidden notranslate`}
+            translate="no"
+            data-no-translate="true"
             role="listbox"
             aria-label={t("languageSwitcher.ariaLabel")}
           >

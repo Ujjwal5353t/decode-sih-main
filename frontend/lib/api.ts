@@ -148,8 +148,12 @@ export interface RolePermissionsResponse {
 
 export async function getRolePermissions(
   role?: Role,
+  lang?: string,
 ): Promise<RolePermissionsResponse> {
-  const q = role ? `?role=${encodeURIComponent(role)}` : "";
+  const params = new URLSearchParams();
+  if (role) params.set("role", role);
+  if (lang) params.set("lang", lang);
+  const q = params.toString() ? `?${params.toString()}` : "";
   return fetchApi<RolePermissionsResponse>(`/auth/permissions${q}`);
 }
 
@@ -284,8 +288,13 @@ async function fetchApi<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const token = getStoredToken();
+  const preferredLang =
+    typeof window !== "undefined"
+      ? localStorage.getItem("preferred_language") || "en"
+      : "en";
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "Accept-Language": preferredLang,
     ...(options.headers as Record<string, string>),
   };
 

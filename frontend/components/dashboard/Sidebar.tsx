@@ -93,7 +93,7 @@ export function DashboardSidebar({
     modules: "dashboard.nav.learningModules",
     assignments: "dashboard.nav.classAssignments",
     practice: "dashboard.nav.practiceQuizzes",
-    quizzes: "dashboard.nav.practiceQuizzes",
+    quizzes: "dashboard.nav.quizzes",
     grading: "dashboard.nav.grading",
     "diagnostic-quiz": "dashboard.nav.diagnosticQuiz",
     "gap-report": "dashboard.nav.gapReport",
@@ -108,17 +108,20 @@ export function DashboardSidebar({
     "admin-requests": "dashboard.nav.adminRequests",
     "school-requests": "dashboard.nav.schoolRequests",
     history: "dashboard.nav.history",
+    children: "dashboard.nav.children",
+    progress: "dashboard.nav.progress",
+    ncert_master: "dashboard.nav.ncertMaster",
+    schools: "dashboard.nav.schools",
   };
 
   const getNavItemLabel = (item: DashboardPermissionItem) => {
     if (role === "student" && item.id === "overview") {
-      return t("dashboard.nav.studentOverview");
+      const studentOverview = t("dashboard.nav.studentOverview");
+      if (studentOverview && studentOverview !== "dashboard.nav.studentOverview") return studentOverview;
     }
-    const key = navItemKeyMap[item.id];
-    if (key) {
-      const translated = t(key as any);
-      if (translated && translated !== key) return translated;
-    }
+    const key = navItemKeyMap[item.id] || `dashboard.nav.${item.id}`;
+    const translated = t(key as any);
+    if (translated && translated !== key) return translated;
     return item.label;
   };
 
@@ -126,6 +129,13 @@ export function DashboardSidebar({
     const key = `dashboard.categories.${cat.toLowerCase()}`;
     const translated = t(key as any);
     return translated && translated !== key ? translated : cat;
+  };
+
+  const getBadgeLabel = (badge?: string) => {
+    if (!badge) return "";
+    const key = `dashboard.badges.${badge.toLowerCase()}`;
+    const translated = t(key as any);
+    return translated && translated !== key ? translated : badge;
   };
 
   const getRoleBadgeLabel = () => {
@@ -299,7 +309,7 @@ export function DashboardSidebar({
                         <span className="truncate">{itemLabel}</span>
                         {item.badge && (
                           <span className="ml-auto shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-brand">
-                            {item.badge}
+                            {getBadgeLabel(item.badge)}
                           </span>
                         )}
                       </button>
@@ -340,7 +350,7 @@ export function DashboardSidebar({
                                   : "bg-brand/10 text-brand border border-brand/20"
                               }`}
                             >
-                              {item.badge}
+                              {getBadgeLabel(item.badge)}
                             </span>
                           )}
                           <ChevronRight
@@ -384,7 +394,7 @@ export function DashboardSidebar({
                                 : "bg-brand/10 text-brand"
                             }`}
                           >
-                            {item.badge}
+                            {getBadgeLabel(item.badge)}
                           </span>
                         )}
                         {isActive && <ChevronRight className="w-3.5 h-3.5 text-white/80" />}
@@ -423,10 +433,10 @@ export function DashboardSidebar({
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h4 className="text-xs font-bold text-slate-900 dark:text-white">
-                    Stay Connected
+                    {t("Stay Connected")}
                   </h4>
                   <p className="mt-0.5 text-[11px] font-medium leading-tight text-slate-500 dark:text-slate-400">
-                    Enable notifications to never miss an update
+                    {t("Enable notifications to never miss an update")}
                   </p>
                 </div>
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white text-sky-600 shadow-2xs dark:bg-slate-800 dark:text-sky-400">
@@ -442,7 +452,7 @@ export function DashboardSidebar({
                 }}
                 className="mt-3 w-full rounded-xl bg-[#0284c7] py-2 text-center text-xs font-bold text-white shadow-sm shadow-sky-500/20 transition-all hover:bg-sky-700 active:scale-95 cursor-pointer"
               >
-                Enable Notifications
+                {t("Enable Notifications")}
               </button>
             </div>
           </div>
@@ -456,17 +466,17 @@ export function DashboardSidebar({
                 <span className="grid h-6 w-6 place-items-center rounded-lg bg-amber-400/20 text-sm">
                   👑
                 </span>
-                <span>VidyaSetu Scholar</span>
+                <span>{t("VidyaSetu Scholar")}</span>
               </div>
               <p className="mt-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 leading-tight">
-                Unlock all NCERT modules, adaptive AI quizzes &amp; badges.
+                {t("Unlock all NCERT modules, adaptive AI quizzes & badges.")}
               </p>
               <button
                 type="button"
                 onClick={() => onSelectTab("modules")}
                 className="mt-2.5 w-full rounded-xl bg-sky-500 py-1.5 text-center text-xs font-bold text-white shadow-sm shadow-sky-500/20 transition-all hover:bg-sky-600 active:scale-95 cursor-pointer"
               >
-                Explore Modules
+                {t("Explore Modules")}
               </button>
             </div>
           </div>
