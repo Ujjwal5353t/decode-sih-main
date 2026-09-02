@@ -2072,6 +2072,10 @@ export async function getLearningModules(): Promise<LearningModuleOut[]> {
   return res.modules;
 }
 
+export async function getLearningModule(gapId: string): Promise<LearningModuleOut> {
+  return fetchApi<LearningModuleOut>(`/student/learning-modules/${gapId}`);
+}
+
 export async function startModuleQuiz(gapId: string): Promise<ModuleQuizStartOut> {
   return fetchApi<ModuleQuizStartOut>(`/student/learning-modules/${gapId}/quiz/start`, {
     method: "POST",
