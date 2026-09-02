@@ -2142,13 +2142,13 @@ function SchoolDashboardView({
         {/* TAB: OVERVIEW */}
         {activeTab === "overview" && (
           <div className="space-y-6">
-            {/* ── 1. Hero: Light Blue Modern SaaS Institutional Welcome Banner ── */}
+            {/* ── 1. Hero: Premium Admin Institutional Welcome Banner ── */}
             <Hero
               eyebrow={
-                <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/85 px-3.5 py-1 text-xs font-bold text-slate-700 shadow-2xs backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="inline-flex items-center gap-2 rounded-full border border-blue-100/80 bg-white/80 px-3.5 py-1 text-xs font-bold text-slate-700 shadow-sm backdrop-blur-sm dark:border-slate-700/80 dark:bg-slate-800/70 dark:text-slate-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   <span>{school.branch_name} Branch</span>
-                  <span className="opacity-40">•</span>
+                  <span className="text-slate-300 dark:text-slate-600">·</span>
                   <span>
                     Prefix: <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{school.student_prefix}</span>
                   </span>
@@ -2157,44 +2157,50 @@ function SchoolDashboardView({
               title={`Hello, ${school.school_name || "Admin"}! 👋`}
               subtitle={
                 <p>
-                  Welcome back! Here&apos;s what&apos;s happening across <span className="font-semibold text-slate-900 dark:text-white">{school.school_name || "your school"}</span> today.
+                  Welcome back! Here&apos;s what&apos;s happening across{" "}
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {school.school_name || "your school"}
+                  </span>{" "}
+                  today.
                 </p>
               }
               actions={
                 <>
+                  {/* Primary CTA */}
                   <button
                     type="button"
                     onClick={() => {
                       const curriculumTab = document.querySelector('[data-tab="curriculum"]') as HTMLElement;
                       curriculumTab?.click();
                     }}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-[#2563EB] px-6 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:bg-blue-700 active:scale-95"
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-blue-500/30 active:scale-95 dark:bg-blue-600 dark:hover:bg-blue-500 dark:shadow-blue-700/30"
                   >
-                    <BarChart3 className="h-4 w-4" />
-                    View Reports
+                    <BarChart3 className="h-4 w-4 shrink-0" />
+                    <span>View Reports</span>
                   </button>
 
+                  {/* Secondary CTA */}
                   <button
                     type="button"
                     onClick={() => {
                       const teachersTab = document.querySelector('[data-tab="teachers"]') as HTMLElement;
                       teachersTab?.click();
                     }}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200/90 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-850 dark:text-slate-200"
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm backdrop-blur-sm transition-all duration-200 hover:bg-white hover:border-slate-300 hover:shadow-md active:scale-95 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:bg-slate-700/90 dark:hover:border-slate-600"
                   >
-                    <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                    Manage Users
+                    <Users className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
+                    <span>Manage Users</span>
                   </button>
                 </>
               }
               illustration={
                 <Image
-                  src="/images/school_admin_hero.png"
-                  alt="School Admin Workspace"
-                  width={520}
+                  src="/images/admin_hero_illustration.png"
+                  alt="Admin at workspace"
+                  width={480}
                   height={360}
                   priority
-                  className="h-[240px] sm:h-[275px] lg:h-[305px] w-auto select-none object-contain object-bottom drop-shadow-md"
+                  className="h-[210px] sm:h-[255px] lg:h-[285px] xl:h-[310px] w-auto select-none object-contain object-bottom drop-shadow-lg"
                 />
               }
               facts={
@@ -2203,23 +2209,25 @@ function SchoolDashboardView({
                     label="Teachers"
                     value={teacherCount !== null ? <AnimatedNumber value={teacherCount} /> : "—"}
                     hint="Registered in branch"
+                    accent="#3b82f6"
                   />
                   <HeroFact
                     label="Students"
                     value={<AnimatedNumber value={quizSummaries.length} />}
                     hint={`Class ${selectedClass} roster`}
+                    accent="#10b981"
                   />
                   <HeroFact
-                    label="Curriculum Modules"
+                    label="Modules"
                     value={<AnimatedNumber value={modules.length} />}
-                    hint={`${classSubjects.length} subject${
-                      classSubjects.length === 1 ? "" : "s"
-                    } configured`}
+                    hint={`${classSubjects.length} subject${classSubjects.length === 1 ? "" : "s"}`}
+                    accent="#8b5cf6"
                   />
                   <HeroFact
-                    label="Syllabus Coverage"
-                    value="Classes 1–5"
-                    hint="Active curriculum"
+                    label="Syllabus"
+                    value="1–5"
+                    hint="Active classes"
+                    accent="#f59e0b"
                   />
                 </>
               }
