@@ -278,32 +278,17 @@ async def get_chapter_chunks(
     return list(result.scalars().all())
 
 
-async def search_chunks_for_rag(
-    session: AsyncSession,
-    branch_name: str,
-    class_number: int,
-    subject: str,
-    query: str,
-    chapter_numbers: Optional[list[int]] = None,
-    top_k: int = 5,
+def rank_chunks(
+    chunks: list[DocumentChunk], query: str, top_k: int = 5
 ) -> list[RAGSearchResult]:
     """
-    Search chunks for RAG quiz & question generation.
-    Filters by branch, class, subject, and optional chapter_numbers.
+    Pure, no-DB-call scoring of an already-fetched chunk list against a query
+    — the hybrid-score half of search_chunks_for_rag, split out so a caller
+    that needs to rank the *same* fetched chunk set against several different
+    queries (e.g. remediation_service building a module per gap, several
+    gaps sharing one subject/class) can do so without a repeat DB round trip
+    per query. search_chunks_for_rag itself is just this plus the fetch.
     """
-    stmt = select(DocumentChunk).where(
-        (DocumentChunk.branch_name == branch_name) | (DocumentChunk.branch_name == "SELF")
-    ).where(
-        DocumentChunk.class_number == class_number,
-        DocumentChunk.subject.ilike(f"%{subject.strip()}%"),  # type: ignore[attr-defined]
-    )
-
-    if chapter_numbers:
-        stmt = stmt.where(DocumentChunk.chapter_number.in_(chapter_numbers))  # type: ignore[attr-defined]
-
-    result = await session.execute(stmt)
-    chunks = list(result.scalars().all())
-
     if not chunks:
         return []
 
@@ -346,3 +331,31 @@ async def search_chunks_for_rag(
         )
         for score, chunk in top_matches
     ]
+
+
+async def search_chunks_for_rag(
+    session: AsyncSession,
+    branch_name: str,
+    class_number: int,
+    subject: str,
+    query: str,
+    chapter_numbers: Optional[list[int]] = None,
+    top_k: int = 5,
+) -> list[RAGSearchResult]:
+    """
+    Search chunks for RAG quiz & question generation.
+    Filters by branch, class, subject, and optional chapter_numbers.
+    """
+    stmt = select(DocumentChunk).where(
+        (DocumentChunk.branch_name == branch_name) | (DocumentChunk.branch_name == "SELF")
+    ).where(
+        DocumentChunk.class_number == class_number,
+        DocumentChunk.subject.ilike(f"%{subject.strip()}%"),  # type: ignore[attr-defined]
+    )
+
+    if chapter_numbers:
+        stmt = stmt.where(DocumentChunk.chapter_number.in_(chapter_numbers))  # type: ignore[attr-defined]
+
+    result = await session.execute(stmt)
+    chunks = list(result.scalars().all())
+    return rank_chunks(chunks, query, top_k)
