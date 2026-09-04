@@ -15,12 +15,12 @@ from src.core.database import get_session
 from src.core.dependencies import get_current_parent
 from src.models.parent import Parent
 from src.schemas.auth import AddChildRequest
-from src.schemas.learning import StudentDetailedProgressOut, StudentProgressOut
+from src.schemas.learning import ClassLeaderboardOut, StudentDetailedProgressOut, StudentProgressOut
 from src.schemas.parent import ChildLinkOut, ParentProfile
 from src.schemas.quiz import GapReportOut
 from src.schemas.student import StudentProfile
 from src.schemas.teacher import StudentTestResultSummaryOut
-from src.services import learning_progress_service, parent_service, quiz_service
+from src.services import assessment_progress_service, learning_progress_service, parent_service, quiz_service
 
 router = APIRouter(prefix="/parent", tags=["Parent Dashboard"])
 
@@ -151,4 +151,62 @@ async def get_child_detailed_progress(
     return await assessment_progress_service.calculate_student_detailed_progress(student, session)
 
 
+@router.get(
+    "/children/{student_unique_number}/leaderboard",
+    response_model=ClassLeaderboardOut,
+    summary="Class leaderboard — top 10 students + child's own rank, ranked by holistic mastery",
+)
+async def get_child_leaderboard(
+    student_unique_number: str,
+    parent: Parent = Depends(get_current_parent),
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Returns the top 10 students in the child's class/section ranked by
+    holistic_mastery_percent (avg test score + improvement trajectory).
 
+    my_entry is always set to the child's own ranked row so the parent can see
+    exactly where their child stands, even if the child is outside the top 10.
+
+    Only available for school-enrolled children who have completed class setup.
+    """
+    from fastapi import HTTPException, status
+    from src.models.student import Student as StudentModel
+    from sqlmodel import select as sql_select
+
+    student = await parent_service.get_owned_student(parent, student_unique_number, session)
+
+    if (student.enrollment_type or "school") != "school":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The class leaderboard is only available for school-enrolled students.",
+        )
+    if student.class_number is None or student.section is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This child has not completed class setup yet.",
+        )
+
+    students_result = await session.execute(
+        sql_select(StudentModel).where(
+            StudentModel.branch_name == student.branch_name,
+            StudentModel.class_number == student.class_number,
+            StudentModel.section == student.section,
+            StudentModel.enrollment_type == "school",
+        )
+    )
+    class_students = list(students_result.scalars().all())
+
+    # Full ranked list in one pass; slice top 10 and find the child's entry
+    full_board = await assessment_progress_service.get_class_leaderboard(
+        class_students, student.class_number, student.section, session,
+        top_n=len(class_students),
+    )
+
+    my_entry = next(
+        (e for e in full_board.top_entries if e.student_id == student.id), None
+    )
+
+    full_board.top_entries = full_board.top_entries[:10]
+    full_board.my_entry = my_entry
+    return full_board

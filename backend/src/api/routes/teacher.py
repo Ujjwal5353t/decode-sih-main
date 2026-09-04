@@ -39,11 +39,12 @@ from src.schemas.teacher import (
     TeacherClassOut,
     TeacherProfile,
 )
-from src.schemas.learning import ClassProgressOut, StudentDetailedProgressOut
+from src.schemas.learning import ClassLeaderboardOut, ClassProgressOut, StudentDetailedProgressOut
 from src.schemas.student import StudentProfile
 from src.schemas.module import ModuleOut
 from src.schemas.chunk import ChapterOut, ChunkOut, RAGChunkSearchRequest, RAGSearchResult
 from src.services import (
+    assessment_progress_service,
     teacher_service,
     module_service,
     chunk_service,
@@ -133,6 +134,38 @@ async def get_class_learning_progress(
     return await learning_progress_service.get_class_progress(
         students, class_number, section, session, subject=target_subject, allowed_subjects=assigned_subjects
     )
+
+
+@router.get(
+    "/classes/{class_number}/{section}/leaderboard",
+    response_model=ClassLeaderboardOut,
+    summary="Class leaderboard — all students ranked by holistic mastery (improvement-based), teacher view",
+)
+async def get_class_leaderboard(
+    class_number: int,
+    section: str,
+    teacher: Teacher = Depends(get_current_teacher),
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Full ranked list of all school-enrolled students in this class/section,
+    sorted by holistic_mastery_percent DESC (avg test score + improvement trajectory).
+
+    Unlike the student/parent view, the teacher sees every student — not just the
+    top 10 — so they can identify students who are struggling and need support.
+    my_entry is null for the teacher (they are not a student in the class).
+    """
+    await teacher_service.verify_teacher_class_access(teacher, class_number, section, session)
+    students = await teacher_service.get_class_students(
+        teacher.branch_name, class_number, section.upper(), session
+    )
+    # top_n = very large number so all students are returned
+    board = await assessment_progress_service.get_class_leaderboard(
+        students, class_number, section, session, top_n=len(students) if students else 1
+    )
+    # Teacher view: my_entry is always null
+    board.my_entry = None
+    return board
 
 
 @router.get(

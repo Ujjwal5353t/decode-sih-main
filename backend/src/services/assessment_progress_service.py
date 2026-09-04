@@ -24,7 +24,9 @@ from src.models.teacher import (
 from src.schemas.learning import (
     AssessmentAttemptTrend,
     AssessmentGrowthItem,
+    ClassLeaderboardOut,
     DiagnosticGapSummary,
+    LeaderboardEntryOut,
     ModuleProgressOut,
     StudentDetailedProgressOut,
     SubjectAssessmentProgressOut,
@@ -475,4 +477,102 @@ async def calculate_student_detailed_progress(
         diagnostic_gaps=diagnostic_gaps,
         diagnostic_overall_score=diag_overall_score,
         recent_activity=module_progress.recent_activity,
+    )
+
+
+async def get_class_leaderboard(
+    students: list[Student],
+    class_number: int,
+    section: str,
+    session: AsyncSession,
+    top_n: int = 10,
+) -> ClassLeaderboardOut:
+    """
+    Build a class leaderboard ranked by holistic_mastery_percent.
+
+    Ranking rules
+    -------------
+    Primary   : holistic_mastery_percent DESC
+                (avg_test_score + consecutive_growth_rate × 0.25)
+                Directly rewards improvement from previous marks to current.
+    Tiebreaker: curriculum_completion_percent DESC
+                (lesson-completion %) — active learners win ties.
+    Shared rank: Two students at identical (holistic, curriculum) scores get
+                 the same rank; the next rank is skipped accordingly.
+
+    Scope
+    -----
+    Only school-enrolled students (enrollment_type == "school") are ranked.
+    Self-enrolled students are silently excluded — they have no class/section.
+
+    top_n
+    -----
+    Pass top_n=None (or a very large number) for the teacher view that shows
+    every student ranked.
+    """
+    # Filter to school-enrolled students only
+    school_students = [s for s in students if (s.enrollment_type or "school") == "school"]
+
+    if not school_students:
+        return ClassLeaderboardOut(
+            class_number=class_number,
+            section=section.upper(),
+            total_students=0,
+            top_entries=[],
+            my_entry=None,
+        )
+
+    # Compute holistic progress for every student in the class
+    scored: list[tuple[Student, int, int, float, float]] = []
+    # tuples: (student, holistic_mastery_percent, curriculum_completion_percent,
+    #           avg_test_score, consecutive_growth_rate)
+    for student in school_students:
+        try:
+            detail = await calculate_student_detailed_progress(student, session)
+            holistic = detail.holistic_mastery_percent
+            curriculum = detail.curriculum_completion_percent
+            avg_score = detail.average_test_score
+            growth = detail.consecutive_growth_rate
+        except Exception:
+            # Never let one bad student break the whole leaderboard
+            holistic = 0
+            curriculum = 0
+            avg_score = 0.0
+            growth = 0.0
+        scored.append((student, holistic, curriculum, avg_score, growth))
+
+    # Sort: holistic DESC, then curriculum DESC (tiebreaker)
+    scored.sort(key=lambda t: (t[1], t[2]), reverse=True)
+
+    # Assign ranks — ties share the same rank
+    entries: list[LeaderboardEntryOut] = []
+    current_rank = 1
+    for i, (student, holistic, curriculum, avg_score, growth) in enumerate(scored):
+        if i > 0:
+            prev_holistic, prev_curriculum = scored[i - 1][1], scored[i - 1][2]
+            if holistic != prev_holistic or curriculum != prev_curriculum:
+                current_rank = i + 1  # skip ranks for shared positions
+        entries.append(
+            LeaderboardEntryOut(
+                rank=current_rank,
+                student_id=student.id,
+                unique_number=student.unique_number,
+                full_name=student.full_name or f"Student #{student.unique_number}",
+                holistic_mastery_percent=holistic,
+                curriculum_completion_percent=curriculum,
+                avg_test_score=round(avg_score, 1),
+                consecutive_growth_rate=round(growth, 1),
+            )
+        )
+
+    total = len(entries)
+    # top_entries: all entries for teacher (top_n=None/large); top N for student/parent
+    top_entries = entries[:top_n] if top_n and top_n < total else entries
+
+    return ClassLeaderboardOut(
+        class_number=class_number,
+        section=section.upper(),
+        total_students=total,
+        top_entries=top_entries,
+        my_entry=None,  # caller sets this after filtering for themselves
     )

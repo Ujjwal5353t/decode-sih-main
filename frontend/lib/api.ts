@@ -2226,3 +2226,66 @@ export async function submitModuleQuiz(
   });
 }
 
+
+// ── Leaderboard ────────────────────────────────────────────────────────────────
+
+/** One student's row in the class leaderboard. */
+export interface LeaderboardEntry {
+  rank: number;
+  student_id: string;
+  unique_number: string;
+  full_name: string;
+  /** Primary ranking metric: avg_test_score + consecutive_growth_rate × 0.25 */
+  holistic_mastery_percent: number;
+  /** Lesson-completion % — used as a tiebreaker and secondary display info. */
+  curriculum_completion_percent: number;
+  /** Average of the latest score % across all assignments taken. */
+  avg_test_score: number;
+  /** Average (latest_score − initial_score) per assignment — +ve = improving. */
+  consecutive_growth_rate: number;
+}
+
+/**
+ * Full leaderboard response.
+ *
+ * - Student / parent view: top_entries has ≤ 10 rows; my_entry is always set.
+ * - Teacher view: top_entries contains ALL students ranked; my_entry is null.
+ */
+export interface ClassLeaderboard {
+  class_number: number;
+  section: string;
+  total_students: number;
+  top_entries: LeaderboardEntry[];
+  my_entry: LeaderboardEntry | null;
+}
+
+/**
+ * Student: top 10 classmates + own rank.
+ * Requires school enrollment and class setup to be completed.
+ */
+export async function getStudentLeaderboard(): Promise<ClassLeaderboard> {
+  return fetchApi<ClassLeaderboard>("/student/leaderboard");
+}
+
+/**
+ * Teacher: full ranked list of all students in a class section.
+ */
+export async function getTeacherClassLeaderboard(
+  classNumber: number,
+  section: string
+): Promise<ClassLeaderboard> {
+  return fetchApi<ClassLeaderboard>(
+    `/teacher/classes/${classNumber}/${section}/leaderboard`
+  );
+}
+
+/**
+ * Parent: top 10 + child's own rank for one linked child.
+ */
+export async function getParentChildLeaderboard(
+  studentUniqueNumber: string
+): Promise<ClassLeaderboard> {
+  return fetchApi<ClassLeaderboard>(
+    `/parent/children/${studentUniqueNumber}/leaderboard`
+  );
+}

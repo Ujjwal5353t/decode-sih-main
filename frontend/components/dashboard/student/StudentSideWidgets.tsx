@@ -2,16 +2,20 @@
 
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 import {
-  Trophy,
   Sparkles,
-  ChevronRight,
   Gift,
-  Star,
   Award,
 } from "lucide-react";
-import { GamificationSummaryOut, StudentProfile } from "@/lib/api";
+import {
+  GamificationSummaryOut,
+  StudentProfile,
+  ClassLeaderboard,
+  getStudentLeaderboard,
+} from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
+import { LeaderboardPanel } from "@/components/dashboard/shared/LeaderboardPanel";
 
 export function StudentSideWidgets({
   student,
@@ -32,19 +36,29 @@ export function StudentSideWidgets({
   const totalXp = summary?.total_xp ?? 0;
   const chest = summary?.chest;
 
-  const leaderboard = [
-    { rank: 1, name: "Sophie", xp: 1240, avatar: "👑", isUser: false },
-    {
-      rank: 2,
-      name: student.full_name?.split(" ")[0] || "You",
-      xp: 980,
-      avatar: "🐼",
-      isUser: true,
-    },
-    { rank: 3, name: "Daniel", xp: 870, avatar: "🚀", isUser: false },
-    { rank: 4, name: "Maya", xp: 760, avatar: "⭐", isUser: false },
-    { rank: 5, name: "Liam", xp: 650, avatar: "⚡", isUser: false },
-  ];
+  // ── Live leaderboard ──────────────────────────────────────────────────────
+  const [leaderboard, setLeaderboard] = useState<ClassLeaderboard | null>(null);
+  const [lbLoading, setLbLoading] = useState(true);
+  const [lbError, setLbError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (student.enrollment_type !== "school" || !student.class_number || !student.section) {
+      setLbLoading(false);
+      return;
+    }
+    getStudentLeaderboard()
+      .then(setLeaderboard)
+      .catch((err) => {
+        const msg: string = err?.message ?? String(err);
+        // 403 = self-enrolled, 400 = class not set up yet — show a soft message
+        if (msg.includes("403") || msg.includes("400")) {
+          setLbError("Leaderboard not available yet.");
+        } else {
+          setLbError("Could not load leaderboard.");
+        }
+      })
+      .finally(() => setLbLoading(false));
+  }, [student.enrollment_type, student.class_number, student.section]);
 
   return (
     <div className="space-y-6">
@@ -53,65 +67,20 @@ export function StudentSideWidgets({
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.08 }}
-        className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-amber-500" />
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-white font-[family-name:var(--font-display)]">
-              Leaderboard
-            </h3>
+        {lbLoading ? (
+          <div className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 animate-pulse h-48" />
+        ) : lbError ? (
+          <div className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 text-sm text-slate-400 text-center">
+            {lbError}
           </div>
-          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-extrabold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-            This week
-          </span>
-        </div>
-
-        <div className="mt-4 space-y-2">
-          {leaderboard.map((item) => (
-            <div
-              key={item.rank}
-              className={`flex items-center justify-between rounded-2xl px-3.5 py-2.5 transition-colors ${
-                item.isUser
-                  ? "border border-sky-300 bg-sky-50/90 shadow-sm dark:border-sky-800 dark:bg-sky-950/40 font-bold"
-                  : "hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  className={`grid h-6 w-6 place-items-center rounded-full text-xs font-black ${
-                    item.rank === 1
-                      ? "bg-amber-400 text-amber-950"
-                      : item.rank === 2
-                      ? "bg-sky-500 text-white"
-                      : item.rank === 3
-                      ? "bg-amber-700/20 text-amber-800 dark:text-amber-300"
-                      : "text-slate-400"
-                  }`}
-                >
-                  {item.rank}
-                </span>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-base">{item.avatar}</span>
-                  <span
-                    className={`text-xs ${
-                      item.isUser
-                        ? "font-extrabold text-sky-950 dark:text-white"
-                        : "font-semibold text-slate-800 dark:text-slate-200"
-                    }`}
-                  >
-                    {item.name} {item.isUser ? "(You)" : ""}
-                  </span>
-                </div>
-              </div>
-
-              <span className="font-mono text-xs font-bold text-sky-600 dark:text-sky-400">
-                {item.xp} XP
-              </span>
-            </div>
-          ))}
-        </div>
+        ) : leaderboard ? (
+          <LeaderboardPanel data={leaderboard} viewerStudentId={student.id} />
+        ) : (
+          <div className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 text-sm text-slate-400 text-center">
+            Leaderboard is only available for school-enrolled students.
+          </div>
+        )}
       </motion.div>
 
       {/* ── 2. REWARD / MYSTERY CHEST CARD ────────────────────────────────── */}

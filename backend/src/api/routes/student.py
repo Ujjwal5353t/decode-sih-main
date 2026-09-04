@@ -28,6 +28,7 @@ from src.core.dependencies import get_current_student
 from src.models.student import Student
 from src.schemas.learning import (
     ClaimChestResponse,
+    ClassLeaderboardOut,
     GamificationSummaryOut,
     LearningEventSyncRequest,
     LearningEventSyncResponse,
@@ -56,6 +57,7 @@ from src.schemas.teacher import (
     SubmissionOut,
 )
 from src.services import (
+    assessment_progress_service,
     gamification_service,
     learning_progress_service,
     lesson_service,
@@ -402,6 +404,66 @@ async def get_student_detailed_progress(
 ):
     from src.services import assessment_progress_service
     return await assessment_progress_service.calculate_student_detailed_progress(student, session)
+
+
+@router.get(
+    "/leaderboard",
+    response_model=ClassLeaderboardOut,
+    summary="Class leaderboard — top 10 students ranked by holistic mastery (improvement-based) plus this student's own rank",
+)
+async def get_student_leaderboard(
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Returns the top 10 students in this student's class/section ranked by
+    holistic_mastery_percent (avg test score + improvement trajectory × 0.25).
+
+    The student's own entry (my_entry) is always returned regardless of rank,
+    so they always know where they stand even if they are outside the top 10.
+
+    Only available for school-enrolled students who have completed class setup.
+    """
+    from fastapi import HTTPException, status
+
+    if (student.enrollment_type or "school") != "school":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The class leaderboard is only available for school-enrolled students.",
+        )
+    if student.class_number is None or student.section is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please complete your class setup first via POST /auth/student/setup-class.",
+        )
+
+    from src.models.student import Student as StudentModel
+    from sqlmodel import select as sql_select
+
+    students_result = await session.execute(
+        sql_select(StudentModel).where(
+            StudentModel.branch_name == student.branch_name,
+            StudentModel.class_number == student.class_number,
+            StudentModel.section == student.section,
+            StudentModel.enrollment_type == "school",
+        )
+    )
+    class_students = list(students_result.scalars().all())
+
+    # Fetch the full ranked list in one pass, then slice top 10 and pick my_entry
+    full_board = await assessment_progress_service.get_class_leaderboard(
+        class_students, student.class_number, student.section, session,
+        top_n=len(class_students),
+    )
+
+    my_entry = next(
+        (e for e in full_board.top_entries if e.student_id == student.id), None
+    )
+
+    # Return only top 10 to the student (privacy: they cannot see everyone's position)
+    full_board.top_entries = full_board.top_entries[:10]
+    full_board.my_entry = my_entry
+    return full_board
 
 
 # ── Gamification: XP, reward chests ────────────────────────────────────────────

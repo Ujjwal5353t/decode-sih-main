@@ -261,3 +261,46 @@ class ClaimChestResponse(BaseModel):
     chest_index: Optional[int] = None
     xp_awarded: Optional[int] = None
     badge: Optional[str] = None
+
+
+# ── Class Leaderboard (server → student / parent / teacher) ───────────────────
+
+class LeaderboardEntryOut(BaseModel):
+    """One student's row in the class leaderboard."""
+
+    rank: int
+    student_id: uuid.UUID
+    unique_number: str
+    full_name: str
+
+    # Primary ranking metric — blends avg test score with improvement trajectory.
+    # Formula: avg_test_score + (consecutive_growth_rate × 0.25)
+    holistic_mastery_percent: int
+
+    # Tiebreaker and secondary display info.
+    curriculum_completion_percent: int
+
+    # Shown in teacher view and on the student's own card.
+    avg_test_score: float
+    consecutive_growth_rate: float  # +ve = improving, -ve = declining
+
+
+class ClassLeaderboardOut(BaseModel):
+    """
+    Leaderboard for one class section.
+
+    Student / parent view : top_entries holds at most top_n entries (default 10);
+                            my_entry is always set so the caller always knows their rank.
+    Teacher view          : top_entries holds ALL students ranked;
+                            my_entry is None.
+    """
+
+    class_number: int
+    section: str
+    total_students: int
+
+    # Ranked entries — top N for student/parent; full list for teacher.
+    top_entries: list[LeaderboardEntryOut]
+
+    # The caller's own ranked entry. Present for student and parent; null for teacher.
+    my_entry: Optional[LeaderboardEntryOut] = None

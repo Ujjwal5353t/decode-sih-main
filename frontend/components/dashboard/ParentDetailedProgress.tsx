@@ -18,15 +18,19 @@ import {
   Sparkles,
   TrendingDown,
   TrendingUp,
+  Trophy,
   User,
   Zap,
 } from "lucide-react";
 import {
   AssessmentGrowthItem,
+  ClassLeaderboard,
   ChildLinkOut,
   StudentDetailedProgressOut,
   getChildDetailedProgress,
+  getParentChildLeaderboard,
 } from "@/lib/api";
+import { LeaderboardPanel } from "@/components/dashboard/shared/LeaderboardPanel";
 import { Item, Stagger } from "@/components/dashboard/console/motion";
 import {
   Chip,
@@ -113,9 +117,35 @@ export function ParentDetailedProgress({
   const [progress, setProgress] = useState<StudentDetailedProgressOut | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<"assessments" | "subjects" | "curriculum" | "gaps">("assessments");
+  const [activeSection, setActiveSection] = useState<"assessments" | "subjects" | "curriculum" | "gaps" | "leaderboard">("assessments");
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<AssessmentGrowthItem | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
+
+  // ── Leaderboard state ─────────────────────────────────────────────────────
+  const [leaderboard, setLeaderboard] = useState<ClassLeaderboard | null>(null);
+  const [lbLoading, setLbLoading] = useState(false);
+  const [lbError, setLbError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeSection !== "leaderboard" || !selectedStudentNumber) return;
+    let cancelled = false;
+    setLbLoading(true);
+    setLbError(null);
+    getParentChildLeaderboard(selectedStudentNumber)
+      .then((data) => { if (!cancelled) setLeaderboard(data); })
+      .catch((err) => {
+        if (!cancelled) {
+          const msg: string = err?.message ?? String(err);
+          setLbError(
+            msg.includes("403") || msg.includes("400")
+              ? "Leaderboard not available for this child yet."
+              : "Could not load leaderboard."
+          );
+        }
+      })
+      .finally(() => { if (!cancelled) setLbLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeSection, selectedStudentNumber]);
 
   useEffect(() => {
     if (!selectedStudentNumber && childrenList.length > 0) {
@@ -365,7 +395,35 @@ export function ParentDetailedProgress({
                 <span>Diagnostic Gaps ({progress.diagnostic_gaps.length})</span>
               </button>
             )}
+            <button
+              onClick={() => setActiveSection("leaderboard")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeSection === "leaderboard"
+                  ? "bg-amber-500 text-white shadow-xs"
+                  : "bg-amber-500/10 text-amber-600 hover:bg-amber-500/20"
+              }`}
+            >
+              <Trophy className="w-3.5 h-3.5" />
+              <span>Class Leaderboard</span>
+            </button>
           </div>
+
+          {/* ── Leaderboard Section ────────────────────────────────────────── */}
+          {activeSection === "leaderboard" && (
+            <div>
+              {lbLoading ? (
+                <div className="py-12"><Loading /></div>
+              ) : lbError ? (
+                <Notice tone="rose">{lbError}</Notice>
+              ) : leaderboard ? (
+                <LeaderboardPanel
+                  data={leaderboard}
+                  viewerStudentId={progress.student_id.toString()}
+                  title={`🏆 Class ${leaderboard.class_number}${leaderboard.section} Leaderboard`}
+                />
+              ) : null}
+            </div>
+          )}
 
           {/* ── SECTION 1: Consecutive Assessment Growth Table ─────────────── */}
           {activeSection === "assessments" && (
