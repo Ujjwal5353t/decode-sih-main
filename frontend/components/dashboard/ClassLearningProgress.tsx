@@ -15,17 +15,21 @@ import {
   Sparkles,
   TrendingDown,
   TrendingUp,
+  Trophy,
   X,
   Zap,
 } from "lucide-react";
 import {
   AssessmentGrowthItem,
+  ClassLeaderboard,
   ClassProgressOut,
   ClassStudentProgressOut,
   StudentDetailedProgressOut,
   getClassLearningProgress,
+  getTeacherClassLeaderboard,
   getTeacherStudentDetailedProgress,
 } from "@/lib/api";
+import { LeaderboardPanel } from "@/components/dashboard/shared/LeaderboardPanel";
 import { Item, Stagger } from "@/components/dashboard/console/motion";
 import {
   Chip,
@@ -73,11 +77,28 @@ export function ClassLearningProgress({
   subject?: string;
 }) {
   const { t } = useTranslation();
-  const [activeView, setActiveView] = useState<"assessments" | "curriculum">("assessments");
+  const [activeView, setActiveView] = useState<"assessments" | "curriculum" | "leaderboard">("assessments");
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<ClassStudentProgressOut | null>(null);
   const [studentDetailProgress, setStudentDetailProgress] = useState<StudentDetailedProgressOut | null>(null);
   const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+
+  // ── Leaderboard state ─────────────────────────────────────────────────────
+  const [leaderboard, setLeaderboard] = useState<ClassLeaderboard | null>(null);
+  const [lbLoading, setLbLoading] = useState(false);
+  const [lbError, setLbError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeView !== "leaderboard") return;
+    let cancelled = false;
+    setLbLoading(true);
+    setLbError(null);
+    getTeacherClassLeaderboard(classNumber, section)
+      .then((data) => { if (!cancelled) setLeaderboard(data); })
+      .catch((err) => { if (!cancelled) setLbError(err.message || "Could not load leaderboard."); })
+      .finally(() => { if (!cancelled) setLbLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeView, classNumber, section]);
 
   const isSpecificSubject = Boolean(
     subject &&
@@ -294,6 +315,17 @@ export function ClassLearningProgress({
               <BookOpen className="w-3.5 h-3.5" />
               <span>Curriculum Modules</span>
             </button>
+            <button
+              onClick={() => setActiveView("leaderboard")}
+              className={`px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeView === "leaderboard"
+                  ? "bg-brand text-white shadow-xs"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              <Trophy className="w-3.5 h-3.5" />
+              <span>Leaderboard</span>
+            </button>
           </div>
         </div>
 
@@ -322,7 +354,22 @@ export function ClassLearningProgress({
           </div>
         )}
 
-        {loading ? (
+        {/* ── Leaderboard view (shown before loading check for its own loader) ─ */}
+        {activeView === "leaderboard" ? (
+          <div className="p-4">
+            {lbLoading ? (
+              <div className="py-12"><Loading /></div>
+            ) : lbError ? (
+              <Notice tone="rose">{lbError}</Notice>
+            ) : leaderboard ? (
+              <LeaderboardPanel
+                data={leaderboard}
+                showAll
+                title={`🏆 Class ${classNumber}${section} Leaderboard`}
+              />
+            ) : null}
+          </div>
+        ) : loading ? (
           <div className="py-12"><Loading /></div>
         ) : error ? (
           <div className="p-5">
