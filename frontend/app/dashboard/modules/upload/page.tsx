@@ -28,7 +28,7 @@ function ModuleUploadContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, role, loading, logout } = useAuth();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [permissions, setPermissions] = useState<RolePermissionsResponse | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
 
@@ -44,11 +44,11 @@ function ModuleUploadContent() {
 
   useEffect(() => {
     if (role) {
-      getRolePermissions(role)
+      getRolePermissions(role, language)
         .then((res) => setPermissions(res))
         .catch((err) => console.log("Fetch permissions note:", err.message));
     }
-  }, [role]);
+  }, [role, language]);
 
   if (loading || !user || role !== "school" || !permissions) {
     return <LoadingScreen message={t("dashboard.common.loading")} />;

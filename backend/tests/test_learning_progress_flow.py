@@ -425,9 +425,115 @@ async def test_teacher_class_progress_view():
     print("PASS test_teacher_class_progress_view")
 
 
+async def test_activity_points_and_streaks():
+    """Verify points accumulation and multi-day / broken daily streak logic."""
+    engine, factory = await _fresh_db()
+    async with factory() as session:
+        student, maths, _ = await _seed(session)
+
+        # Day 1 (2 days ago): finished 1 lesson -> started lesson (5) + activity (5) + quiz (10) + lesson completed (50) = 70 pts
+        two_days_ago = datetime.utcnow() - timedelta(days=2)
+        day1_events = [
+            LearningEventIn(
+                client_event_id=str(uuid.uuid4()),
+                event_type=LearningEventType.LESSON_STARTED.value,
+                occurred_at=two_days_ago,
+                lesson_id=maths[0].id,
+            ),
+            LearningEventIn(
+                client_event_id=str(uuid.uuid4()),
+                event_type=LearningEventType.ACTIVITY_COMPLETED.value,
+                occurred_at=two_days_ago,
+                lesson_id=maths[0].id,
+            ),
+            LearningEventIn(
+                client_event_id=str(uuid.uuid4()),
+                event_type=LearningEventType.QUIZ_COMPLETED.value,
+                occurred_at=two_days_ago,
+                lesson_id=maths[0].id,
+            ),
+            LearningEventIn(
+                client_event_id=str(uuid.uuid4()),
+                event_type=LearningEventType.LESSON_COMPLETED.value,
+                occurred_at=two_days_ago,
+                lesson_id=maths[0].id,
+            ),
+        ]
+        await progress.ingest_events(student, day1_events, session)
+
+        # Day 2 (yesterday): finished lesson 2 -> + 70 pts = 140 pts
+        yesterday = datetime.utcnow() - timedelta(days=1)
+        day2_events = [
+            LearningEventIn(
+                client_event_id=str(uuid.uuid4()),
+                event_type=LearningEventType.LESSON_STARTED.value,
+                occurred_at=yesterday,
+                lesson_id=maths[1].id,
+            ),
+            LearningEventIn(
+                client_event_id=str(uuid.uuid4()),
+                event_type=LearningEventType.ACTIVITY_COMPLETED.value,
+                occurred_at=yesterday,
+                lesson_id=maths[1].id,
+            ),
+            LearningEventIn(
+                client_event_id=str(uuid.uuid4()),
+                event_type=LearningEventType.QUIZ_COMPLETED.value,
+                occurred_at=yesterday,
+                lesson_id=maths[1].id,
+            ),
+            LearningEventIn(
+                client_event_id=str(uuid.uuid4()),
+                event_type=LearningEventType.LESSON_COMPLETED.value,
+                occurred_at=yesterday,
+                lesson_id=maths[1].id,
+            ),
+        ]
+        await progress.ingest_events(student, day2_events, session)
+
+        # Day 3 (today): finished lesson 3 -> + 70 pts = 210 pts
+        today = datetime.utcnow()
+        day3_events = [
+            LearningEventIn(
+                client_event_id=str(uuid.uuid4()),
+                event_type=LearningEventType.LESSON_STARTED.value,
+                occurred_at=today,
+                lesson_id=maths[2].id,
+            ),
+            LearningEventIn(
+                client_event_id=str(uuid.uuid4()),
+                event_type=LearningEventType.ACTIVITY_COMPLETED.value,
+                occurred_at=today,
+                lesson_id=maths[2].id,
+            ),
+            LearningEventIn(
+                client_event_id=str(uuid.uuid4()),
+                event_type=LearningEventType.QUIZ_COMPLETED.value,
+                occurred_at=today,
+                lesson_id=maths[2].id,
+            ),
+            LearningEventIn(
+                client_event_id=str(uuid.uuid4()),
+                event_type=LearningEventType.LESSON_COMPLETED.value,
+                occurred_at=today,
+                lesson_id=maths[2].id,
+            ),
+        ]
+        await progress.ingest_events(student, day3_events, session)
+
+        report = await progress.get_student_progress(student, session)
+        assert report.points == 210, f"Expected 210 points, got {report.points}"
+        assert report.current_streak == 3, f"Expected current streak 3, got {report.current_streak}"
+        assert report.longest_streak == 3, f"Expected longest streak 3, got {report.longest_streak}"
+
+    await engine.dispose()
+    print("PASS test_activity_points_and_streaks")
+
+
 if __name__ == "__main__":
     asyncio.run(test_full_learning_flow())
     asyncio.run(test_offline_sync_is_idempotent())
     asyncio.run(test_untrusted_input_is_rejected_not_stored())
     asyncio.run(test_teacher_class_progress_view())
+    asyncio.run(test_activity_points_and_streaks())
     print("\nAll learning-progress tests passed.")

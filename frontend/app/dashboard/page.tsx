@@ -41,6 +41,7 @@ import {
   Menu,
   RefreshCw,
   Target,
+  Flame,
   Play,
   Bell,
   TrendingUp,
@@ -51,6 +52,7 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { DashboardSidebar } from "@/components/dashboard/Sidebar";
 import { ModuleProgressOverview, RecentActivityWidget } from "@/components/dashboard/LearningProgressPanel";
 import { ClassLearningProgress } from "@/components/dashboard/ClassLearningProgress";
+import { ParentDetailedProgress } from "@/components/dashboard/ParentDetailedProgress";
 import { StudentHero, StudentHeroFact } from "@/components/dashboard/student/StudentHero";
 import {
   LearningCard,
@@ -116,7 +118,7 @@ import {
   useModuleProcessing,
 } from "@/components/school/ModuleProcessingProvider";
 import { useAuth } from "@/hooks/useAuth";
-import { useTranslation } from "@/hooks/useTranslation";
+import { useTranslation, DynamicText } from "@/hooks/useTranslation";
 import { Mascot, MascotMood } from "@/components/quiz/Mascot";
 import { QuizRunnerModal } from "@/components/quiz/QuizRunnerModal";
 import { AttemptHistoryModal } from "@/components/quiz/AttemptHistoryModal";
@@ -141,6 +143,7 @@ import {
   QuizStatusOut,
   StudentQuizSummaryOut,
   getStudentModules,
+  getStudentLearningProgress,
   getNCERTBooksForClass,
   getSubjectPriority,
   SubjectPriorityOut,
@@ -193,6 +196,8 @@ import {
   getStudentTestResults,
   getChildTestResults,
   getTeacherStudentAttempts,
+  getChildLearningProgress,
+  StudentProgressOut,
   AssignmentAttemptOut,
   StudentTestResultSummaryOut,
 } from "@/lib/api";
@@ -281,7 +286,7 @@ function SubjectGroupHeader({
 export default function DashboardPage() {
   const router = useRouter();
   const { user, role, loading, logout, setupClass } = useAuth();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   const [permissions, setPermissions] = useState<RolePermissionsResponse | null>(null);
   const [activeTab, setActiveTab] = useState<string>("overview");
@@ -344,10 +349,10 @@ export default function DashboardPage() {
     }
   }, [loading, user, role, router]);
 
-  // Fetch RBAC Permissions & Navigation Schema from Backend
+  // Fetch RBAC Permissions & Navigation Schema from Backend (re-fetches on language change)
   useEffect(() => {
     if (role) {
-      getRolePermissions(role)
+      getRolePermissions(role, language)
         .then((res) => {
           setPermissions(res);
           const tabParam =
@@ -359,13 +364,13 @@ export default function DashboardPage() {
             res.navigation.find((i) => i.is_default)?.id ||
             res.navigation[0]?.id ||
             "overview";
-          setActiveTab(defaultTab);
+          setActiveTab((prev) => tabParam || prev || defaultTab);
         })
         .catch((err) => {
           console.log("Fetch permissions note:", err.message);
         });
     }
-  }, [role]);
+  }, [role, language]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -396,7 +401,7 @@ export default function DashboardPage() {
     modules: "dashboard.nav.learningModules",
     assignments: "dashboard.nav.classAssignments",
     practice: "dashboard.nav.practiceQuizzes",
-    quizzes: "dashboard.nav.practiceQuizzes",
+    quizzes: "dashboard.nav.quizzes",
     grading: "dashboard.nav.grading",
     "diagnostic-quiz": "dashboard.nav.diagnosticQuiz",
     "gap-report": "dashboard.nav.gapReport",
@@ -411,11 +416,16 @@ export default function DashboardPage() {
     "admin-requests": "dashboard.nav.adminRequests",
     "school-requests": "dashboard.nav.schoolRequests",
     history: "dashboard.nav.history",
+    children: "dashboard.nav.children",
+    progress: "dashboard.nav.progress",
+    ncert_master: "dashboard.nav.ncertMaster",
+    schools: "dashboard.nav.schools",
   };
 
   const getPageTitle = () => {
     if (role === "student" && activeTab === "overview") {
-      return t("dashboard.nav.studentOverview");
+      const studentOverview = t("dashboard.nav.studentOverview");
+      if (studentOverview && studentOverview !== "dashboard.nav.studentOverview") return studentOverview;
     }
     const navKey = navItemKeyMap[activeTab] || `dashboard.nav.${activeTab}`;
     const translated = t(navKey as any);
@@ -425,7 +435,8 @@ export default function DashboardPage() {
 
   const getPageDesc = () => {
     if (role === "student" && activeTab === "overview") {
-      return t("dashboard.topbar.studentOverviewDesc");
+      const studentDesc = t("dashboard.topbar.studentOverviewDesc");
+      if (studentDesc && studentDesc !== "dashboard.topbar.studentOverviewDesc") return studentDesc;
     }
     const descKey = `dashboard.descriptions.${activeTab}`;
     const translated = t(descKey as any);
@@ -502,7 +513,7 @@ export default function DashboardPage() {
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search languages, lessons, modules..."
+                  placeholder={t("Search languages, lessons, modules...")}
                   className="w-full rounded-full border border-slate-200/80 bg-slate-50/90 pl-10 pr-4 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-200/50 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200 dark:placeholder-slate-500 dark:focus:border-sky-600"
                 />
               </div>
@@ -592,6 +603,7 @@ export default function DashboardPage() {
             <ParentDashboardView
               parent={user as ParentProfile}
               activeTab={activeTab}
+              onSelectTab={setActiveTab}
             />
           )}
           {role === "admin" && (
@@ -745,7 +757,7 @@ function StudentDashboardView({
                 <span className="font-mono font-extrabold">{student.unique_number}</span>
               </span>
             }
-            title={`Good morning, ${
+            title={`${t("Good morning")}, ${
               student.full_name || `${t("dashboard.student.studentPrefix")}${student.unique_number}`
             }! 👋`}
             subtitle={
@@ -753,7 +765,7 @@ function StudentDashboardView({
                 {isSelfEnrolled
                   ? t("dashboard.student.selfEnrolledTag")
                   : `${student.school_name} — ${student.branch_name} (${student.state})`}
-                . One lesson closer to your next learning adventure!
+                . {t("One lesson closer to your next learning adventure!")}
               </p>
             }
             actions={
@@ -761,7 +773,7 @@ function StudentDashboardView({
                 <Link href="/dashboard/diagnostic-quiz">
                   <Button variant="primary" size="md" className="rounded-full px-6 shadow-md shadow-sky-500/25">
                     <Target className="mr-1.5 h-4 w-4" />
-                    {quizStatus.in_progress_attempt_id ? "Continue Quiz" : "Start Diagnostic Quiz"}
+                    {quizStatus.in_progress_attempt_id ? t("Continue Quiz") : t("Start Diagnostic Quiz")}
                   </Button>
                 </Link>
               ) : quizStatus?.completed ? (
@@ -769,7 +781,7 @@ function StudentDashboardView({
                   <Link href="/dashboard/learn">
                     <Button variant="primary" size="md" className="rounded-full px-6 shadow-md shadow-sky-500/25">
                       <Play className="mr-1.5 h-4 w-4 fill-white" />
-                      Continue Learning →
+                      {t("Continue Learning →")}
                     </Button>
                   </Link>
                   <Link href="/dashboard/diagnostic-quiz">
@@ -778,7 +790,7 @@ function StudentDashboardView({
                       size="md"
                       className="rounded-full border-white/90 bg-white/90 px-5 text-sky-900 shadow-sm backdrop-blur-md hover:bg-white dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                     >
-                      View My Results
+                      {t("View My Results")}
                     </Button>
                   </Link>
                 </>
@@ -802,8 +814,8 @@ function StudentDashboardView({
                   hint={
                     student.class_number
                       ? isSelfEnrolled
-                        ? "NCERT Curriculum"
-                        : "Assigned section"
+                        ? t("NCERT Curriculum")
+                        : t("Assigned section")
                       : t("dashboard.student.notConfigured")
                   }
                 />
@@ -812,12 +824,12 @@ function StudentDashboardView({
                   value={
                     <AnimatedNumber value={isSelfEnrolled ? ncertBooks.length : modules.length} />
                   }
-                  hint={isSelfEnrolled ? "NCERT Official Books" : "School Branch Syllabus"}
+                  hint={isSelfEnrolled ? t("NCERT Official Books") : t("School Branch Syllabus")}
                 />
                 <StudentHeroFact
-                  label="Diagnostic Assessment"
-                  value={quizStatus?.completed ? "Done" : "Pending"}
-                  hint={quizStatus?.completed ? "Completed" : "Unlocks your modules"}
+                  label={t("Diagnostic Assessment")}
+                  value={quizStatus?.completed ? t("Done") : t("Pending")}
+                  hint={quizStatus?.completed ? t("Completed") : t("Unlocks your modules")}
                 />
               </>
             }
@@ -1188,28 +1200,51 @@ function StudentDashboardView({
                       isTopPriority={idx === 0}
                     />
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {group.items.map((book) => (
-                        <div
-                          key={book.id}
-                          className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                                {book.subject}
-                              </span>
-                              <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">
-                                NCERT Book
-                              </span>
+                      {group.items.map((book) => {
+                        const prog = learningProgress?.modules.find(
+                          (m) => m.subject.toLowerCase() === (book.subject || "").toLowerCase()
+                        );
+                        return (
+                          <div
+                            key={book.id}
+                            className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand truncate">
+                                    {book.subject}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded shrink-0">
+                                    NCERT Book
+                                  </span>
+                                </div>
+                                {prog && (
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border shrink-0 ${
+                                      prog.status === "completed"
+                                        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                        : prog.status === "in_progress"
+                                        ? "bg-brand/10 text-brand border-border-brand"
+                                        : "bg-surface text-text-tertiary border-border-primary"
+                                    }`}
+                                  >
+                                    {prog.status === "completed"
+                                      ? "Completed"
+                                      : prog.status === "in_progress"
+                                      ? `${prog.progress_percent}% In Progress`
+                                      : "Not Started"}
+                                  </span>
+                                )}
+                              </div>
+                              <h3 className="text-sm font-bold text-text-primary">{book.title}</h3>
+                              <p className="text-xs text-text-secondary mt-1 line-clamp-2">
+                                {book.description}
+                              </p>
                             </div>
-                            <h3 className="text-sm font-bold text-text-primary">{book.title}</h3>
-                            <p className="text-xs text-text-secondary mt-1 line-clamp-2">
-                              {book.description}
-                            </p>
-                          </div>
 
                           <div className="mt-4 pt-3 border-t border-border-primary/50 flex items-center justify-between">
-                            <span className="text-[11px] text-text-tertiary">Official NCERT Standard</span>
+                            <span className="text-[11px] text-text-tertiary">{t("Official NCERT Standard")}</span>
                             {book.file_url ? (
                               <a
                                 href={formatPdfUrl(book.file_url)}
@@ -1218,16 +1253,17 @@ function StudentDashboardView({
                                 className="inline-flex items-center gap-1 text-xs text-brand font-semibold hover:underline"
                               >
                                 <FileText className="w-3.5 h-3.5" />
-                                Study Book PDF →
+                                {t("Study Book PDF →")}
                               </a>
                             ) : (
                               <span className="text-xs text-amber-500 font-semibold italic">
-                                PDF Pending Upload
+                                {t("PDF Pending Upload")}
                               </span>
                             )}
                           </div>
                         </div>
-                      ))}
+                      );
+                    })}
                     </div>
                   </div>
                 ))}
@@ -1235,9 +1271,9 @@ function StudentDashboardView({
             ) : (
               <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
                 <BookOpen className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-                <h3 className="text-sm font-semibold text-text-primary">Loading NCERT Curriculum</h3>
+                <h3 className="text-sm font-semibold text-text-primary">{t("Loading NCERT Curriculum")}</h3>
                 <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
-                  Official NCERT textbooks for Class {student.class_number || 1} are being loaded for your learning roadmap.
+                  {t("Official NCERT textbooks are being loaded for your learning roadmap.")}
                 </p>
               </div>
             )
@@ -1248,41 +1284,65 @@ function StudentDashboardView({
                 {groupBySubjectPriority(modules, subjectPriority).map((group, idx) => (
                   <div key={group.subject}>
                     <SubjectGroupHeader
-                      subject={group.subject}
+                      subject={t(group.subject)}
                       priorityInfo={group.priorityInfo}
                       isTopPriority={idx === 0}
                     />
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {group.items.map((mod) => (
-                        <div
-                          key={mod.id}
-                          className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-                                {mod.subject}
-                              </span>
-                              <span className="text-xs text-text-tertiary">Class {mod.class_number}</span>
+                      {group.items.map((mod) => {
+                        const prog = learningProgress?.modules.find(
+                          (m) => m.subject.toLowerCase() === (mod.subject || "").toLowerCase()
+                        );
+                        return (
+                          <div
+                            key={mod.id}
+                            className="glass rounded-[var(--radius-md)] p-5 border border-border-primary hover:border-brand transition-all flex flex-col justify-between"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand truncate">
+                                    {t(mod.subject)}
+                                  </span>
+                                  <span className="text-xs text-text-tertiary shrink-0">{t(`Class ${mod.class_number}`)}</span>
+                                </div>
+                                {prog && (
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border shrink-0 ${
+                                      prog.status === "completed"
+                                        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                        : prog.status === "in_progress"
+                                        ? "bg-brand/10 text-brand border-border-brand"
+                                        : "bg-surface text-text-tertiary border-border-primary"
+                                    }`}
+                                  >
+                                    {prog.status === "completed"
+                                      ? t("Completed")
+                                      : prog.status === "in_progress"
+                                      ? t(`${prog.progress_percent}% In Progress`)
+                                      : t("Not Started")}
+                                  </span>
+                                )}
+                              </div>
+                              <h3 className="text-sm font-bold text-text-primary">{t(mod.title)}</h3>
                             </div>
-                            <h3 className="text-sm font-bold text-text-primary">{mod.title}</h3>
-                          </div>
 
-                          {mod.file_url ? (
-                            <a
-                              href={formatPdfUrl(mod.file_url)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                              Open PDF Module
-                            </a>
-                          ) : (
-                            <span className="mt-4 text-xs text-text-tertiary italic">NCERT Module Content</span>
-                          )}
-                        </div>
-                      ))}
+                            {mod.file_url ? (
+                              <a
+                                href={formatPdfUrl(mod.file_url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                {t("Open PDF Module")}
+                              </a>
+                            ) : (
+                              <span className="mt-4 text-xs text-text-tertiary italic">{t("NCERT Module Content")}</span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
@@ -1291,9 +1351,9 @@ function StudentDashboardView({
               /* Empty state if roles/data are not seeded */
               <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
                 <BookOpen className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-                <h3 className="text-sm font-semibold text-text-primary">No School Modules Uploaded Yet</h3>
+                <h3 className="text-sm font-semibold text-text-primary">{t("No School Modules Uploaded Yet")}</h3>
                 <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
-                  No learning modules have been uploaded for Class {student.class_number || 1} at your school branch yet.
+                  {t("No learning modules have been uploaded for your class yet.")}
                 </p>
               </div>
             )
@@ -1324,6 +1384,7 @@ function StudentDashboardView({
 }
 
 function StudentHistorySection() {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<"all" | "diagnostic" | "class_tests">("all");
   const [diagnosticAttempts, setDiagnosticAttempts] = useState<QuizAttemptSummaryOut[]>([]);
   const [testResults, setTestResults] = useState<StudentTestResultSummaryOut[]>([]);
@@ -1412,10 +1473,10 @@ function StudentHistorySection() {
         <div>
           <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
             <Clock className="w-5 h-5 text-brand" />
-            <span>Personal Assessment &amp; Attempt History</span>
+            <span>{t("Personal Assessment & Attempt History")}</span>
           </h3>
           <p className="text-xs text-text-secondary mt-0.5">
-            Review past scores, attempts, teacher feedback, and AI study advice for diagnostic &amp; class tests.
+            {t("Review past scores, attempts, teacher feedback, and AI study advice for diagnostic & class tests.")}
           </p>
         </div>
 
@@ -1429,7 +1490,7 @@ function StudentHistorySection() {
                 : "text-text-secondary hover:text-text-primary"
             }`}
           >
-            All ({diagnosticAttempts.length + testResults.length})
+            {t(`All (${diagnosticAttempts.length + testResults.length})`)}
           </button>
           <button
             onClick={() => setFilter("diagnostic")}
@@ -1439,7 +1500,7 @@ function StudentHistorySection() {
                 : "text-text-secondary hover:text-text-primary"
             }`}
           >
-            Diagnostic Quizzes ({diagnosticAttempts.length})
+            {t(`Diagnostic Quizzes (${diagnosticAttempts.length})`)}
           </button>
           <button
             onClick={() => setFilter("class_tests")}
@@ -1449,7 +1510,7 @@ function StudentHistorySection() {
                 : "text-text-secondary hover:text-text-primary"
             }`}
           >
-            Class Tests ({testResults.length})
+            {t(`Class Tests (${testResults.length})`)}
           </button>
         </div>
       </div>
@@ -1459,18 +1520,18 @@ function StudentHistorySection() {
         <div className="glass rounded-[var(--radius-md)] p-4 border border-border-primary flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
-              Diagnostic Assessment
+              {t("Diagnostic Assessment")}
             </span>
             <div className="text-lg font-extrabold text-text-primary mt-0.5">
               {latestCompletedDiagnostic?.overall_score !== null &&
               latestCompletedDiagnostic?.overall_score !== undefined
                 ? `${latestCompletedDiagnostic.overall_score.toFixed(1)}%`
                 : completedDiagnosticCount > 0
-                ? "Completed"
-                : "Pending"}
+                ? t("Completed")
+                : t("Pending")}
             </div>
             <p className="text-[11px] text-text-secondary mt-0.5">
-              {completedDiagnosticCount} Attempt{completedDiagnosticCount === 1 ? "" : "s"} Recorded
+              {t(`${completedDiagnosticCount} Attempt${completedDiagnosticCount === 1 ? "" : "s"} Recorded`)}
             </p>
           </div>
           <div className="w-9 h-9 rounded-xl bg-brand/10 text-brand flex items-center justify-center font-bold">
@@ -1481,13 +1542,13 @@ function StudentHistorySection() {
         <div className="glass rounded-[var(--radius-md)] p-4 border border-border-primary flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
-              Class Tests Performance
+              {t("Class Tests Performance")}
             </span>
             <div className="text-lg font-extrabold text-text-primary mt-0.5">
-              {avgClassTestScore !== null ? `${avgClassTestScore.toFixed(1)}% Avg` : "No Scores Yet"}
+              {avgClassTestScore !== null ? `${avgClassTestScore.toFixed(1)}% Avg` : t("No Scores Yet")}
             </div>
             <p className="text-[11px] text-text-secondary mt-0.5">
-              {classTestCount} Class Test{classTestCount === 1 ? "" : "s"} Assigned
+              {t(`${classTestCount} Class Test${classTestCount === 1 ? "" : "s"} Assigned`)}
             </p>
           </div>
           <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
@@ -1498,13 +1559,13 @@ function StudentHistorySection() {
         <div className="glass rounded-[var(--radius-md)] p-4 border border-border-primary flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
-              Total Assessments
+              {t("Total Assessments")}
             </span>
             <div className="text-lg font-extrabold text-text-primary mt-0.5 font-[family-name:var(--font-display)]">
               {diagnosticAttempts.length + testResults.length}
             </div>
             <p className="text-[11px] text-text-secondary mt-0.5">
-              Diagnostic &amp; Teacher Tests Combined
+              {t("Diagnostic & Teacher Tests Combined")}
             </p>
           </div>
           <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
@@ -1534,7 +1595,7 @@ function StudentHistorySection() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-brand/10 text-brand border border-border-brand">
-                          Diagnostic Quiz
+                          {t("Diagnostic Quiz")}
                         </span>
                         <span className="text-xs text-text-tertiary font-medium">
                           • {att.subjects?.join(", ") || "All Subjects"}
@@ -1543,20 +1604,20 @@ function StudentHistorySection() {
 
                       <h4 className="font-bold text-sm text-text-primary flex items-center gap-2">
                         <Target className="w-4 h-4 text-brand shrink-0" />
-                        <span>Adaptive Diagnostic Assessment Attempt</span>
+                        <span>{t("Adaptive Diagnostic Assessment Attempt")}</span>
                       </h4>
 
                       <p className="text-[11px] text-text-tertiary">
-                        Started: {new Date(att.started_at).toLocaleString()}
+                        {t("Started:")} {new Date(att.started_at).toLocaleString()}
                         {att.completed_at &&
-                          ` • Completed: ${new Date(att.completed_at).toLocaleString()}`}
+                          ` • ${t("Completed:")} ${new Date(att.completed_at).toLocaleString()}`}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0">
                       {att.overall_score !== null && att.overall_score !== undefined ? (
                         <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-brand/10 text-brand border border-border-brand">
-                          {att.overall_score.toFixed(1)}% Mastery
+                          {att.overall_score.toFixed(1)}% {t("Mastery")}
                         </span>
                       ) : (
                         <span
@@ -1564,7 +1625,7 @@ function StudentHistorySection() {
                             isCompleted ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"
                           }`}
                         >
-                          {isCompleted ? "Completed" : "In Progress"}
+                          {isCompleted ? t("Completed") : t("Pending")}
                         </span>
                       )}
 
@@ -1576,7 +1637,7 @@ function StudentHistorySection() {
                           className="text-xs py-1 gap-1 cursor-pointer"
                         >
                           <FileText className="w-3.5 h-3.5" />
-                          View Gap Report
+                          {t("View Gap Report")}
                         </Button>
                       )}
                     </div>
@@ -1603,7 +1664,7 @@ function StudentHistorySection() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-brand/10 text-brand">
-                          {asgn.assignment_type === "pdf_upload" ? "Manual PDF Test" : "AI Quiz"}
+                          {asgn.assignment_type === "pdf_upload" ? t("Manual PDF Test") : t("AI Quiz")}
                         </span>
                         {asgn.subject && (
                           <span className="text-xs text-text-tertiary font-medium">• {asgn.subject}</span>
@@ -1612,13 +1673,13 @@ function StudentHistorySection() {
 
                       <h4 className="font-bold text-sm text-text-primary flex items-center gap-2">
                         <FileText className="w-4 h-4 text-brand shrink-0" />
-                        <span>{asgn.title}</span>
+                        <span>{t(asgn.title)}</span>
                       </h4>
 
                       <p className="text-[11px] text-text-tertiary">
-                        Assigned on {new Date(asgn.created_at).toLocaleDateString()}
+                        {t("Assigned on")} {new Date(asgn.created_at).toLocaleDateString()}
                         {sub?.last_attempted_at &&
-                          ` • Last Attempt: ${new Date(sub.last_attempted_at).toLocaleString()}`}
+                          ` • ${t("Last Attempt:")} ${new Date(sub.last_attempted_at).toLocaleString()}`}
                       </p>
                     </div>
 
@@ -1631,10 +1692,10 @@ function StudentHistorySection() {
                               : "bg-amber-500/10 text-amber-500 border-amber-500/30"
                           }`}
                         >
-                          {scorePercent.toFixed(1)}% ({isPassed ? "PASSED" : "FAILED"})
+                          {scorePercent.toFixed(1)}% ({isPassed ? t("PASSED") : t("FAILED")})
                         </span>
                       ) : (
-                        <span className="text-xs text-text-tertiary italic">Score Pending</span>
+                        <span className="text-xs text-text-tertiary italic">{t("Pending")}</span>
                       )}
 
                       {attempts.length > 0 && (
@@ -1651,7 +1712,7 @@ function StudentHistorySection() {
                           className="text-xs py-1 gap-1 cursor-pointer"
                         >
                           <Clock className="w-3.5 h-3.5" />
-                          View Attempts ({attempts.length})
+                          {t(`View Attempts (${attempts.length})`)}
                         </Button>
                       )}
                     </div>
@@ -1662,9 +1723,11 @@ function StudentHistorySection() {
                     <div className="p-3 rounded bg-brand/5 border border-border-brand text-xs space-y-1">
                       <div className="flex items-center gap-1.5 text-brand font-bold">
                         <MessageSquare className="w-3.5 h-3.5" />
-                        <span>Teacher Feedback:</span>
+                        <span>{t("Teacher Feedback:")}</span>
                       </div>
-                      <p className="text-text-primary">{fb.feedback_text}</p>
+                      <p className="text-text-primary">
+                        <DynamicText text={fb.feedback_text} />
+                      </p>
                     </div>
                   )}
 
@@ -1673,9 +1736,11 @@ function StudentHistorySection() {
                     <div className="p-3 rounded bg-surface/60 border border-border-primary/60 text-xs space-y-1">
                       <div className="flex items-center gap-1.5 text-brand font-bold">
                         <Brain className="w-3.5 h-3.5" />
-                        <span>Latest AI Study Advice:</span>
+                        <span>{t("Latest AI Study Advice:")}</span>
                       </div>
-                      <p className="text-text-primary line-clamp-2">{latestAttempt.ai_feedback}</p>
+                      <p className="text-text-primary line-clamp-2">
+                        <DynamicText text={latestAttempt.ai_feedback} />
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1686,7 +1751,7 @@ function StudentHistorySection() {
       ) : (
         <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
           <Clock className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-          <h4 className="text-sm font-semibold text-text-primary">No Recorded History Found</h4>
+          <h4 className="text-sm font-semibold text-text-primary">{t("No recorded attempt history found for this test.")}</h4>
           <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
             Complete your diagnostic quiz or submit class assignments to start building your personal assessment history.
           </p>
@@ -1715,6 +1780,7 @@ function StudentHistorySection() {
 }
 
 function StudentAssignmentsSection() {
+  const { t } = useTranslation();
   const [assignments, setAssignments] = useState<AssignmentOut[]>([]);
   const [testResults, setTestResults] = useState<StudentTestResultSummaryOut[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -1799,10 +1865,12 @@ function StudentAssignmentsSection() {
         <div>
           <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
             <FileText className="w-5 h-5 text-brand" />
-            <span>Class Tests, Quizzes &amp; Active Homework</span>
+            <span>{t("Class Tests, Quizzes & Active Homework")}</span>
           </h3>
           <p className="text-xs text-text-secondary mt-0.5">
-            Attempt assigned AI quizzes and upload PDF responses before deadlines. Past test results &amp; feedback can be reviewed under Assessment History.
+            {t(
+              "Attempt assigned AI quizzes and upload PDF responses before deadlines. Past test results & feedback can be reviewed under Assessment History."
+            )}
           </p>
         </div>
       </div>
@@ -1831,25 +1899,25 @@ function StudentAssignmentsSection() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase bg-brand/10 text-brand border border-border-brand">
-                      {asgn.assignment_type === "pdf_upload" ? "Manual PDF Test" : "AI RAG Quiz"}
+                      {asgn.assignment_type === "pdf_upload" ? t("Manual PDF Test") : t("AI RAG Quiz")}
                     </span>
 
                     {asgn.deadline_at && (
                       <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        Due {new Date(asgn.deadline_at).toLocaleDateString()}
+                        {t("Due")} {new Date(asgn.deadline_at).toLocaleDateString()}
                       </span>
                     )}
                   </div>
 
-                  <h4 className="font-bold text-sm text-text-primary">{asgn.title}</h4>
+                  <h4 className="font-bold text-sm text-text-primary">{t(asgn.title)}</h4>
                   {asgn.description && (
-                    <p className="text-xs text-text-secondary line-clamp-2">{asgn.description}</p>
+                    <p className="text-xs text-text-secondary line-clamp-2">{t(asgn.description)}</p>
                   )}
 
                   {asgn.subject && (
                     <span className="inline-block text-[11px] font-semibold text-text-tertiary">
-                      Subject: {asgn.subject}
+                      {t("Subject:")} {t(asgn.subject)}
                     </span>
                   )}
 
@@ -1863,7 +1931,7 @@ function StudentAssignmentsSection() {
                         className="inline-flex items-center gap-1.5 text-xs text-brand font-semibold hover:underline"
                       >
                         <FileText className="w-4 h-4" />
-                        View Question Paper (PDF) →
+                        {t("View Question Paper (PDF) →")}
                       </a>
                     </div>
                   )}
@@ -1873,7 +1941,7 @@ function StudentAssignmentsSection() {
                 <div className="pt-3 border-t border-border-primary/50 space-y-3">
                   {hasAttempts && (
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-text-tertiary">Latest Status:</span>
+                      <span className="text-text-tertiary">{t("Latest Status:")}</span>
                       {scorePercent !== null && scorePercent !== undefined ? (
                         <span
                           className={`font-bold px-2 py-0.5 rounded text-[11px] ${
@@ -1882,11 +1950,11 @@ function StudentAssignmentsSection() {
                               : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
                           }`}
                         >
-                          {scorePercent.toFixed(1)}% ({isPassed ? "PASSED" : "FAILED"})
+                          {scorePercent.toFixed(1)}% ({isPassed ? t("PASSED") : t("FAILED")})
                         </span>
                       ) : (
                         <span className="text-brand font-semibold">
-                          Submitted ({attempts.length} Attempt{attempts.length === 1 ? "" : "s"})
+                          {t("Submitted")} ({t(`${attempts.length} Attempt${attempts.length === 1 ? "" : "s"} Recorded`)})
                         </span>
                       )}
                     </div>
@@ -1897,7 +1965,7 @@ function StudentAssignmentsSection() {
                     <div className="flex items-center justify-between gap-2">
                       {isPassed ? (
                         <span className="text-emerald-500 text-xs font-bold flex items-center gap-1">
-                          <CheckCircle className="w-4 h-4" /> Test Passed (Score ≥ 60%)
+                          <CheckCircle className="w-4 h-4" /> {t("Test Passed (Score ≥ 60%)")}
                         </span>
                       ) : (
                         <Button
@@ -1907,7 +1975,7 @@ function StudentAssignmentsSection() {
                           className="w-full text-xs py-1.5 gap-1.5 cursor-pointer"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
-                          {hasAttempts ? "Re-attempt Quiz (Adapted Questions)" : "Attempt AI Quiz (15 Mins)"}
+                          {hasAttempts ? t("Re-attempt Quiz (Adapted Questions)") : t("Attempt AI Quiz (15 Mins)")}
                         </Button>
                       )}
                     </div>
@@ -1931,7 +1999,7 @@ function StudentAssignmentsSection() {
                           <div className="px-3 py-1.5 rounded bg-surface border border-border-primary text-xs text-text-secondary hover:border-brand truncate text-center font-medium">
                             {selectedResponseFile[asgn.id]
                               ? selectedResponseFile[asgn.id]?.name
-                              : "Select Response PDF (Max 5MB)"}
+                              : t("Select Response PDF (Max 5MB)")}
                           </div>
                         </label>
 
@@ -1945,7 +2013,7 @@ function StudentAssignmentsSection() {
                           {uploadingPdfId === asgn.id ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           ) : (
-                            "Upload PDF"
+                            t("Upload PDF")
                           )}
                         </Button>
                       </div>
@@ -1959,9 +2027,11 @@ function StudentAssignmentsSection() {
       ) : (
         <div className="glass rounded-[var(--radius-lg)] p-12 text-center border border-border-primary border-dashed">
           <FileText className="w-10 h-10 text-text-tertiary mx-auto mb-3 opacity-50" />
-          <h4 className="text-sm font-semibold text-text-primary">No Active Tests Available</h4>
+          <h4 className="text-sm font-semibold text-text-primary">{t("No Active Tests Available")}</h4>
           <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1">
-            There are currently no active quizzes or assignments for your class section. You can check your past test attempts under "Assessment History".
+            {t(
+              "There are currently no active quizzes or assignments for your class section. You can check your past test attempts under \"Assessment History\"."
+            )}
           </p>
         </div>
       )}
@@ -2142,13 +2212,13 @@ function SchoolDashboardView({
         {/* TAB: OVERVIEW */}
         {activeTab === "overview" && (
           <div className="space-y-6">
-            {/* ── 1. Hero: Light Blue Modern SaaS Institutional Welcome Banner ── */}
+            {/* ── 1. Hero: Premium Admin Institutional Welcome Banner ── */}
             <Hero
               eyebrow={
-                <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/85 px-3.5 py-1 text-xs font-bold text-slate-700 shadow-2xs backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="inline-flex items-center gap-2 rounded-full border border-blue-100/80 bg-white/80 px-3.5 py-1 text-xs font-bold text-slate-700 shadow-sm backdrop-blur-sm dark:border-slate-700/80 dark:bg-slate-800/70 dark:text-slate-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   <span>{school.branch_name} Branch</span>
-                  <span className="opacity-40">•</span>
+                  <span className="text-slate-300 dark:text-slate-600">·</span>
                   <span>
                     Prefix: <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{school.student_prefix}</span>
                   </span>
@@ -2157,44 +2227,50 @@ function SchoolDashboardView({
               title={`Hello, ${school.school_name || "Admin"}! 👋`}
               subtitle={
                 <p>
-                  Welcome back! Here&apos;s what&apos;s happening across <span className="font-semibold text-slate-900 dark:text-white">{school.school_name || "your school"}</span> today.
+                  Welcome back! Here&apos;s what&apos;s happening across{" "}
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {school.school_name || "your school"}
+                  </span>{" "}
+                  today.
                 </p>
               }
               actions={
                 <>
+                  {/* Primary CTA */}
                   <button
                     type="button"
                     onClick={() => {
                       const curriculumTab = document.querySelector('[data-tab="curriculum"]') as HTMLElement;
                       curriculumTab?.click();
                     }}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-[#2563EB] px-6 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:bg-blue-700 active:scale-95"
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-blue-500/30 active:scale-95 dark:bg-blue-600 dark:hover:bg-blue-500 dark:shadow-blue-700/30"
                   >
-                    <BarChart3 className="h-4 w-4" />
-                    View Reports
+                    <BarChart3 className="h-4 w-4 shrink-0" />
+                    <span>View Reports</span>
                   </button>
 
+                  {/* Secondary CTA */}
                   <button
                     type="button"
                     onClick={() => {
                       const teachersTab = document.querySelector('[data-tab="teachers"]') as HTMLElement;
                       teachersTab?.click();
                     }}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200/90 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-850 dark:text-slate-200"
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm backdrop-blur-sm transition-all duration-200 hover:bg-white hover:border-slate-300 hover:shadow-md active:scale-95 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:hover:bg-slate-700/90 dark:hover:border-slate-600"
                   >
-                    <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                    Manage Users
+                    <Users className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
+                    <span>Manage Users</span>
                   </button>
                 </>
               }
               illustration={
                 <Image
-                  src="/images/school_admin_hero.png"
-                  alt="School Admin Workspace"
-                  width={520}
+                  src="/images/admin_hero_illustration.png"
+                  alt="Admin at workspace"
+                  width={480}
                   height={360}
                   priority
-                  className="h-[240px] sm:h-[275px] lg:h-[305px] w-auto select-none object-contain object-bottom drop-shadow-md"
+                  className="h-[210px] sm:h-[255px] lg:h-[285px] xl:h-[310px] w-auto select-none object-contain object-bottom drop-shadow-lg"
                 />
               }
               facts={
@@ -2203,23 +2279,25 @@ function SchoolDashboardView({
                     label="Teachers"
                     value={teacherCount !== null ? <AnimatedNumber value={teacherCount} /> : "—"}
                     hint="Registered in branch"
+                    accent="#3b82f6"
                   />
                   <HeroFact
                     label="Students"
                     value={<AnimatedNumber value={quizSummaries.length} />}
                     hint={`Class ${selectedClass} roster`}
+                    accent="#10b981"
                   />
                   <HeroFact
-                    label="Curriculum Modules"
+                    label="Modules"
                     value={<AnimatedNumber value={modules.length} />}
-                    hint={`${classSubjects.length} subject${
-                      classSubjects.length === 1 ? "" : "s"
-                    } configured`}
+                    hint={`${classSubjects.length} subject${classSubjects.length === 1 ? "" : "s"}`}
+                    accent="#8b5cf6"
                   />
                   <HeroFact
-                    label="Syllabus Coverage"
-                    value="Classes 1–5"
-                    hint="Active curriculum"
+                    label="Syllabus"
+                    value="1–5"
+                    hint="Active classes"
+                    accent="#f59e0b"
                   />
                 </>
               }
@@ -3009,6 +3087,76 @@ function SchoolDashboardView({
 
 // ── Parent Dashboard View ────────────────────────────────────────────────────
 
+function WardProgressWidget({
+  uniqueNumber,
+  onViewDetailed,
+}: {
+  uniqueNumber: string;
+  onViewDetailed?: () => void;
+}) {
+  const [progress, setProgress] = useState<StudentProgressOut | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getChildLearningProgress(uniqueNumber)
+      .then((data) => {
+        if (!cancelled) setProgress(data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [uniqueNumber]);
+
+  if (loading) {
+    return (
+      <div className="py-2 flex items-center justify-center border-t border-[var(--c-line)] mt-3 pt-3">
+        <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!progress) return null;
+
+  return (
+    <div className="mt-3 pt-3 border-t border-[var(--c-line)] space-y-2">
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-semibold text-text-primary">Learning Progress</span>
+        <span className="font-bold text-brand">{progress.overall_percent}%</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-[var(--c-sunken)] overflow-hidden">
+        <div
+          className={`h-full rounded-full ${progress.overall_percent >= 100 ? "bg-emerald-500" : "bg-brand"}`}
+          style={{ width: `${Math.min(100, Math.max(0, progress.overall_percent))}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between text-[11px] text-text-secondary pt-0.5">
+        <span className="inline-flex items-center gap-1 text-amber-500 font-semibold">
+          <Award className="w-3.5 h-3.5" /> {progress.points ?? 0} XP
+        </span>
+        <span className="inline-flex items-center gap-1 text-rose-500 font-medium">
+          <Flame className="w-3 h-3" /> {progress.current_streak ?? 0}d streak
+        </span>
+        <span>
+          {progress.modules_completed}/{progress.total_modules} done
+        </span>
+      </div>
+      {onViewDetailed && (
+        <button
+          onClick={onViewDetailed}
+          className="w-full text-center text-[11px] font-bold text-brand hover:underline pt-1 cursor-pointer block"
+        >
+          View Detailed Progress &amp; Growth →
+        </button>
+      )}
+    </div>
+  );
+}
+
 function getGreetingPrefix(): string {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
@@ -3019,9 +3167,11 @@ function getGreetingPrefix(): string {
 function ParentDashboardView({
   parent,
   activeTab = "overview",
+  onSelectTab,
 }: {
   parent: ParentProfile;
   activeTab?: string;
+  onSelectTab?: (tab: string) => void;
 }) {
   const { t } = useTranslation();
   const [childrenList, setChildrenList] = useState<ChildLinkOut[]>([]);
@@ -3669,6 +3819,12 @@ function ParentDashboardView({
                             </span>
                           </Field>
                         </div>
+                        <div className="px-5 pb-3">
+                          <WardProgressWidget
+                            uniqueNumber={child.student_unique_number}
+                            onViewDetailed={() => onSelectTab && onSelectTab("progress")}
+                          />
+                        </div>
                       </Panel>
                     </Item>
                   ))}
@@ -3682,6 +3838,11 @@ function ParentDashboardView({
               )}
             </div>
           </div>
+        )}
+
+        {/* TAB: PROGRESS & CONSECUTIVE GROWTH ANALYTICS */}
+        {(activeTab === "progress" || activeTab === "analytics") && (
+          <ParentDetailedProgress childrenList={childrenList} />
         )}
 
         {/* TAB: REPORTS */}
@@ -4707,6 +4868,7 @@ function TeacherDashboardView({
               <ClassLearningProgress
                 classNumber={selectedClass.class_number}
                 section={selectedClass.section}
+                subject={selectedClass.subject}
               />
             )}
 

@@ -35,6 +35,7 @@ import {
 import type { Role } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/components/providers/ThemeProvider";
+import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
 
 /**
@@ -137,6 +138,7 @@ export function AccountMenu({
 }) {
   const { refreshProfile } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { t } = useTranslation();
 
   const [open, setOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -226,7 +228,7 @@ export function AccountMenu({
               {displayName}
             </span>
             <span className="block truncate text-[11px] font-medium text-text-tertiary">
-              {role === "student" ? "Student Learner" : roleLabel}
+              {role === "student" ? t("Student Learner") : t(roleLabel)}
             </span>
           </div>
 
@@ -266,7 +268,7 @@ export function AccountMenu({
                     {displayName}
                   </span>
                   <span className="block truncate text-[11px] text-text-tertiary">
-                    {role === "student" ? "Student Learner" : subtitle}
+                    {role === "student" ? t("Student Learner") : t(subtitle)}
                   </span>
                 </div>
               </div>
@@ -282,7 +284,7 @@ export function AccountMenu({
                   }}
                 >
                   <UserCircle className="h-4 w-4 shrink-0 text-brand" />
-                  Your Profile
+                  {t("Your Profile")}
                 </button>
 
                 <button
@@ -302,7 +304,7 @@ export function AccountMenu({
                       )}
                     />
                   )}
-                  {refreshing ? "Refreshing…" : refreshed ? "Profile updated" : "Refresh Profile"}
+                  {refreshing ? t("Refreshing…") : refreshed ? t("Profile updated") : t("Refresh Profile")}
                 </button>
 
                 <button
@@ -317,16 +319,16 @@ export function AccountMenu({
                     ) : (
                       <Sun className="h-4 w-4 shrink-0 text-amber-500" />
                     )}
-                    Interface Theme
+                    {t("Interface Theme")}
                   </span>
                   <span className="rounded-md border border-[var(--c-line)] bg-[var(--c-sunken)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
-                    {theme === "dark" ? "Dark" : "Light"}
+                    {theme === "dark" ? t("Dark") : t("Light")}
                   </span>
                 </button>
 
                 <Link href="/" role="menuitem" className={itemClass} onClick={close}>
                   <Home className="h-4 w-4 shrink-0 text-text-tertiary" />
-                  Back to Home
+                  {t("Back to Home")}
                 </Link>
               </div>
 

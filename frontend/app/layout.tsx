@@ -19,7 +19,7 @@ const inter = Inter({
 
 
 export const metadata: Metadata = {
-  title: "VidyaSetu — AI-Powered Inclusive Education Platform",
+  title: "VidyaSetu AI-Powered Inclusive Education Platform",
   description:
     "Making quality education accessible to every child, regardless of language, internet availability, or learning differences. AI-powered adaptive learning with 50+ languages, offline support, and accessibility-first design.",
   keywords: [

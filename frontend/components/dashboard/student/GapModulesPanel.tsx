@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { getLearningModules, LearningModuleOut } from "@/lib/api";
+import { useTranslation, DynamicText } from "@/hooks/useTranslation";
 
 /**
  * Gap-driven remediation modules — the crux of the exact earlier-class
@@ -28,6 +29,7 @@ import { getLearningModules, LearningModuleOut } from "@/lib/api";
  * an inline panel. This component is just the entry-point list.
  */
 export function GapModulesPanel() {
+  const { t } = useTranslation();
   const [modules, setModules] = useState<LearningModuleOut[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,10 +47,11 @@ export function GapModulesPanel() {
           <Target className="w-4.5 h-4.5 text-amber-500" />
         </div>
         <div>
-          <h2 className="text-base font-bold text-text-primary">Close Your Gaps</h2>
+          <h2 className="text-base font-bold text-text-primary">{t("Close Your Gaps")}</h2>
           <p className="text-xs text-text-secondary">
-            Focused reviews built from exactly what your diagnostic quiz found — the crux of
-            each earlier-class chapter, then a quick check.
+            {t(
+              "Focused reviews built from exactly what your diagnostic quiz found — the crux of each earlier-class chapter, then a quick check."
+            )}
           </p>
         </div>
       </div>
@@ -67,10 +70,11 @@ export function GapModulesPanel() {
       ) : modules && modules.length === 0 ? (
         <div className="glass rounded-[var(--radius-lg)] p-8 text-center border border-emerald-500/25 bg-emerald-500/[0.04]">
           <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-          <h3 className="text-sm font-bold text-text-primary">No open gaps right now</h3>
+          <h3 className="text-sm font-bold text-text-primary">{t("No open gaps right now")}</h3>
           <p className="text-xs text-text-secondary mt-1 max-w-sm mx-auto">
-            Every topic your diagnostic quiz flagged has been reviewed and passed. New gaps
-            will appear here if a future check-in finds one.
+            {t(
+              "Every topic your diagnostic quiz flagged has been reviewed and passed. New gaps will appear here if a future check-in finds one."
+            )}
           </p>
         </div>
       ) : (
@@ -85,6 +89,7 @@ export function GapModulesPanel() {
 }
 
 function ModuleCard({ module: m }: { module: LearningModuleOut }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -96,23 +101,23 @@ function ModuleCard({ module: m }: { module: LearningModuleOut }) {
       <div className="p-4">
         <div className="flex items-center gap-2 mb-2">
           <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand/10 text-brand">
-            {m.subject}
+            {t(m.subject)}
           </span>
           <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-600">
-            From Class {m.origin_class}
+            {t(`From Class ${m.origin_class}`)}
           </span>
         </div>
-        <h3 className="text-sm font-bold text-text-primary">{m.topic_name}</h3>
+        <h3 className="text-sm font-bold text-text-primary">{t(m.topic_name)}</h3>
         {m.chapter_title && (
-          <p className="text-[11px] text-text-tertiary mt-0.5">{m.chapter_title}</p>
+          <p className="text-[11px] text-text-tertiary mt-0.5">{t(m.chapter_title)}</p>
         )}
 
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="mt-3 flex items-center gap-1 text-xs font-semibold text-text-secondary hover:text-text-primary"
+          className="mt-3 flex items-center gap-1 text-xs font-semibold text-text-secondary hover:text-text-primary cursor-pointer"
         >
           {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          <span>{expanded ? "Hide the crux" : "Show the crux"}</span>
+          <span>{expanded ? t("Hide the crux") : t("Show the crux")}</span>
         </button>
 
         <AnimatePresence>
@@ -125,18 +130,18 @@ function ModuleCard({ module: m }: { module: LearningModuleOut }) {
             >
               {m.crux_points.length === 0 ? (
                 <li className="text-xs text-text-tertiary italic">
-                  No summary available yet for this topic.
+                  {t("No summary available yet for this topic.")}
                 </li>
               ) : (
                 m.crux_points.slice(0, 2).map((point, i) => (
                   <li key={i} className="text-xs text-text-secondary leading-relaxed pl-3 border-l-2 border-brand/30 line-clamp-2">
-                    {point}
+                    <DynamicText text={point} />
                   </li>
                 ))
               )}
               {m.crux_points.length > 2 && (
                 <li className="text-[11px] text-text-tertiary italic pl-3">
-                  +{m.crux_points.length - 2} more in the full review…
+                  +{m.crux_points.length - 2} {t("more in the full review…")}
                 </li>
               )}
             </motion.ul>
@@ -147,7 +152,7 @@ function ModuleCard({ module: m }: { module: LearningModuleOut }) {
           <Link href={`/dashboard/learning-modules/${m.gap_id}`} className="block">
             <Button variant="primary" size="sm" className="w-full justify-center">
               <Sparkles className="w-3.5 h-3.5" />
-              {m.quiz_available ? "Start Review" : "Review the Crux"}
+              {m.quiz_available ? t("Start Review") : t("Review the Crux")}
             </Button>
           </Link>
         </div>

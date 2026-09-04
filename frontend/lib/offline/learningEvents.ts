@@ -336,6 +336,19 @@ export function applyPendingEvents(
   const totalLessons = modules.reduce((sum, m) => sum + m.total_lessons, 0);
   const completedLessons = modules.reduce((sum, m) => sum + m.completed_lessons, 0);
 
+  // Approximate pending points bonus for un-synced events
+  let bonusPoints = 0;
+  const serverKnownLessonIds = new Set(
+    progress.modules.flatMap((m) => m.completed_lesson_ids)
+  );
+  const newlyCompleted = new Set<string>();
+  for (const c of completions) {
+    if (c.lesson_id && !serverKnownLessonIds.has(c.lesson_id)) {
+      newlyCompleted.add(c.lesson_id);
+    }
+  }
+  bonusPoints += newlyCompleted.size * 50;
+
   return {
     ...progress,
     modules,
@@ -345,5 +358,7 @@ export function applyPendingEvents(
     modules_completed: modules.filter((m) => m.status === "completed").length,
     modules_in_progress: modules.filter((m) => m.status === "in_progress").length,
     modules_not_started: modules.filter((m) => m.status === "not_started").length,
+    points: (progress.points ?? 0) + bonusPoints,
+    current_streak: Math.max(progress.current_streak ?? 0, completions.length > 0 ? 1 : 0),
   };
 }
