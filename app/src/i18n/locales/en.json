@@ -1,0 +1,1609 @@
+{
+  "nav": {
+    "product": "Product",
+    "features": "Features",
+    "playground": "Playground",
+    "about": "About",
+    "contact": "Contact",
+    "dashboard": "Dashboard",
+    "login": "Log in",
+    "signup": "Sign Up",
+    "signout": "Sign Out",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "goToHome": "VidyaSetu — Go to home",
+    "skipToContent": "Skip to main content"
+  },
+  "dotNav": {
+    "hero": "Home",
+    "why": "Why It Matters",
+    "how-it-works": "How It Works",
+    "quiz-showcase": "Playground",
+    "teacher-parent": "Dashboards",
+    "faq": "FAQs",
+    "cta": "Contact"
+  },
+  "hero": {
+    "badge": "Inclusive Education · AI Powered · Offline Ready",
+    "headlineWord1": "Learning",
+    "headlineWord2": "Built",
+    "headlineWord3": "Around",
+    "headlineHighlight": "Every Child",
+    "headlineWord4": "Not",
+    "headlineWord5": "the",
+    "headlineWord6": "Other",
+    "headlineWord7": "Way",
+    "headlineWord8": "Around.",
+    "subPhrases": [
+      "In Their Language",
+      "At Their Pace",
+      "On Their Terms"
+    ],
+    "description": "Inclusive Education AI adapts to every learner with personalized lessons, regional languages, offline access, and accessibility tools — ensuring every student learns confidently.",
+    "startLearning": "Start Learning Free",
+    "watchDemo": "Watch Demo",
+    "trustBadges": {
+      "offlineFirst": "Offline First",
+      "languages": "7+ Languages",
+      "wcag": "WCAG Accessible",
+      "trustedBySchools": "Trusted by Schools"
+    },
+    "cards": {
+      "adaptiveLearning": "Adaptive Learning",
+      "aiPowered": "AI-powered",
+      "languages": "7+ Languages",
+      "regionalSupport": "Regional support",
+      "offlineReady": "Offline Ready",
+      "noInternet": "No internet needed",
+      "lessonCompletion": "Lesson Completion"
+    }
+  },
+  "why": {
+    "badge": "WHY IT MATTERS — INDIA EVIDENCE",
+    "title": "Education is a right,",
+    "titleHighlight": "not a privilege.",
+    "subtitle": "India-specific evidence highlights the critical learning gaps that demand adaptive, multilingual, and offline-first AI education.",
+    "heroBadge": "India Education Data",
+    "heroTitle": "Children in India's Foundational + Preparatory stages",
+    "heroDesc": "Too many learners still navigate one-size-fits-all education that cannot adapt to their language, location, pace, or individual learning needs.",
+    "heroCitation": "According to UDISE+ 2023–24",
+    "targetPopulation": "Target Population",
+    "card1Title": "Rural Class V children cannot read a Class II-level text",
+    "card1Citation": "According to ASER 2024",
+    "card2Title": "Students in India are not taught in the language they speak and understand best",
+    "card2Citation": "According to UNICEF India",
+    "card3Title": "Children with Special Needs in India's Foundational + Preparatory stages",
+    "card3Citation": "According to UDISE+ 2023–24",
+    "card3Suffix": " Lakh",
+    "card4Title": "Schools in India still lack internet access",
+    "card4Citation": "According to UDISE+ 2024–25",
+    "missionQuote": "“Every child deserves the chance to learn in a way that works for them — regardless of language, ability, or internet access.”",
+    "missionLabel": "Our Core Mission"
+  },
+  "features": {
+    "badge": "CORE PLATFORM CAPABILITIES",
+    "title": "Built for Every Learner,",
+    "titleHighlight": "Every Context.",
+    "subtitle": "A purpose-built suite of tools designed for truly inclusive learning — from AI-powered adaptivity to offline access.",
+    "items": {
+      "adaptive": {
+        "title": "Adaptive Learning",
+        "desc": "AI adjusts difficulty, pace, and teaching style in real-time based on each child's unique learning patterns.",
+        "badge": "Core AI Engine"
+      },
+      "snap": {
+        "title": "Snap & Learn",
+        "desc": "Point your camera at any textbook page — AI extracts content and creates interactive lessons instantly.",
+        "badge": "Instant OCR"
+      },
+      "languages": {
+        "title": "50+ Regional Languages",
+        "desc": "Learn in Hindi, Tamil, Bengali, Marathi, or any of 50+ supported regional languages.",
+        "badge": "Native Voices"
+      },
+      "accessibility": {
+        "title": "Accessibility Suite",
+        "desc": "Dyslexia-friendly fonts, ADHD focus modes, high-contrast themes, and screen reader optimized content.",
+        "badge": "WCAG AAA"
+      },
+      "offline": {
+        "title": "Offline-First",
+        "desc": "Download lessons once, learn anywhere. No internet required after initial sync.",
+        "badge": "Zero Latency"
+      },
+      "gamified": {
+        "title": "Gamified Learning",
+        "desc": "XP points, streak rewards, leaderboards, and achievement badges that make learning addictive.",
+        "badge": "Fun & Engaging"
+      },
+      "teacherAssistant": {
+        "title": "Teacher AI Assistant",
+        "desc": "Automated lesson planning, smart grading, and personalized student insights.",
+        "badge": "Time Saver"
+      },
+      "parentVoice": {
+        "title": "Parent Voice Updates",
+        "desc": "AI-generated audio summaries of your child's progress — in your language.",
+        "badge": "Daily Audio"
+      },
+      "aiLessons": {
+        "title": "AI-Generated Lessons",
+        "desc": "Personalized lesson content created by AI, tailored to curriculum and learning goals.",
+        "badge": "Auto Curriculum"
+      }
+    }
+  },
+  "quizShowcase": {
+    "badge": "CORE LEARNING INTELLIGENCE",
+    "title": "AI that turns any curriculum into",
+    "titleHighlight": "adaptive mastery.",
+    "subtitle": "Experience personalized quizzes, school curriculum ingestion, and live adaptive learning paths — engineered around every child's speed.",
+    "tabs": {
+      "quiz": "Personalized Adaptive Quizzes",
+      "upload": "School Curriculum Upload",
+      "builder": "AI Curriculum Builder"
+    },
+    "controls": {
+      "cbseClass": "CBSE CLASS 5",
+      "aiAdaptive": "AI ADAPTIVE",
+      "easy": "EASY",
+      "medium": "MEDIUM",
+      "hard": "HARD",
+      "streak": "streak",
+      "topicMastery": "TOPIC MASTERY",
+      "question": "Question",
+      "of": "of",
+      "topic": "Topic",
+      "offlineActive": "Offline Mode Active",
+      "offlineReady": "Synced · Offline Ready"
+    },
+    "simulator": {
+      "title": "AI Adaptive Learning Path Simulator",
+      "desc": "See how the curriculum dynamically rewires itself based on student quiz scores",
+      "simHighScore": "Simulate High Score (95%)",
+      "simStruggling": "Simulate Struggling (40%)",
+      "depGraph": "Curriculum Dependency Graph",
+      "realTimeAdapt": "Real-Time AI Adaptation",
+      "masteryLabel": "Mastery:"
+    },
+    "pills": {
+      "curriculumUpload": {
+        "label": "School Curriculum Upload",
+        "desc": "Ingests syllabus PDF → generates practice & quizzes"
+      },
+      "curriculumBuilder": {
+        "label": "AI Curriculum Builder",
+        "desc": "Continuously adjusts path to child's quiz mastery"
+      },
+      "regionalLanguages": {
+        "label": "7+ Regional Languages",
+        "desc": "Every lesson & quiz available in native voice"
+      },
+      "offlineFirst": {
+        "label": "Offline First",
+        "desc": "Practices without internet & syncs progress"
+      }
+    },
+    "learningPath": {
+      "title": "Learning Journey",
+      "steps": {
+        "assess": {
+          "label": "Assessment",
+          "desc": "Baseline test"
+        },
+        "lesson": {
+          "label": "Lesson",
+          "desc": "AI-built lesson"
+        },
+        "practice": {
+          "label": "Practice",
+          "desc": "Guided practice"
+        },
+        "quiz": {
+          "label": "Quiz",
+          "desc": "Adaptive quiz"
+        },
+        "mastery": {
+          "label": "Mastery",
+          "desc": "Concept locked"
+        },
+        "next": {
+          "label": "Next Topic",
+          "desc": "AI recommendation"
+        }
+      }
+    },
+    "subjects": {
+      "title": "Subjects",
+      "science": "Science",
+      "math": "Mathematics",
+      "history": "History",
+      "geo": "Geography",
+      "hindi": "Hindi"
+    },
+    "studentCard": {
+      "uploadedBy": "Uploaded by",
+      "lvl": "LVL"
+    },
+    "insights": {
+      "teacherCopilot": "Teacher AI Co-Pilot",
+      "weakConceptAlert": "Weak Concept Alert",
+      "weakConceptDesc": "Denominators — 3 attempts, 40% accuracy",
+      "classInsight": "Class Insight",
+      "classInsightDesc": "12 students behind on Science quiz",
+      "topProgress": "Top Progress",
+      "topProgressDesc": "Aarav → 90th percentile this week",
+      "regionalLanguage": "Regional Language"
+    },
+    "quiz": {
+      "correctMsg": "Correct! +{xp} XP earned ✨",
+      "explanation": "Explanation:",
+      "nextQuestion": "Next Question",
+      "seeResults": "See Results",
+      "perfectScore": "Perfect Score! 🎉",
+      "greatWork": "Great Work! 💪",
+      "resultsOf": "{score} of {total} correct · +{xp} XP earned",
+      "accuracy": "Accuracy",
+      "streak": "Streak",
+      "difficulty": "Difficulty",
+      "retakeQuiz": "Retake Quiz",
+      "aiRecommends": "AI Recommends Next Topic",
+      "start": "Start",
+      "parentUpdateSent": "Parent Update Auto-Sent"
+    },
+    "upload": {
+      "title": "School Curriculum Upload",
+      "subtitle": "Upload syllabus, textbook PDF, or exam scheme",
+      "dropZoneTitle": "Drag & drop syllabus PDF or select sample",
+      "dropZoneSubtitle": "Supports PDF, DOCX, scanned textbook images",
+      "selectFileLabel": "Select Sample Curriculum File:",
+      "processingBtn": "AI Processing Curriculum...",
+      "convertBtn": "Convert Syllabus to Interactive Engine",
+      "pipelineTitle": "AI Synthesis Pipeline",
+      "pipelineBadge": "OCR + LLM Extraction",
+      "readyBadge": "✨ Ready for Classroom",
+      "alignedBadge": "100% Aligned",
+      "generatedMsg": "Generated 14 lesson modules, 42 adaptive quiz items & 6 regional language audio tracks from",
+      "steps": {
+        "parsing": {
+          "label": "Document Parsing",
+          "desc": "Extracting chapters, topics & learning objectives"
+        },
+        "graphing": {
+          "label": "Concept Graphing",
+          "desc": "Mapping dependencies to CBSE / NCERT standards"
+        },
+        "synthesis": {
+          "label": "Quiz & Item Synthesis",
+          "desc": "Generating adaptive questions (Easy / Med / Hard)"
+        },
+        "multilingual": {
+          "label": "Multi-Lingual Ready",
+          "desc": "Generating 6 regional language translations & audio"
+        }
+      }
+    },
+    "builder": {
+      "nodes": {
+        "mastered": "Mastered",
+        "currentFocus": "Current Focus",
+        "aiUnlocked": "AI Unlocked Next",
+        "aiRemediation": "AI Injected Remediation",
+        "upcoming": "Upcoming",
+        "unit1": "Unit 1: Plant Anatomy",
+        "unit2": "Unit 2: Photosynthesis",
+        "unit3High": "Unit 3: Plant Respiration (Advanced)",
+        "unit3Low": "Unit 2B: Leaf Micro-Structure (Remediation)",
+        "unit4": "Unit 4: Ecosystem Energy Flow",
+        "scoreReady": "Ready",
+        "scoreAssigned": "Assigned",
+        "scoreLocked": "Locked"
+      }
+    }
+  },
+  "snapAndLearn": {
+    "badge": "SNAP & LEARN",
+    "title": "From textbook to",
+    "titleHighlight": "interactive lesson.",
+    "subtitle": "Just point your camera. AI does the rest.",
+    "steps": {
+      "capture": {
+        "title": "Capture",
+        "subtitle": "Point camera at textbook"
+      },
+      "extract": {
+        "title": "Extract",
+        "subtitle": "AI reads & understands"
+      },
+      "generate": {
+        "title": "Generate",
+        "subtitle": "Interactive lesson created"
+      },
+      "learn": {
+        "title": "Learn",
+        "subtitle": "Adapted to your needs"
+      }
+    }
+  },
+  "accessibilitySection": {
+    "badge": "Accessibility First",
+    "title": "Barrier-Free",
+    "titleHighlight": "Education.",
+    "subtitle": "Experience every accessibility feature in real time. Drag the slider to compare standard content against adapted rendering.",
+    "dragPrompt": "Drag slider left / right",
+    "interactiveDemo": "Interactive Demo",
+    "before": "BEFORE",
+    "after": "AFTER",
+    "standardDisplay": "Standard Unadapted Display",
+    "slideRight": "Drag right to reveal accessibility enhancements ➔",
+    "activeFeature": "✓ Active Feature:",
+    "dragLeft": "Drag handle left to compare with standard display",
+    "resetSplit": "Reset Split (50/50)",
+    "sliderLabel": "Slider:",
+    "fontSizeLabel": "Font Size:",
+    "deficiencyFilter": "Deficiency Filter:",
+    "pauseAudio": "Pause Audio",
+    "playNarration": "Play Narration",
+    "tabs": {
+      "dyslexia": {
+        "label": "Dyslexia Support",
+        "badge": "OpenDyslexic Font",
+        "description": "Weighted character bottoms, wider letter spacing, and warm background tint to eliminate visual crowding.",
+        "beforeLabel": "Standard Dense Text",
+        "afterLabel": "Dyslexia-Adapted Format"
+      },
+      "adhd": {
+        "label": "ADHD Focus Mode",
+        "badge": "Spotlight Ruler",
+        "description": "Interactive reading spotlight ruler with dimmed background that tracks reading lines.",
+        "beforeLabel": "Standard Full Page",
+        "afterLabel": "Focus Reading Ruler"
+      },
+      "highContrast": {
+        "label": "High Contrast",
+        "badge": "AAA Contrast",
+        "description": "Ultra-high contrast themes for low vision, glare reduction, and outdoor sunlight reading.",
+        "beforeLabel": "Standard Contrast (4.5:1)",
+        "afterLabel": "WCAG AAA High Contrast (21:1)"
+      },
+      "colorBlind": {
+        "label": "Color-Blind Friendly",
+        "badge": "Palette Adapted",
+        "description": "Adapted pattern fills and color schemes for protanopia, deuteranopia, and tritanopia.",
+        "beforeLabel": "Standard Color Diagram",
+        "afterLabel": "Adaptive Color & Pattern Diagram"
+      },
+      "largeText": {
+        "label": "Dynamic Sizing",
+        "badge": "Adjustable Scaling",
+        "description": "Instant font magnification and adaptable line-height without breaking layout structure.",
+        "beforeLabel": "Standard 14px Text",
+        "afterLabel": "Enhanced 22px Scaled Text"
+      },
+      "audioNarration": {
+        "label": "Audio Narration",
+        "badge": "Natural TTS",
+        "description": "Natural AI voice narration with real-time karaoke-style word highlighting.",
+        "beforeLabel": "Silent Reading Text",
+        "afterLabel": "Animated Voice Narration"
+      },
+      "signLanguage": {
+        "label": "Sign Language AI",
+        "badge": "ISL Avatar",
+        "description": "Sign language avatar explaining key concepts for Deaf and hard-of-hearing learners.",
+        "beforeLabel": "Text-Only Lesson",
+        "afterLabel": "Text + Sign Language Avatar"
+      }
+    },
+    "lesson": {
+      "title": "Photosynthesis: How Plants Make Food",
+      "subtitle": "Grade 6 Science · Chapter 4",
+      "body": "Plants are nature's solar food factories. They draw liquid water from soil through roots, capture carbon dioxide gas from surrounding air, and absorb radiant sunlight using green chlorophyll pigments inside leaf cells.",
+      "equation": "6CO₂ + 6H₂O + Sunlight ⟶ C₆H₁₂O₆ + 6O₂",
+      "takeaway": "Key Takeaway: Water + Carbon Dioxide + Sunlight = Glucose (Food) + Oxygen."
+    },
+    "audio": {
+      "pauseBtn": "Pause Audio",
+      "playBtn": "Listen Live 🔊"
+    },
+    "isl": {
+      "syncedText": "✓ ISL Synchronized Text",
+      "selectConcept": "Select Concept:",
+      "avatarInterpreter": "AI Avatar Interpreter",
+      "islSign": "ISL Sign:",
+      "demonstrating": "Demonstrating",
+      "synced": "Synchronized with Grade 6 Science Curriculum",
+      "islGloss": "ISL Gloss:",
+      "pause": "Pause",
+      "play": "Play",
+      "replay": "Replay 🔄",
+      "readyForFeed": "Ready for real ISL video feeds",
+      "captionsOn": "Captions ON",
+      "captionsOff": "Captions OFF"
+    },
+    "adhd": {
+      "spotlightFocus": "Spotlight Focus Line",
+      "rulerActive": "ADHD Reading Ruler Active (hover up/down)"
+    },
+    "colorBlind": {
+      "patternCoded": "Pattern-Coded Diagram"
+    }
+  },
+  "teacherAI": {
+    "badge": "TEACHER AI COPILOT",
+    "title": "Less time reading dashboards.",
+    "titleHighlight": "More time teaching.",
+    "subtitle": "AI helps teachers spend less time analyzing data and more time helping students — surfacing weak concepts, at-risk learners and the next best lesson automatically.",
+    "insights": {
+      "weakConcepts": {
+        "title": "Weak concepts detected",
+        "subtitle": "Fractions & photosynthesis need re-teaching in 5B."
+      },
+      "aiSuggestions": {
+        "title": "Student AI suggestions",
+        "subtitle": "3 learners recommended for dyslexia-friendly mode."
+      },
+      "attendance": {
+        "title": "Attendance intelligence",
+        "subtitle": "Absence patterns linked to falling mastery."
+      },
+      "lessonRecap": {
+        "title": "Lesson recommendations",
+        "subtitle": "Auto-built 20-min recap deck, ready to project."
+      }
+    },
+    "dashboard": {
+      "classHeader": "Class 5B · Science",
+      "studentsWeek": "32 students · Week 14",
+      "mastery": "MASTERY",
+      "attendance": "ATTENDANCE",
+      "atRisk": "AT RISK",
+      "conceptMastery": "Concept mastery by topic",
+      "updatedToday": "Updated today",
+      "engagementHeatmap": "Engagement heatmap",
+      "aiActionCard": "AI action card",
+      "aiActionMsg": "Re-teach \"fractions\" to 7 students with a visual lesson.",
+      "assignNow": "Assign now"
+    }
+  },
+  "dashboardDemo": {
+    "badge": "LIVE PRODUCT DASHBOARD DEMO",
+    "title": "Teachers, parents & students",
+    "titleHighlight": "connected in one place.",
+    "subtitle": "Switch roles to experience how AI delivers actionable insights for educators, clear voice updates for parents, and adaptive goals for students.",
+    "liveSync": "Live Session Sync Active",
+    "ecosystemDesc": "VidyaSetu AI Connected Ecosystem · Real-Time Sync",
+    "roles": {
+      "teacher": {
+        "label": "Teacher View",
+        "badge": "Ms. Ananya · Grade 5 Science"
+      },
+      "parent": {
+        "label": "Parent View",
+        "badge": "Mr. Sharma · Parent of Rohan"
+      },
+      "student": {
+        "label": "Student View",
+        "badge": "Rohan S. · Level 4 Learner"
+      }
+    },
+    "teacher": {
+      "classMastery": "CLASS MASTERY",
+      "vsLastWeek": "+12% vs last week",
+      "studentsEnrolled": "STUDENTS ENROLLED",
+      "activeAttendance": "100% Active Attendance",
+      "atRiskAlert": "AT-RISK ALERT",
+      "needRecap": "Need Photosynthesis Recap",
+      "accessibilityModes": "ACCESSIBILITY MODES",
+      "dyslexiaAdhd": "Dyslexia & ADHD Active",
+      "weakConceptsTitle": "Weak Concepts & Class Gaps",
+      "autoDetected": "Auto-detected by AI",
+      "lowMastery": "% Low Mastery",
+      "moderate": "% Moderate",
+      "highMastery": "% High Mastery",
+      "aiRecommended": "AI Recommended Next Lesson",
+      "recapTitle": "15-Min Visual Experiment Recap",
+      "recapDesc": "AI generated a 4-slide interactive visual presentation to address the chemical equation gap identified in today's assessment.",
+      "projectRecap": "Project Recap Deck to Classroom"
+    },
+    "parent": {
+      "weeklyReport": "Weekly Report",
+      "greatProgress": "Great progress in Science this week! 🎉",
+      "progressDesc": "Rohan completed 4 lessons, earned 450 XP points, and mastered plant photosynthesis in audio narration mode.",
+      "streak": "Streak",
+      "lessons": "Lessons",
+      "audioUpdateTitle": "Audio Voice Update for Parents",
+      "audioLength": "1 Min Audio",
+      "playingAudio": "Playing Audio Report...",
+      "tapToPlay": "Tap to Play Summary",
+      "homeActivityTitle": "Recommended 5-Min Home Activity",
+      "homeActivityName": "🌱 Plant Sunlight Experiment",
+      "homeActivityDesc": "Ask Rohan to show you a leaf in your home garden and explain how plants use sunlight to make food.",
+      "whatsappDigest": "Weekly WhatsApp Digest Sent",
+      "delivered": "✓ Delivered",
+      "audioTranscript": "“Hello! Rohan completed the Photosynthesis chapter this week with a 92% mastery score.”"
+    },
+    "student": {
+      "levelBadge": "Level 4 Explorer",
+      "welcome": "Welcome back, Rohan! 👋",
+      "badgeMsg": "You are 1 lesson away from earning your \"Botany Master\" badge!",
+      "totalPoints": "Total Points",
+      "lesson1": "1. Plant Structure",
+      "completed100": "Completed 100%",
+      "lesson2": "2. Photosynthesis",
+      "inProgress": "In Progress (85%)",
+      "lesson3": "3. Solar Energy Quiz",
+      "unlocksNext": "Unlocks Next"
+    }
+  },
+  "howItWorks": {
+    "badge": "HOW IT WORKS",
+    "title": "From diagnosis to mastery",
+    "titleHighlight": "in six simple steps.",
+    "subtitle": "How VidyaSetu personalizes education, empowers teachers, and keeps parents informed.",
+    "steps": [
+      {
+        "title": "Create Profile",
+        "desc": "Language, grade, device and accessibility needs in under two minutes."
+      },
+      {
+        "title": "Learning Assessment",
+        "desc": "A playful 8-minute diagnostic maps strengths, gaps and learning style."
+      },
+      {
+        "title": "AI Builds the Journey",
+        "desc": "A personalized curriculum path is generated and cached for offline use."
+      },
+      {
+        "title": "Student Learns",
+        "desc": "Adaptive lessons, narration and quizzes — with or without internet."
+      },
+      {
+        "title": "Teacher Insights",
+        "desc": "Classroom analytics and action cards land in the teacher copilot."
+      },
+      {
+        "title": "Parent Updates",
+        "desc": "Weekly voice summaries, progress timeline, and gentle nudges — in home language."
+      }
+    ]
+  },
+  "faq": {
+    "badge": "FREQUENTLY ASKED QUESTIONS",
+    "title": "Everything you need to know",
+    "titleHighlight": "about VidyaSetu.",
+    "subtitle": "Got questions? We have answers. If you can't find what you're looking for, feel free to contact our team.",
+    "items": [
+      {
+        "q": "01 — What is VidyaSetu?",
+        "a": "VidyaSetu is an AI-powered learning platform built to make education accessible to every child—regardless of language, learning needs, or internet connectivity.\n\nIt combines adaptive learning, regional languages, offline-first education, assistive technology, life-skills learning, and AI-powered support for teachers and parents in one ecosystem."
+      },
+      {
+        "q": "02 — What makes it different from a normal AI tutor?",
+        "a": "We don't just make AI explain a lesson—we make the learning experience adapt to the learner.\n\nUnlike a conventional AI tutor, VidyaSetu combines personalized learning + accessibility + regional languages + offline learning + assistive technology + teacher/parent collaboration.\n\nA child doesn't simply receive an answer. The platform learns from their progress and adapts what they learn, how they learn it, and how much support they receive."
+      },
+      {
+        "q": "03 — How does AI personalize learning for my child?",
+        "a": "Every child learns differently.\n\nOur platform can use assessment results, learning progress, interactions, pace, and performance to build an individual learning profile. The system can then adapt the difficulty, pace, explanation style, content format, and activities to better match the child's needs.\n\nInstead of asking every child to fit the curriculum, we make the curriculum fit the child."
+      },
+      {
+        "q": "04 — Can it work without the internet?",
+        "a": "Yes—that's one of our core principles.\n\nThe platform follows an offline-first approach, allowing essential learning experiences to continue even when internet connectivity is unavailable. Learning activity can be stored locally and synchronized when connectivity returns.\n\nThis makes the platform especially relevant for low-connectivity schools and communities where continuous internet access cannot be assumed."
+      },
+      {
+        "q": "05 — How does it support children with different learning needs?",
+        "a": "Accessibility is built into the learning experience—not added as an afterthought.\n\nDepending on the learner's needs, the platform can provide features such as dyslexia-friendly reading modes, adjustable text and spacing, reduced cognitive load, high-contrast interfaces, captions, visual learning, sign-language support, and AAC-style communication.\n\nThe goal isn't to create a separate classroom for every child. It's to create one learning environment that can adapt to different children."
+      },
+      {
+        "q": "06 — What is Snap & Learn?",
+        "a": "Snap & Learn turns an ordinary textbook page into an interactive AI lesson.\n\nA child photographs a page, and AI can read the content, understand it, simplify the explanation, translate it into a preferred language, narrate it, and generate interactive questions.\n\nSo instead of needing a specially digitized textbook, a printed page can become an accessible, personalized learning experience."
+      },
+      {
+        "q": "07 — How do teachers and parents become part of the learning journey?",
+        "a": "Learning shouldn't stop at the student's screen.\n\nOur Teacher/Parent AI Co-Pilot turns learning progress into useful, human-friendly insights.\n\nTeachers can receive actionable recommendations about where a child may need additional support, while parents can receive simple updates—potentially through voice in their preferred language—so they understand what the child is learning and how they can help.\n\nAI connects the child, teacher, and parent instead of isolating learning to an app."
+      },
+      {
+        "q": "08 — Does VidyaSetu replace teachers?",
+        "a": "No. It makes teachers more powerful.\n\nAI can handle repetitive tasks such as identifying learning patterns, adapting content, and summarizing progress. Teachers remain responsible for the human side of education—understanding the child, building confidence, mentoring, encouraging, and making important decisions.\n\nAI personalizes the learning. Humans personalize the care."
+      }
+    ]
+  },
+  "cta": {
+    "badge": "GET IN TOUCH",
+    "title": "Transform Inclusive Education",
+    "titleHighlight": "In Your School Today.",
+    "subtitle": "Join hundreds of educators, parents, and schools empowering every learner with accessible AI.",
+    "trust1": "Free for individuals",
+    "trust2": "School plans",
+    "trust3": "No credit card",
+    "form": {
+      "eyebrow": "GET IN TOUCH",
+      "title": "We'd love to hear from you",
+      "subtitle": "Whether you're an educator, a parent, or a school — reach out and let's build something inclusive together.",
+      "namePlaceholder": "Your name",
+      "emailPlaceholder": "you@example.com",
+      "messagePlaceholder": "Tell us how we can help...",
+      "submitBtn": "Send Message",
+      "sending": "Sending...",
+      "successTitle": "Message sent!",
+      "successDesc": "Thank you for reaching out. We'll get back to you within 24 hours.",
+      "sendAnother": "Send another message",
+      "privacy": "We respect your privacy. No spam, ever.",
+      "requiredError": "Please fill out all required fields.",
+      "failedError": "Failed to submit message. Please try again."
+    }
+  },
+  "learningProgress": {
+    "continueLearning": "Continue Learning",
+    "startLearning": "Start Learning",
+    "continue": "Continue",
+    "overallProgress": "Overall Progress",
+    "modulesCompleted": "Modules Completed",
+    "inProgress": "In Progress",
+    "notStarted": "Not Started",
+    "completed": "Completed",
+    "ofModulesInClass": "of {total} in your class",
+    "lastActive": "Last active {time}",
+    "notStartedYet": "Not started yet",
+    "lessonsDone": "{done} of {total} lessons done",
+    "lastStudied": "last studied {time}",
+    "moduleProgress": "Module Progress",
+    "syncNow": "Sync now",
+    "offlineNotice": "You're offline — your learning is being saved on this device.",
+    "savedActivitiesWaiting": "{count} learning activities saved on this device, waiting to sync.",
+    "showingLastSaved": "Showing your last saved progress."
+  },
+  "diagnosticQuiz": {
+    "studentsOnly": "Students Only",
+    "studentsOnlyDesc": "The diagnostic quiz is only available on student accounts.",
+    "backToDashboard": "Back to Dashboard",
+    "title": "Diagnostic Assessment",
+    "subtitle": "Identify strengths and topics to review",
+    "streak": "streak",
+    "points": "Points",
+    "correctFeedback": "Correct!",
+    "incorrectFeedback": "Almost there! Keep going.",
+    "question": "Question",
+    "of": "of",
+    "finishQuiz": "Finish Diagnostic Quiz",
+    "nextQuestion": "Next Question",
+    "resultsTitle": "Diagnostic Assessment Completed!",
+    "resultsSubtitle": "Here is your personalized learning gap breakdown",
+    "overallMastery": "Overall Mastery",
+    "recommendedFocus": "Recommended Focus Topics",
+    "viewCurriculum": "Start Learning Modules",
+    "xpEarnedSuffix": "XP earned",
+    "correctSuffix": "correct"
+  },
+  "lessons": {
+    "title": "Animated Lessons",
+    "subtitle": "Interactive audio-visual explanations with step-by-step concepts",
+    "startLesson": "Start Lesson",
+    "completed": "Completed",
+    "slide": "Slide",
+    "next": "Next Slide",
+    "prev": "Previous Slide",
+    "checkUnderstanding": "Check Understanding",
+    "correct": "Correct! Great job!",
+    "incorrect": "Not quite. Let's try again!",
+    "lessonFinished": "Lesson Completed!",
+    "returnToLessons": "Return to Lessons"
+  },
+  "teacher": {
+    "classes": "My Classes",
+    "curriculum": "Curriculum Modules",
+    "studentAnalytics": "Student Analytics",
+    "assignmentGrading": "Assignment Grading",
+    "parentUpdates": "Parent Voice Notes",
+    "copilotInsights": "AI Copilot Insights",
+    "assignSubject": "Assign Subject",
+    "createAssignment": "Create Assignment",
+    "gradeSubmission": "Grade Submission",
+    "sendVoiceRecap": "Generate Voice Recap"
+  },
+  "school": {
+    "curriculumManagement": "Curriculum Management",
+    "teacherDirectory": "Teacher Directory",
+    "studentRoster": "Student Roster",
+    "uploadSyllabus": "Upload Syllabus / PDF",
+    "importNcertBook": "Import NCERT Book",
+    "unassignedTeachers": "Unassigned Teachers",
+    "assignedTeachers": "Assigned Teachers",
+    "assignClass": "Assign Class"
+  },
+  "parent": {
+    "childOverview": "Child Overview",
+    "weeklyVoiceSummary": "Weekly Voice Summary",
+    "subjectMastery": "Subject Mastery",
+    "recentActivity": "Recent Learning Activities",
+    "playVoiceSummary": "Play Voice Summary",
+    "attendanceAlert": "Attendance & Daily Streak"
+  },
+  "footer": {
+    "description": "AI-powered, inclusive learning designed around every child — regardless of language, ability, or internet access.",
+    "copyright": "© {year} VidyaSetu • AI for Inclusive Education.",
+    "sections": {
+      "product": "Product",
+      "explore": "Explore",
+      "quickLinks": "Quick Links"
+    },
+    "links": {
+      "adaptiveLearning": "Adaptive Learning",
+      "regionalLanguages": "Regional Languages",
+      "offlineLearning": "Offline Learning",
+      "accessibility": "Accessibility",
+      "whyItMatters": "Why It Matters",
+      "features": "Features",
+      "faqs": "FAQs",
+      "home": "Home",
+      "playground": "Playground",
+      "dashboards": "Dashboards",
+      "contactUs": "Contact Us",
+      "indiaData": "India Data"
+    }
+  },
+  "sidebar": {
+    "interfaceTheme": "Interface Theme",
+    "signOut": "Sign Out",
+    "roleLabels": {
+      "student": "Student",
+      "teacher": "Teacher",
+      "school": "School Admin",
+      "parent": "Parent",
+      "admin": "Super Administrator",
+      "fallback": "Account"
+    },
+    "subtitles": {
+      "selfEducated": "Self-Educated (NCERT)",
+      "branch": "{name} Branch",
+      "guardian": "Guardian",
+      "systemOps": "System Operations"
+    },
+    "roleBadgeFallback": "{role} Role"
+  },
+  "languageSwitcher": {
+    "label": "Language",
+    "ariaLabel": "Select language"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "next": "Next",
+    "back": "Back",
+    "retry": "Retry",
+    "loading": "Loading…",
+    "logOut": "Log out"
+  },
+  "a11y": {
+    "switchTheme": "Switch to {theme} mode"
+  },
+  "schoolAdmin": {
+    "allocation": {
+      "title": "Teacher & Subject Allocation",
+      "subtitle": "Assign one subject teacher per class subject. Teachers can teach multiple subjects across different classes.",
+      "matrixTab": "Class Subject Matrix",
+      "directoryTab": "Teacher Directory ({count})",
+      "assignTeacherBtn": "Assign Teacher",
+      "noTeachers": "No teachers registered in this branch yet",
+      "noTeachersDesc": "When teachers sign up with your branch name, they will appear in this directory for class and subject assignments.",
+      "classLabel": "Class:",
+      "classOption": "Class {cls}",
+      "sectionLabel": "Section:",
+      "sectionOption": "Section {sec}",
+      "staffingStatus": "Staffing Status:",
+      "subjectsAssignedCount": "{assigned} of {total} Subjects Assigned",
+      "table": {
+        "subject": "Subject",
+        "status": "Status",
+        "assignedTeacher": "Assigned Subject Teacher",
+        "action": "Action"
+      },
+      "assigned": "Assigned",
+      "unassigned": "Unassigned",
+      "change": "(Change)",
+      "selectTeacher": "Select Teacher",
+      "reassign": "Reassign",
+      "deassign": "De-assign",
+      "assign": "Assign",
+      "directorySearchPlaceholder": "Search by teacher name, phone, or class...",
+      "filterAll": "All",
+      "filterAssigned": "Assigned",
+      "filterUnassigned": "Unassigned",
+      "filterActive": "Active"
+    },
+    "subjects": {
+      "english": "English",
+      "hindi": "Hindi",
+      "mathematics": "Mathematics",
+      "evs": "Environmental Studies",
+      "science": "Science",
+      "social": "Social Studies",
+      "computer": "Computer"
+    }
+  },
+  "teacherDashboard": {
+    "noClassAssignedTitle": "No Class Assigned Yet",
+    "noClassAssignedDesc": "You can't perform any actions since no class has been assigned to you yet. Please contact your school branch administrator to assign your class (e.g. 4th A).",
+    "noClassAssignedHint": "Once assigned, you will be able to view student lists, upload PDF assignments, generate adaptive AI quizzes, and track student progress with feedback.",
+    "activeClass": "Active Class:",
+    "classPrefix": "Class",
+    "educatorBadge": "Educator",
+    "school": "School:",
+    "branch": "Branch:",
+    "currentClass": "Current Class",
+    "enrolledStudents": "Enrolled Students",
+    "activeAssignments": "Active Assignments",
+    "pdfAndAiQuizzes": "PDF & AI Quizzes",
+    "curriculumModules": "Curriculum Modules",
+    "availableForAiQuiz": "Available for AI Quiz",
+    "studentsEnrolledIn": "Students Enrolled in",
+    "uniqueId": "Unique ID",
+    "studentNameEmail": "Student Name / Email",
+    "enrollmentMode": "Enrollment Mode",
+    "joinedDate": "Joined Date",
+    "noStudentsEnrolled": "No students enrolled in",
+    "assignmentsAndQuizzes": "Assignments & Quizzes",
+    "assignmentsDesc": "Upload homework documents or generate automatic AI quizzes from curriculum modules.",
+    "uploadPdfAssignmentBtn": "Upload PDF Assignment (Max 5MB)",
+    "generateAiQuizBtn": "Generate AI Quiz from Modules",
+    "pdfUpload": "PDF Upload",
+    "aiQuiz": "AI Quiz",
+    "locked": "Locked",
+    "active": "Active",
+    "viewAssignmentPdf": "View Assignment PDF",
+    "deadline": "Deadline:",
+    "noDeadline": "No Deadline Set",
+    "deleteAssignment": "Delete assignment",
+    "noAssignmentsTitle": "No Assignments Created Yet",
+    "noAssignmentsDesc": "Use the buttons above to upload a manual PDF assignment (max 5MB) or generate an adaptive AI quiz from your class modules.",
+    "gradingTitle": "Student Progress & Assessment Scores",
+    "gradingDesc": "Select an assignment to view student scores and give individual feedback.",
+    "attemptStatus": "Attempt Status",
+    "scoreMax": "Score / Max",
+    "lastAttempted": "Last Attempted",
+    "actions": "Actions",
+    "attempted": "Attempted",
+    "notGraded": "Not Graded",
+    "close": "Close",
+    "gradeFeedback": "Grade / Feedback",
+    "gradeFeedbackForStudent": "Grade & Feedback for Student",
+    "scoreOutOf100": "Score (Out of 100)",
+    "feedbackGuidanceMsg": "Feedback / Guidance Message",
+    "feedbackPlaceholder": "Enter feedback or advice for this student...",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "saveScoreFeedback": "Save Score & Feedback",
+    "scoreSavedSuccess": "Score & feedback saved successfully!",
+    "noSubmissionsYet": "No student submissions yet for this assignment.",
+    "curriculumModulesFor": "Curriculum Modules for",
+    "viewModulePdf": "View Module PDF",
+    "ncertModule": "NCERT Module",
+    "noModulesFoundFor": "No curriculum modules found for",
+    "uploadPdfModalTitle": "Upload PDF Assignment",
+    "assignmentTitleRequired": "Assignment Title *",
+    "descInstructions": "Description / Instructions",
+    "instructionsPlaceholder": "Instructions for students...",
+    "deadlineDays": "Deadline (Days Active)",
+    "deadlinePlaceholder": "e.g. 7 (leave empty for no deadline)",
+    "selectPdfRequired": "Select PDF Document (Max 5 MB) *",
+    "uploading": "Uploading...",
+    "uploadAssignmentBtn": "Upload Assignment",
+    "generateAiQuizModalTitle": "Generate Adaptive AI Quiz",
+    "quizTitleRequired": "Quiz Title *",
+    "selectModulesRequired": "Select Modules / Chapters *",
+    "noModulesWarning": "No uploaded modules found for this class. Upload modules first in the School dashboard to generate adaptive quizzes.",
+    "generating": "Generating...",
+    "generateQuizBtn": "Generate AI Quiz",
+    "cancelBtn": "Cancel",
+    "generatingBtn": "Generating...",
+    "mobile": {
+      "tabs": {
+        "home": "Home",
+        "classes": "Classes",
+        "assignments": "Assignments",
+        "profile": "Profile"
+      },
+      "home": {
+        "loadError": "Failed to load your classes.",
+        "loading": "Loading your classes…",
+        "welcomeBack": "Welcome back,",
+        "classesAssigned": "Classes Assigned",
+        "noClassesTitle": "No classes assigned yet",
+        "noClassesSubtitle": "Ask your school admin to assign you a class and subject."
+      },
+      "classesList": {
+        "loading": "Loading classes…"
+      },
+      "classDetail": {
+        "loading": "Loading class…",
+        "loadError": "Failed to load class progress.",
+        "detailLoadError": "Failed to load detailed progress.",
+        "loadingDetail": "Loading detailed progress…",
+        "holisticMastery": "Holistic Mastery",
+        "curriculumCompletion": "Curriculum Completion",
+        "avgTestScore": "Avg. Test Score",
+        "trend": "Trend",
+        "assessmentsPassed": "{passed}/{total} assessments passed",
+        "lagging": "{count} lagging",
+        "diagnosticGaps": "⚠ {count} diagnostic gap(s) still open",
+        "studentCount": "{count} student(s)",
+        "done": "{count} done",
+        "inProgress": "{count} in progress",
+        "leaderboard": "Leaderboard"
+      },
+      "assignments": {
+        "loadingClasses": "Loading your classes…",
+        "loadError": "Failed to load assignments.",
+        "loadingAssignments": "Loading assignments…",
+        "unlockSubtitle": "Assignments unlock once your school admin assigns you a class.",
+        "loadingSubmissions": "Loading submissions…",
+        "submissionsError": "Failed to load submissions.",
+        "titleRequired": "Give the assignment a title.",
+        "deadlineInvalid": "Deadline must be at least 1 day, or left blank.",
+        "createError": "Failed to create assignment.",
+        "titlePlaceholder": "Title, e.g. Fractions Practice",
+        "generatedFrom": "Questions are generated automatically from this class's published modules for {subject}.",
+        "assignedSubject": "the assigned subject",
+        "limitToChapters": "Limit to chapters (optional)",
+        "chapterLabel": "Ch {number}",
+        "loadingChapters": "Loading chapters…",
+        "noChapters": "No chapters found yet — the quiz will draw from all of this subject's published material.",
+        "chaptersError": "Couldn't load chapters — the quiz will draw from all published material for this subject.",
+        "sendFeedback": "Send",
+        "feedbackSent": "Feedback sent.",
+        "feedbackError": "Failed to send feedback.",
+        "deleteConfirm": "Delete \"{title}\"? This cannot be undone.",
+        "deleteError": "Failed to delete assignment."
+      }
+    }
+  },
+  "quizQuestions": {
+    "science": [
+      {
+        "text": "Which part of the plant is primarily responsible for photosynthesis?",
+        "options": [
+          "Root",
+          "Stem",
+          "Leaf",
+          "Flower"
+        ],
+        "explanation": "Leaves contain chlorophyll — the green pigment that absorbs sunlight to power photosynthesis.",
+        "topic": "Photosynthesis"
+      },
+      {
+        "text": "What gas do plants release as a byproduct of photosynthesis?",
+        "options": [
+          "CO₂",
+          "Nitrogen",
+          "Oxygen",
+          "Hydrogen"
+        ],
+        "explanation": "Oxygen (O₂) is released when plants split water molecules using sunlight energy.",
+        "topic": "Photosynthesis"
+      },
+      {
+        "text": "What process converts liquid water into water vapor in the water cycle?",
+        "options": [
+          "Condensation",
+          "Precipitation",
+          "Evaporation",
+          "Infiltration"
+        ],
+        "explanation": "Evaporation is when liquid water gains heat energy to become water vapor.",
+        "topic": "Water Cycle"
+      },
+      {
+        "text": "In which part of the chloroplast does the light-dependent reaction occur?",
+        "options": [
+          "Stroma",
+          "Matrix",
+          "Thylakoid Membrane",
+          "Cell Wall"
+        ],
+        "explanation": "Light-dependent reactions occur in the thylakoid membranes where chlorophyll resides.",
+        "topic": "Photosynthesis"
+      }
+    ],
+    "math": [
+      {
+        "text": "What is ½ + ¼?",
+        "options": [
+          "⅓",
+          "¾",
+          "⅖",
+          "⅔"
+        ],
+        "explanation": "Convert to common denominator: 2/4 + 1/4 = 3/4 = ¾",
+        "topic": "Fractions"
+      },
+      {
+        "text": "3/5 of a class of 40 students are girls. How many boys are there?",
+        "options": [
+          "24",
+          "16",
+          "20",
+          "12"
+        ],
+        "explanation": "Girls = 3/5 × 40 = 24. Boys = 40 − 24 = 16.",
+        "topic": "Fractions"
+      },
+      {
+        "text": "What is the area of a triangle with base 8 cm and height 5 cm?",
+        "options": [
+          "40 cm²",
+          "13 cm²",
+          "20 cm²",
+          "80 cm²"
+        ],
+        "explanation": "Area = ½ × base × height = ½ × 8 × 5 = 20 cm²",
+        "topic": "Geometry"
+      }
+    ],
+    "history": [
+      {
+        "text": "Who led the Salt March of 1930?",
+        "options": [
+          "Nehru",
+          "Mahatma Gandhi",
+          "Sardar Patel",
+          "Ambedkar"
+        ],
+        "explanation": "Gandhi led the 241-mile Dandi March to protest the British salt tax.",
+        "topic": "Freedom Movement"
+      },
+      {
+        "text": "Which ruler converted to Buddhism after the Kalinga War?",
+        "options": [
+          "Chandragupta",
+          "Harsha",
+          "Ashoka",
+          "Akbar"
+        ],
+        "explanation": "Emperor Ashoka embraced Buddhism's path of non-violence after Kalinga.",
+        "topic": "Ancient India"
+      }
+    ],
+    "geo": [
+      {
+        "text": "Which is the longest river in India?",
+        "options": [
+          "Brahmaputra",
+          "Godavari",
+          "Ganga",
+          "Yamuna"
+        ],
+        "explanation": "The Ganga stretches ~2,525 km, making it the longest river in India.",
+        "topic": "Indian Rivers"
+      },
+      {
+        "text": "What climate type does the Thar Desert have?",
+        "options": [
+          "Tropical",
+          "Arid",
+          "Mediterranean",
+          "Temperate"
+        ],
+        "explanation": "The Thar Desert has an arid climate with very hot temperatures and minimal rainfall.",
+        "topic": "Climate"
+      }
+    ],
+    "hindi": [
+      {
+        "text": "Which of the following words is a Noun?",
+        "options": [
+          "Beautiful",
+          "Run",
+          "Slowly",
+          "Book"
+        ],
+        "explanation": "'Book' is a Noun (संज्ञा) — it is the name of an object.",
+        "topic": "Grammar"
+      },
+      {
+        "text": "Who authored the epic 'Ramcharitmanas'?",
+        "options": [
+          "Kabir Das",
+          "Tulsidas",
+          "Surdas",
+          "Mirabai"
+        ],
+        "explanation": "Goswami Tulsidas composed the Ramcharitmanas in the 16th century.",
+        "topic": "Literature"
+      }
+    ]
+  },
+  "parentDashboard": {
+    "welcome": "Welcome, {name}",
+    "parentFallback": "Parent",
+    "guardianAccount": "Guardian Account:",
+    "registeredGuardian": "Registered Guardian",
+    "linkedWards": "Linked Wards",
+    "childrenCount": "{count} Child(ren)",
+    "monitoredWards": "Monitored Wards",
+    "registeredStudents": "Registered Students",
+    "progressTracking": "Progress Tracking",
+    "activeStatus": "Active",
+    "syncingModules": "Syncing School & NCERT Modules",
+    "guardianFeedback": "Guardian Feedback",
+    "connectedStatus": "Connected",
+    "directTeacherRemarks": "Direct Teacher Remarks & Alerts",
+    "yourWards": "Your Wards / Children",
+    "showingLinkedStudents": "Showing {count} linked student(s)",
+    "studentPrefix": "Student #{id}",
+    "classSection": "Class & Section:",
+    "classSelf": "Class {classNumber} (Self)",
+    "classSectionVal": "Class {classNumber} - Section {section}",
+    "classNotSet": "Class not set",
+    "schoolBranch": "School / Branch:",
+    "selfEducated": "NCERT Self-Educated",
+    "schoolBranchVal": "{school} ({branch})",
+    "linkedDate": "Linked {date}",
+    "monitoringStatus": "Monitoring",
+    "noWardsTitle": "No Wards Linked Yet",
+    "noWardsDesc": "Students who register with your mobile number will automatically appear here. You can also link a child directly using their Unique Student ID.",
+    "linkChildTitle": "Link an Additional Child",
+    "linkChildDesc": "Enter your child's Unique Student ID (e.g. LKD0001) to link their learning progress to your dashboard.",
+    "studentIdPlaceholder": "Unique Student ID (e.g. LKD0001)",
+    "linkingBtn": "Linking...",
+    "linkChildBtn": "Link Child",
+    "failedToLink": "Failed to link child.",
+    "linkedChildrenList": "Your Linked Children & Wards",
+    "selfEnrolled": "Self Enrolled",
+    "schoolEnrolled": "School Enrolled",
+    "enrolledClass": "Enrolled Class:",
+    "notConfigured": "Not Configured",
+    "schoolInstitution": "School / Institution:",
+    "noLinkedChildrenFound": "No Linked Children Found",
+    "noLinkedChildrenDesc": "Link your child using their Unique Student ID above to monitor their academic performance and adaptive learning progress.",
+    "reportsTitle": "Academic Reports & Progress Analytics",
+    "reportsDesc": "Diagnostic quiz performance, gap topics, and AI-generated summaries for each linked child.",
+    "gapQuizTitle": "Gap Identification Quiz",
+    "notCompletedYet": "Not completed yet.",
+    "overallScore": "overall score",
+    "noGapsFound": "No gaps found.",
+    "summaryGenerating": "Summary generating...",
+    "daysStreak": "{days} Days",
+    "lessonsCompleted": "{completed}/{total}",
+    "detailedProgressTitle": "Detailed Progress & Assessment Growth",
+    "detailedProgressDesc": "Consecutive test trends, score growth deltas, lagging subject alerts, and curriculum mastery.",
+    "holisticMastery": "Real Holistic Mastery",
+    "consecutiveGrowth": "Consecutive Test Growth",
+    "laggingAlerts": "Lagging / Alert Areas",
+    "improving": "Improving",
+    "declining": "Declining",
+    "mastered": "Mastered",
+    "needsAttention": "Needs Attention",
+    "laggingBehind": "Lagging Behind",
+    "subjectMastery": "Subject Mastery Matrix",
+    "curriculumLessons": "Curriculum & Learning Modules",
+    "diagnosticGaps": "Diagnostic Skill Gaps"
+  },
+  "dashboard": {
+    "welcome": "Welcome back",
+    "overview": "Overview",
+    "modules": "Modules",
+    "learningPath": "Learning Path",
+    "progress": "Progress",
+    "assignments": "Assignments",
+    "gapReport": "Diagnostic & Gap Report",
+    "teachers": "Teachers",
+    "students": "Students",
+    "classes": "Classes",
+    "subjects": "Subjects",
+    "settings": "Settings",
+    "accessibility": "Accessibility",
+    "myProgress": "My Learning Progress",
+    "assignedTasks": "Assigned Tasks",
+    "startQuiz": "Start Diagnostic Quiz",
+    "continueLearning": "Continue Learning",
+    "recentActivity": "Recent Activity",
+    "completed": "Completed",
+    "pending": "Pending",
+    "score": "Score",
+    "feedback": "Teacher Feedback",
+    "common": {
+      "search": "Search...",
+      "all": "All",
+      "active": "Active",
+      "inactive": "Inactive",
+      "assigned": "Assigned",
+      "unassigned": "Unassigned",
+      "activeOnly": "Active Only",
+      "noRecords": "No records found",
+      "status": "Status",
+      "loading": "Loading..."
+    },
+    "nav": {
+      "overview": "Overview",
+      "studentOverview": "Student Overview",
+      "teacherOverview": "Teacher Overview",
+      "branchOverview": "Branch Overview",
+      "parentOverview": "Parent Overview",
+      "systemOverview": "System Overview",
+      "learningModules": "Learning Modules",
+      "classAssignments": "Class Assignments",
+      "assignments": "Assignments & Quizzes",
+      "quizzes": "AI Practice Quizzes",
+      "practiceQuizzes": "AI Practice Quizzes",
+      "history": "Assessment History",
+      "classes": "Assigned Classes",
+      "grading": "Submissions & Grading",
+      "curriculum": "Curriculum & Books",
+      "teachers": "Teacher Directory",
+      "students": "Student Directory",
+      "subjects": "Subjects",
+      "analytics": "Performance Analytics",
+      "parentConnect": "Parent Connect",
+      "settings": "Settings",
+      "adminRequests": "Administrator Requests",
+      "schoolRequests": "School Requests",
+      "children": "My Children",
+      "progress": "Detailed Progress",
+      "ncertMaster": "NCERT Master Catalogue",
+      "schools": "Registered Institutions",
+      "diagnosticQuiz": "Diagnostic Quiz",
+      "gapReport": "Gap Report"
+    },
+    "categories": {
+      "main": "Main",
+      "academics": "Academics",
+      "learning": "Learning",
+      "evaluation": "Evaluation",
+      "resources": "Resources",
+      "practice": "Practice",
+      "curriculum": "Curriculum",
+      "staff": "Staff",
+      "family": "Family",
+      "analytics": "Analytics",
+      "system": "System",
+      "management": "Management",
+      "registrations": "Registrations",
+      "general": "General"
+    },
+    "topbar": {
+      "roles": {
+        "teacher": "Educator / Teacher",
+        "student": "Student Learner",
+        "school": "School Admin",
+        "parent": "Parent & Guardian",
+        "admin": "Super Administrator"
+      },
+      "studentOverviewDesc": "Student profile, enrolled class, unique student number, and learning metrics",
+      "manageWorkspace": "Manage your academic workspace, curriculum modules, and assessments",
+      "searchPlaceholder": "Search workspace, modules, classes...",
+      "activeStatus": "Active Session",
+      "notifications": "Notifications",
+      "signOut": "Sign Out"
+    },
+    "student": {
+      "diagnosticCompleted": "Diagnostic Quiz Completed",
+      "viewResults": "View Results",
+      "schoolModules": "School Learning Modules",
+      "schoolEnrolledBadge": "School Enrolled",
+      "selfEnrolledBadge": "Self Enrolled",
+      "studentPrefix": "Student #",
+      "selfEnrolledTag": "Self-study learner",
+      "class": "Class",
+      "section": "Section",
+      "classAndSection": "Class & Section",
+      "notConfigured": "Not Configured",
+      "availableModules": "Available Modules",
+      "selectClassTitle": "Select Your Class",
+      "setupClassTitle": "Setup Your Class & Section",
+      "selectClassDesc": "Choose your class level to view relevant NCERT textbooks and curriculum modules.",
+      "setupClassDesc": "Choose your class number and assigned section to see your school curriculum modules.",
+      "saveClass": "Save Class",
+      "saveClassAndSection": "Save Class & Section",
+      "unlockBannerTitle": "Unlock Full Access With Diagnostic Quiz",
+      "unlockBannerDesc": "Complete a quick 10-minute diagnostic check to unlock your customized {curriculum} and track skill gaps.",
+      "ncertCurriculum": "NCERT Curriculum",
+      "learningModules": "Learning Modules",
+      "continueQuiz": "Continue Quiz",
+      "startQuiz": "Start Quiz",
+      "ncertClassCurriculum": "NCERT Class {class} Curriculum",
+      "startDiagnosticQuiz": "Start Diagnostic Quiz",
+      "activeBadge": "Active"
+    },
+    "badges": {
+      "tasks": "Tasks",
+      "active": "Active",
+      "core": "Core",
+      "admin": "Admin",
+      "linked": "Linked",
+      "master": "Master",
+      "review": "Review"
+    },
+    "descriptions": {
+      "overview": "Profile summary, branch details, and active assigned classes",
+      "classes": "Preview your assigned class sections, student rosters, and curriculum",
+      "assignments": "Create and manage PDF homework and adaptive AI quizzes",
+      "grading": "Review student attempts, assign scores, and provide individualized feedback",
+      "curriculum": "Browse NCERT books and school learning materials",
+      "modules": "Read school-provided chapters and NCERT interactive textbooks",
+      "quizzes": "Interactive AI-generated concept tests and diagnostic exercises",
+      "history": "View your past test performances, diagnostic quiz attempts, scores, and feedbacks",
+      "admin-requests": "Approve or reject people requesting administrator access to your school",
+      "teachers": "Manage registered branch teachers and assign or de-assign class sections",
+      "children": "Monitor linked children, enrolled classes, learning modules, assignments, and grades",
+      "progress": "Consecutive assessment trends, score growth, lagging areas, and curriculum mastery",
+      "ncert_master": "Central textbook repository: upload, edit, detach, and delete official NCERT book PDFs",
+      "school-requests": "Schools awaiting platform approval before their administrator gets access",
+      "schools": "Directory of all registered school branches and administrator accounts across India"
+    }
+  },
+  "mobile": {
+    "home": {
+      "loading": "Loading your dashboard…",
+      "greeting": "Welcome back,",
+      "classLabel": "Class {class}",
+      "sectionLabel": "Section {section}",
+      "selfEnrolled": "Self-Enrolled",
+      "offlineBanner": "📴 Showing your last saved progress — offline right now.",
+      "errorBanner": "Couldn't refresh your dashboard. Showing what we last saved.",
+      "statProgress": "Overall Progress",
+      "statPoints": "Points",
+      "statStreak": "Day Streak",
+      "continueLearning": "Continue Learning",
+      "continueSummary": "{completed}/{total} lessons • {percent}% done",
+      "whereYouStand": "Where You Stand",
+      "noMasteryYet": "Take the diagnostic quiz to see your subject mastery here.",
+      "gapsToClose": "{count} gap(s) to close",
+      "recentActivity": "Recent Activity",
+      "noActivityYet": "Nothing yet — start a lesson to see it here.",
+      "chestTitle": "🎁 Reward Chest",
+      "chestProgress": "{progress}/{required} lessons to next chest",
+      "chestUnlocked": "Chest ready to open!",
+      "chestClaim": "Claim Chest",
+      "chestClaiming": "Claiming…",
+      "chestClaimed": "+{xp} XP earned — {badge} badge unlocked!",
+      "totalXp": "⭐ {xp} XP",
+      "assignmentsCardTitle": "📋 Assignments",
+      "assignmentsPending": "{count} to complete",
+      "assignmentsNoneDue": "You're all caught up",
+      "viewAll": "View All →"
+    },
+    "lessons": {
+      "title": "Lessons",
+      "subtitle": "NCERT-aligned chapters, broken into bite-sized slides.",
+      "loading": "Loading lessons…",
+      "chapterLabel": "Chapter {number}",
+      "done": "✓ Done",
+      "slideCount": "{count} slides • Class {class}",
+      "offlineBanner": "📴 Offline — showing lessons saved on this device.",
+      "emptyTitle": "No lessons yet",
+      "emptySubtitle": "Check back once your class modules are published.",
+      "errorFallback": "Failed to load lessons."
+    },
+    "lessonViewer": {
+      "loading": "Loading lesson…",
+      "errorFallback": "Couldn't load this lesson.",
+      "backToLessons": "Back to Lessons",
+      "offlineBanner": "📴 Loaded from this device — will sync when you're back online.",
+      "slideLabel": "Slide {current} / {total}",
+      "readAloud": "Read aloud",
+      "back": "← Back",
+      "next": "Next →",
+      "checkUnderstanding": "Check Your Understanding",
+      "correct": "Correct! 🎉",
+      "incorrectExplanation": "Not quite — here's why:",
+      "finishLesson": "Finish Lesson",
+      "lessonFinished": "Lesson Finished! 🎉",
+      "home": "Home",
+      "emptySlides": "This lesson has no content yet."
+    },
+    "quiz": {
+      "title": "Diagnostic Quiz",
+      "checking": "Checking quiz status…",
+      "introTitle": "Find your learning gaps",
+      "introSubtitle": "A short adaptive quiz that adjusts to your answers and pinpoints exactly what to review.",
+      "subjectsLabel": "Subjects",
+      "start": "Start Quiz",
+      "starting": "Starting…",
+      "correctFeedback": "🎉 Correct! +{points}",
+      "incorrectFeedback": "💪 Keep going!",
+      "resultsTitle": "Your Results",
+      "overallMastery": "overall mastery",
+      "xpEarned": "+{xp} XP",
+      "correctCount": "{correct}/{total} correct",
+      "pointsLabel": "⭐ {points} points",
+      "streakLabel": "🔥 Streak {streak}",
+      "recommendedFocus": "✨ Recommended Focus",
+      "summaryPending": "Generating your personalized summary…",
+      "summaryFailed": "Summary not available for this attempt.",
+      "noGaps": "✓ No gaps found — 100%",
+      "classLabel": "Class {class}",
+      "errorStart": "Failed to start the quiz.",
+      "errorAnswer": "Failed to submit your answer.",
+      "errorResult": "Failed to load your results.",
+      "errorStatus": "Failed to load quiz status."
+    },
+    "progress": {
+      "title": "Your Progress",
+      "loading": "Loading progress…",
+      "errorFallback": "Failed to load progress.",
+      "overallMastery": "Overall Mastery",
+      "curriculum": "Curriculum",
+      "points": "Points",
+      "streak": "Streak",
+      "bySubject": "By Subject",
+      "assessmentsSummary": "{count} assessment(s) • avg {avg}%",
+      "laggingTopics": "{count} topic(s) need attention",
+      "openGaps": "Open Gaps",
+      "classLabel": "Class {class}",
+      "leaderboardTitle": "🏆 Class Leaderboard",
+      "leaderboardEmpty": "Leaderboard isn't available for your account yet.",
+      "youRank": "You (#{rank})",
+      "practiceTitle": "Practice Your Gaps",
+      "practiceSubtitle": "Short quizzes on the exact topics your diagnostic flagged.",
+      "practiceEmpty": "No open practice modules right now."
+    },
+    "parentHome": {
+      "linkChildTitle": "Link a Child",
+      "studentIdError": "Enter the child's unique student ID.",
+      "linking": "Linking…",
+      "linkBtn": "Link",
+      "childLinked": "Child linked!",
+      "loadingChildren": "Loading children…",
+      "failedLoadChildren": "Failed to load children.",
+      "failedLinkChild": "Failed to link this child.",
+      "ncertMode": "NCERT Mode",
+      "childrenTab": "Children",
+      "profileTab": "Profile"
+    },
+    "childDetail": {
+      "diagnosticSummary": "✨ Diagnostic Summary",
+      "gapsFound": "{count} gap(s) found",
+      "testResults": "Test Results & Assignments",
+      "aiQuiz": "AI Quiz",
+      "pdfAssignment": "PDF Assignment",
+      "childRank": "Your child",
+      "failedLoadProgress": "Failed to load this child's progress."
+    },
+    "auth": {
+      "tagline": "Inclusive learning, on your device",
+      "roleStudent": "Student",
+      "roleTeacher": "Teacher",
+      "roleParent": "Parent",
+      "branchName": "Branch Name",
+      "branchNamePlaceholder": "e.g. Lotus Kids, Delhi",
+      "identifierTeacher": "Registered Phone Number",
+      "identifierOther": "Mobile Number, Email, or Student ID",
+      "identifierPlaceholderTeacher": "9876543210",
+      "identifierPlaceholderOther": "9876543210 / you@email.com / LKD0001",
+      "password": "Password",
+      "signIn": "Sign In",
+      "signingIn": "Signing in…",
+      "noAccount": "Don't have an account?",
+      "createOne": "Create one",
+      "fillRequired": "Please fill in all required fields.",
+      "branchRequired": "Branch name is required for teacher login.",
+      "createAccount": "Create Account",
+      "alreadyHaveAccount": "Already have an account?",
+      "signInLink": "Sign in",
+      "enrollmentMode": "Enrollment Mode",
+      "enrollmentSchool": "school",
+      "enrollmentSelf": "self",
+      "studentFullName": "Student Full Name",
+      "schoolName": "School Name",
+      "stateLabel": "State",
+      "classLabel": "Class",
+      "sectionLabel": "Section",
+      "childStudentId": "Child's Unique Student ID (optional)",
+      "childStudentIdPlaceholder": "e.g. LKD0001 — or leave blank to auto-link by phone",
+      "mobileNumber": "Mobile Number",
+      "sendOtp": "Send OTP",
+      "otpCode": "6-digit OTP from backend terminal",
+      "passwordMin": "Password (min. 8 characters)",
+      "creatingAccount": "Creating Account…",
+      "nameRequired": "Please enter a name.",
+      "phoneRequired": "Please enter your mobile number.",
+      "otpRequired": "Please verify your mobile number with the OTP first.",
+      "passwordTooShort": "Password must be at least 8 characters.",
+      "schoolFieldsRequired": "Please enter school name and branch name.",
+      "validPhoneRequired": "Enter a valid mobile number first.",
+      "otpSendFailed": "Failed to send OTP.",
+      "otpCodeRequired": "Enter the OTP code.",
+      "otpInvalid": "Invalid OTP code.",
+      "phoneVerified": "Mobile number verified.",
+      "teacherFullName": "Teacher Full Name",
+      "parentGuardianName": "Parent / Guardian Name",
+      "fullNamePlaceholder": "e.g. Aarav Sharma",
+      "schoolNamePlaceholder": "e.g. Lotus Public School",
+      "stateLabelPlaceholder": "e.g. Delhi",
+      "change": "Change",
+      "resend": "Resend",
+      "verify": "Verify",
+      "mobileNumberVerifiedTick": "✓ Mobile number verified"
+    },
+    "profile": {
+      "title": "Profile",
+      "guardian": "Guardian",
+      "selfEnrolled": "Self-Enrolled",
+      "localFirstSync": "Local-First Sync",
+      "pendingActivity": "Pending activity",
+      "everythingSynced": "Everything is synced.",
+      "updatesSaved": "{count} update(s) saved on this device.",
+      "syncing": "Syncing…",
+      "syncNow": "Sync now",
+      "accessibility": "Accessibility",
+      "readAloud": "Read lessons aloud",
+      "readAloudDesc": "Uses on-device text-to-speech (RunAnywhere)",
+      "signLanguageAssist": "Sign language assist",
+      "signLanguageAssistDesc": "Shows a sign-language cue alongside lesson text",
+      "soundEffects": "Sound effects",
+      "soundEffectsDesc": "Chimes for correct / incorrect answers",
+      "testVoice": "▶ Test voice",
+      "testVoiceSample": "This is how VidyaSetu sounds in your selected language.",
+      "language": "Language",
+      "signOut": "Sign Out",
+      "signOutConfirmTitle": "Sign Out",
+      "signOutConfirmBody": "You'll need to sign in again to continue.",
+      "cancel": "Cancel"
+    },
+    "tabs": {
+      "home": "Home",
+      "learn": "Learn",
+      "quiz": "Quiz",
+      "progress": "Progress",
+      "profile": "Profile"
+    },
+    "assignments": {
+      "title": "Assignments",
+      "loading": "Loading assignments…",
+      "errorFallback": "Couldn't load your assignments.",
+      "emptyTitle": "No assignments yet",
+      "emptySubtitle": "Your teacher hasn't published any assignments for your class yet.",
+      "deadlineDays": "{days}d left",
+      "deadlineToday": "Due today",
+      "deadlineOverdue": "Overdue",
+      "typeAiQuiz": "AI Quiz",
+      "typePdfUpload": "PDF Assignment",
+      "pdfUploadNote": "Ask your teacher how to submit this one — PDF uploads aren't supported in the app yet.",
+      "statusNotStarted": "Not started",
+      "statusPassed": "Passed • {percent}%",
+      "statusFailed": "{percent}% • Retry",
+      "locked": "Locked",
+      "startQuiz": "Start Quiz",
+      "retryQuiz": "Retry Quiz",
+      "loadingQuiz": "Loading quiz…",
+      "errorLoadQuiz": "Couldn't load this quiz.",
+      "questionLabel": "Question {current} of {total}",
+      "submitQuiz": "Submit Quiz",
+      "submitting": "Submitting…",
+      "answerAllError": "Please answer every question before submitting.",
+      "errorSubmit": "Couldn't submit your answers.",
+      "resultPassed": "You passed! 🎉",
+      "resultFailed": "Not quite — you can try again.",
+      "scoreLabel": "{score}/{max} ({percent}%)",
+      "aiFeedbackTitle": "Feedback",
+      "backToAssignments": "Back to Assignments",
+      "noQuestions": "This quiz has no questions yet."
+    },
+    "gapPractice": {
+      "title": "Practice",
+      "loading": "Loading your practice modules…",
+      "errorFallback": "Couldn't load your practice modules.",
+      "emptyTitle": "Nothing to practice right now",
+      "emptySubtitle": "New practice modules appear here whenever a diagnostic quiz finds a gap.",
+      "originClassLabel": "From Class {class}",
+      "cruxTitle": "Key Points",
+      "quizAvailable": "{count} question(s) ready",
+      "quizNotAvailable": "Quiz not ready for this topic yet.",
+      "startQuiz": "Start Practice Quiz",
+      "loadingQuiz": "Loading practice quiz…",
+      "errorLoadQuiz": "Couldn't load this practice quiz.",
+      "submitQuiz": "Submit Answers",
+      "submitting": "Submitting…",
+      "answerAllError": "Please answer every question before submitting.",
+      "errorSubmit": "Couldn't submit your answers.",
+      "resultTitle": "Practice Complete",
+      "resultPassed": "Great work — gap closed! 🎉",
+      "resultNotPassed": "Keep practicing — you'll get it next time.",
+      "scoreLabel": "{correct}/{total} correct ({percent}%)",
+      "xpEarned": "+{xp} XP",
+      "backToProgress": "Back to Progress",
+      "noQuestions": "This practice quiz has no questions yet."
+    }
+  }
+}
